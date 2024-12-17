@@ -8,6 +8,8 @@
 ***  タイムライン描画機能
 **/
 
+//aaa
+
 // GLUT を使用
 #include <GL/glut.h>
 
