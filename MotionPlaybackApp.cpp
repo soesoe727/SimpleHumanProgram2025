@@ -1015,10 +1015,10 @@ void MotionPlaybackApp::ColorBarElement(Timeline* timeline, int segment_num, int
 		if(i == 0)
 			timeline->AddElement( 0.0f, name_space, Pattern_Color(pattern, segment_num),  motion.body->segments[segment_num]->name.c_str(), Track_num );
 		red_ratio = frame_dep[i] / max_dep;
-		if(red_ratio > 0.5f)
-			timeline->AddElement( i + name_space, i + 1.0f + name_space, Color4f( 1.0f, (1.0f - red_ratio) * (5.0f / 5.0f) * 2.0f, 0.0f, 1.0f ), "", Track_num );
+		if(red_ratio > 0.6f)
+			timeline->AddElement( i + name_space, i + 1.0f + name_space, Color4f( 1.0f, (1.0f - red_ratio) * (5.0f / 4.0f) * 2.0f, 0.0f, 1.0f ), "", Track_num );
 		else
-			timeline->AddElement( i + name_space, i + 1.0f + name_space, Color4f( red_ratio * (5.0f / 5.0f) * 2.0f, 1.0f, 0.0f, 1.0f ), "", Track_num );
+			timeline->AddElement( i + name_space, i + 1.0f + name_space, Color4f( red_ratio * (5.0f / 6.0f) * 2.0f, 1.0f, 0.0f, 1.0f ), "", Track_num );
 
 		if(i == max_frame && max_frame != -1)
 			timeline->AddElement( i + name_space, i + 1.0f + name_space, Color4f( 0.0f, 0.0f, 0.0f, 1.0f ), "", Track_num );
