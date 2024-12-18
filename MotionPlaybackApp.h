@@ -188,6 +188,9 @@ class  MotionPlaybackApp : public GLUTBaseApp
 	//カラーバーの誤差による色の変化を設定
 	void ColorBarElement(Timeline * timeline, int segment_num, int Track_num, float * frame_dep, Motion & motion);
 
+	//カラーバーの誤差による色の変化を設定
+	void ColorBarElementGray(Timeline * timeline, int segment_num, int Track_num, float * frame_dep, Motion & motion);
+
 	//部位の集合による誤差の最大フレームに紫色を設定(パターン)
 	void PartDepLine(Timeline * timeline, int part_num, int Track_num, DTWinformation * DTW, Motion & motion, int pattern);
 };

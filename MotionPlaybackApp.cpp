@@ -810,33 +810,61 @@ void MotionPlaybackApp::PatternTimeline(Timeline* timeline, Motion& motion, floa
 		case 5:
 			for(int j = 12; j >= 11; j--)//頭部
 			{
-				ColorBarElement(timeline, j, Track_num++, DTW->DTWdepartment[j], motion);
+				if(view_segment != j)
+					ColorBarElementGray(timeline, j, Track_num, DTW->DTWdepartment[j], motion);
+				else
+					ColorBarElement(timeline, j, Track_num, DTW->DTWdepartment[j], motion);
+				Track_num++;
 			}
 			Track_num++;
 			for(int j = 10; j >= 7; j--)//胸部
 			{
-				ColorBarElement(timeline, j, Track_num++, DTW->DTWdepartment[j], motion);
+				if(view_segment != j)
+					ColorBarElementGray(timeline, j, Track_num, DTW->DTWdepartment[j], motion);
+				else
+					ColorBarElement(timeline, j, Track_num, DTW->DTWdepartment[j], motion);
+				Track_num++;
 			}
-			ColorBarElement(timeline, 0, Track_num++, DTW->DTWdepartment[0], motion);//腰
+			if(view_segment != 0)//腰
+					ColorBarElementGray(timeline, 0, Track_num, DTW->DTWdepartment[0], motion);
+				else
+					ColorBarElement(timeline, 0, Track_num, DTW->DTWdepartment[0], motion);
+			Track_num++;
 			Track_num++;
 			for(int j = 13; j <= 16; j++)//右腕
 			{
-				ColorBarElement(timeline, j, Track_num++, DTW->DTWdepartment[j], motion);
+				if(view_segment != j)
+					ColorBarElementGray(timeline, j, Track_num, DTW->DTWdepartment[j], motion);
+				else
+					ColorBarElement(timeline, j, Track_num, DTW->DTWdepartment[j], motion);
+				Track_num++;
 			}
 			Track_num++;
 			for(int j = 36; j <= 39; j++)//左腕
 			{
-				ColorBarElement(timeline, j, Track_num++, DTW->DTWdepartment[j], motion);
+				if(view_segment != j)
+					ColorBarElementGray(timeline, j, Track_num, DTW->DTWdepartment[j], motion);
+				else
+					ColorBarElement(timeline, j, Track_num, DTW->DTWdepartment[j], motion);
+				Track_num++;
 			}
 			Track_num++;
 			for(int j = 1; j <= 3; j++)//右脚
 			{
-				ColorBarElement(timeline, j, Track_num++, DTW->DTWdepartment[j], motion);
+				if(view_segment != j)
+					ColorBarElementGray(timeline, j, Track_num, DTW->DTWdepartment[j], motion);
+				else
+					ColorBarElement(timeline, j, Track_num, DTW->DTWdepartment[j], motion);
+				Track_num++;
 			}
 			Track_num++;
 			for(int j = 4; j <= 6; j++)//左脚
 			{
-				ColorBarElement(timeline, j, Track_num++, DTW->DTWdepartment[j], motion);
+				if(view_segment != j)
+					ColorBarElementGray(timeline, j, Track_num, DTW->DTWdepartment[j], motion);
+				else
+					ColorBarElement(timeline, j, Track_num, DTW->DTWdepartment[j], motion);
+				Track_num++;
 			}
 			break;
 		default:
@@ -988,13 +1016,23 @@ void MotionPlaybackApp::ColorBarElement(Timeline* timeline, int segment_num, int
 			timeline->AddElement( 0.0f, name_space, Pattern_Color(pattern, segment_num),  motion.body->segments[segment_num]->name.c_str(), Track_num );
 		red_ratio = frame_dep[i] / max_dep;
 		if(red_ratio > 0.5f)
-			timeline->AddElement( i + name_space, i + 1.0f + name_space, Color4f( 1.0f, (1.0f - red_ratio) * (5.0f / 5.0f) * 2.0f, 0.0f, 0.2f ), "", Track_num );
+			timeline->AddElement( i + name_space, i + 1.0f + name_space, Color4f( 1.0f, (1.0f - red_ratio) * (5.0f / 5.0f) * 2.0f, 0.0f, 1.0f ), "", Track_num );
 		else
-			timeline->AddElement( i + name_space, i + 1.0f + name_space, Color4f( red_ratio * (5.0f / 5.0f) * 2.0f, 1.0f, 0.0f, 0.2f ), "", Track_num );
+			timeline->AddElement( i + name_space, i + 1.0f + name_space, Color4f( red_ratio * (5.0f / 5.0f) * 2.0f, 1.0f, 0.0f, 1.0f ), "", Track_num );
 
 		if(i == max_frame && max_frame != -1)
-			timeline->AddSubElement( 1, i + name_space, i + 1.0f + name_space, Track_num * 1.2f, 1.0f + Track_num * 1.2f, Color4f( 0.0f, 0.0f, 0.0f, 0.2f ) );
+			timeline->AddElement( i + name_space, i + 1.0f + name_space, Color4f( 0.0f, 0.0f, 0.0f, 1.0f ), "", Track_num );
 	}
+}
+
+void MotionPlaybackApp::ColorBarElementGray(Timeline* timeline, int segment_num, int Track_num, float* frame_dep, Motion& motion)
+{
+	float name_space = 30.0f;
+				
+	//名前だけ表示
+	for(int i = 0; i < motion.num_frames; i++)
+		if(i == 0)
+			timeline->AddElement( 0.0f, name_space, Pattern_Color(pattern, segment_num),  motion.body->segments[segment_num]->name.c_str(), Track_num );
 }
 
 //
@@ -1194,7 +1232,7 @@ void DTWinformation::DTWinformation_init( int frames1, int frames2, const Motion
 
 					//2つの部位の位置の距離、フレームの差をそれぞれ取り、その和を誤差(コスト)とする
 					pos_dep = sqrt(pow(v1.x - v2[k].x, 2.0) + pow(v1.y - v2[k].y, 2.0) + pow(v1.z - v2[k].z, 2.0));
-					frame_dep = 0.008f * abs(k - j);
+					frame_dep = 0.001f * abs(k - j);
 					departure = pos_dep + frame_dep;
 
 					//もし一番距離が小さいパスのコストより小さければ置き換える
@@ -1202,7 +1240,7 @@ void DTWinformation::DTWinformation_init( int frames1, int frames2, const Motion
 					{
 						this->DTWpass[i][j] = k;
 						min_departure = departure;
-						this->DTWdepartment[i][j] = pos_dep;
+						this->DTWdepartment[i][j] = min_departure;
 					}
 				}
 			}
@@ -1215,7 +1253,7 @@ void DTWinformation::DTWinformation_init( int frames1, int frames2, const Motion
 
 					//2つの部位の位置の距離、フレームの差をそれぞれ取り、その和を誤差(コスト)とする
 					pos_dep = sqrt(pow(v1.x - v2[k].x, 2.0) + pow(v1.y - v2[k].y, 2.0) + pow(v1.z - v2[k].z, 2.0));
-					frame_dep = 0.008f * abs(k - j);
+					frame_dep = 0.001f * abs(k - j);
 					departure = pos_dep + frame_dep;
 
 					//もし一番距離が小さいパスのコストより小さければ置き換える
@@ -1223,7 +1261,7 @@ void DTWinformation::DTWinformation_init( int frames1, int frames2, const Motion
 					{
 						this->DTWpass[i][j] = k;
 						min_departure = departure;
-						this->DTWdepartment[i][j] = pos_dep;
+						this->DTWdepartment[i][j] = min_departure;
 					}
 				}
 
