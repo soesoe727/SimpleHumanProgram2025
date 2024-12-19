@@ -1232,7 +1232,7 @@ void DTWinformation::DTWinformation_init( int frames1, int frames2, const Motion
 
 					//2つの部位の位置の距離、フレームの差をそれぞれ取り、その和を誤差(コスト)とする
 					pos_dep = sqrt(pow(v1.x - v2[k].x, 2.0) + pow(v1.y - v2[k].y, 2.0) + pow(v1.z - v2[k].z, 2.0));
-					frame_dep = 0.001f * abs(k - j);
+					frame_dep = 0.002f * abs(k - j);
 					departure = pos_dep + frame_dep;
 
 					//もし一番距離が小さいパスのコストより小さければ置き換える
@@ -1253,7 +1253,7 @@ void DTWinformation::DTWinformation_init( int frames1, int frames2, const Motion
 
 					//2つの部位の位置の距離、フレームの差をそれぞれ取り、その和を誤差(コスト)とする
 					pos_dep = sqrt(pow(v1.x - v2[k].x, 2.0) + pow(v1.y - v2[k].y, 2.0) + pow(v1.z - v2[k].z, 2.0));
-					frame_dep = 0.001f * abs(k - j);
+					frame_dep = 0.002f * abs(k - j);
 					departure = pos_dep + frame_dep;
 
 					//もし一番距離が小さいパスのコストより小さければ置き換える
