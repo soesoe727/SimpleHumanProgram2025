@@ -1183,7 +1183,7 @@ void DrawPostureColor(const Posture& posture, int pattern, int view_segment)
 					else
 						glColor3f( 0.2f, 0.4f, 0.8f );
 				else
-					glColor4f( 0.4f, 0.4f, 0.4f, 0.5f );
+					glColor4f( 0.4f, 0.4f, 0.4f, 0.8f );
 				break;
 			default:
 				std::cout << "pattern isn't defined." << std::endl;
@@ -1289,7 +1289,7 @@ void DrawPostureGray(const Posture& posture, int pattern, int view_segment)
 				if( i == view_segment )
 					glColor3f( 1.0f, 1.0f, 1.0f );
 				else
-					glColor4f( 0.6f, 0.6f, 0.6f, 0.5f );
+					glColor4f( 1.0f, 1.0f, 1.0f, 0.8f );
 				break;
 			default:
 				std::cout << "pattern isn't defined." << std::endl;
