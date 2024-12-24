@@ -24,11 +24,17 @@ struct DTWinformation;
 struct DTWinformation
 {
 	public:
-		//対応パス
+		//各部位ごとの対応パス(segment,frame)
 		int ** DTWpass;
 
+		//全体の対応パス
+		int * PassAll;
+
+		//パス対応された各フレームの誤差(segment,frame)
+		float ** DTWdistance;
+
 		//パス対応された各フレームの誤差
-		float ** DTWdepartment;
+		float * DistanceAll;
 
 		//体節の順番を誤差の大きさ順に並べ替えた値
 		int * DTWorder;
@@ -193,6 +199,9 @@ class  MotionPlaybackApp : public GLUTBaseApp
 
 	//部位の集合による誤差の最大フレームに紫色を設定(パターン)
 	void PartDepLine(Timeline * timeline, int part_num, int Track_num, DTWinformation * DTW, Motion & motion, int pattern);
+
+	//全部位との距離を取る
+	static float DistanceCalc( int num_segments, vector< Vector3f > v1, vector< Vector3f > v2);
 };
 
 
