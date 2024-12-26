@@ -137,13 +137,24 @@ void  MotionPlaybackApp::Display()
 		DrawPostureColor( *curr_posture, pattern, view_segment);
 		DrawPostureShadow( *curr_posture, shadow_dir, shadow_color );
 
-		if(pattern != 5)
+		if(pattern == 0)
 		{
-			//2人目の動作の可視化(白･灰)
-			DrawPostureGray(*curr_posture2, pattern, view_segment);
-			DrawPostureShadow(*curr_posture2, shadow_dir, shadow_color);
+			if(frame_no < motion->num_frames)
+			{
+				//2人目の動作の可視化(白･灰)(パス対応)
+				curr_posture3 = motion2->frames[DTWa->PassAll[frame_no]];
+				DrawPostureGray(curr_posture3, pattern, view_segment);
+				DrawPostureShadow(curr_posture3, shadow_dir, shadow_color);
+			}
+			else
+			{
+				//2人目の動作の可視化(白･灰)(パス対応)
+				curr_posture3 = motion2->frames[DTWa->PassAll[motion->num_frames - 1]];
+				DrawPostureGray(curr_posture3, pattern, view_segment);
+				DrawPostureShadow(curr_posture3, shadow_dir, shadow_color);
+			}
 		}
-		else
+		else if(pattern == 5)
 		{
 			if(frame_no < motion->num_frames)
 			{
@@ -159,6 +170,12 @@ void  MotionPlaybackApp::Display()
 				DrawPostureGray(curr_posture3, pattern, view_segment);
 				DrawPostureShadow(curr_posture3, shadow_dir, shadow_color);
 			}
+		}
+		else
+		{
+			//2人目の動作の可視化(白･灰)
+			DrawPostureGray(*curr_posture2, pattern, view_segment);
+			DrawPostureShadow(*curr_posture2, shadow_dir, shadow_color);
 		}
 
 		if(area == 1)
@@ -1209,6 +1226,7 @@ void DTWinformation::DTWinformation_init( int frames1, int frames2, const Motion
 		}
 	}
 
+	//全体に対するパスの作成
 	for(int j = 0; j < frames1; j++)
 	{
 		if(j == 0)
@@ -1224,7 +1242,7 @@ void DTWinformation::DTWinformation_init( int frames1, int frames2, const Motion
 
 					//2つの部位の位置の距離、フレームの差をそれぞれ取り、その和を誤差(コスト)とする
 					pos_dis = MotionPlaybackApp::DistanceCalc(motion1.body->num_segments, v1[j], v2[k]);
-					frame_dis = 0.003f * abs(k - j);
+					frame_dis = 0.012f * abs(k - j);
 					distance = pos_dis + frame_dis;
 
 					//もし一番距離が小さいパスのコストより小さければ置き換える
@@ -1249,7 +1267,7 @@ void DTWinformation::DTWinformation_init( int frames1, int frames2, const Motion
 
 					//2つの部位の位置の距離、フレームの差をそれぞれ取り、その和を誤差(コスト)とする
 					pos_dis = MotionPlaybackApp::DistanceCalc(motion1.body->num_segments, v1[j], v2[k]);
-					frame_dis = 0.003f * abs(k - j);
+					frame_dis = 0.012f * abs(k - j);
 					distance = pos_dis + frame_dis;
 
 					//もし一番距離が小さいパスのコストより小さければ置き換える
@@ -1262,8 +1280,10 @@ void DTWinformation::DTWinformation_init( int frames1, int frames2, const Motion
 				}
 			}
 		min_distance = 100.0f;
+		std::cout << j << " -> " << PassAll[j] << std::endl;
 	}
 	
+	//部位ごとのパス作成
 	for(int i = 0; i < motion1.body->num_segments; i++)
 	{
 		//手の部位は計算しない
