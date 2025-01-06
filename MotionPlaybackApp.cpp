@@ -1214,6 +1214,7 @@ float MotionPlaybackApp::DistanceCalc(int num_segments, vector<Vector3f> v1, vec
 //
 void DTWinformation::DTWinformation_init( int frames1, int frames2, const Motion & motion1, const Motion & motion2 )
 {
+	//iが体節、jがフレーム1、kがフレーム2
 	float min_distance = 100.0f;
 	float distance, frame_dis, pos_dis, distance2, frame_dis2, pos_dis2;
 	this->PassPart = new int * [motion1.body->num_segments];
@@ -1306,7 +1307,7 @@ void DTWinformation::DTWinformation_init( int frames1, int frames2, const Motion
 				else
 				{
 					//2つの部位の位置の距離、フレームの差をそれぞれ取り、その和を誤差(コスト)とする
-					this->DistanceAll[j][k] = MotionPlaybackApp::DistanceCalc(motion1.body->num_segments, v1[j], v2[k], this->DistancePart) + 0.002f * abs(j-k);
+					this->DistanceAll[j][k] = MotionPlaybackApp::DistanceCalc(motion1.body->num_segments, v1[j], v2[k], this->DistancePart);
 				}
 			}
 		}
@@ -1314,31 +1315,31 @@ void DTWinformation::DTWinformation_init( int frames1, int frames2, const Motion
 	
 
 	//全体に対するパスの作成
-	int j = 0, k = 0;
+	int f1 = 0, f2 = 0;
 	this->PassAll.resize(2, vector<int>());
 	this->PassAll[0].push_back(0);
 	this->PassAll[1].push_back(0);
 	float dis1, dis2, dis3;
-	while(j != frames1 && k != frames2)
+	while(f1 != frames1 && f2 != frames2)
 	{
-		dis1 = this->DistanceAll[j+1][k+1];
-		dis2 = this->DistanceAll[j+1][k];
-		dis3 = this->DistanceAll[j][k+1];
+		dis1 = this->DistanceAll[f1+1][f2+1];
+		dis2 = this->DistanceAll[f1+1][f2] + 0.002f * abs(f1+1-f2);
+		dis3 = this->DistanceAll[f1][f2+1] + 0.002f * abs(f1-(f2+1));
 		if(dis1 < dis2 && dis1 < dis3)
 			if(dis2 < dis3)
 			{
-				this->PassAll[0].push_back(j);
-				this->PassAll[1].push_back(++k);
+				this->PassAll[0].push_back(f1);
+				this->PassAll[1].push_back(++f2);
 			}
 			else
 			{
-				this->PassAll[0].push_back(++j);
-				this->PassAll[1].push_back(k);
+				this->PassAll[0].push_back(++f1);
+				this->PassAll[1].push_back(f2);
 			}
 		else
 		{
-			this->PassAll[0].push_back(++j);
-			this->PassAll[1].push_back(++k);
+			this->PassAll[0].push_back(++f1);
+			this->PassAll[1].push_back(++f2);
 		}
 	}
 	for(int i = 0; i < PassAll[0].size(); i++)
