@@ -25,16 +25,16 @@ struct DTWinformation
 {
 	public:
 		//各部位ごとの対応パス(segment,frame)
-		int ** DTWpass;
+		int ** PassPart;
 
 		//全体の対応パス
-		int * PassAll;
+		vector< vector< int > > PassAll;
 
 		//パス対応された各フレームの誤差(segment,frame)
-		float ** DTWdistance;
+		float ** DistancePart;
 
 		//パス対応された各フレームの誤差
-		float * DistanceAll;
+		vector< vector< float > > DistanceAll;
 
 		//体節の順番を誤差の大きさ順に並べ替えた値
 		int * DTWorder;
@@ -100,6 +100,7 @@ class  MotionPlaybackApp : public GLUTBaseApp
 	Posture *  curr_posture2;
 
 	//パス対応された比較用の姿勢
+	Posture  curr_posture0;
 	Posture  curr_posture3;
 
 	// アニメーション再生中かどうかを表すフラグ
@@ -134,6 +135,13 @@ class  MotionPlaybackApp : public GLUTBaseApp
 
 	//Timeline
 	Timeline * timeline;
+
+	//num_space
+	float num_space = 30.0f;
+
+	//sabun
+	int m1f = -1;
+	int m2f = -1;
 
   public:
 	// コンストラクタ
@@ -195,13 +203,16 @@ class  MotionPlaybackApp : public GLUTBaseApp
 	void ColorBarElement(Timeline * timeline, int segment_num, int Track_num, float * frame_dep, Motion & motion);
 
 	//カラーバーの誤差による色の変化を設定
+	void ColorBarElement2(Timeline * timeline, int segment_num, int Track_num, vector<vector<float>> DistacneAll, vector<vector<int>> PassAll, Motion & motion);
+
+	//カラーバーの誤差による色の変化を設定
 	void ColorBarElementGray(Timeline * timeline, int segment_num, int Track_num, float * frame_dep, Motion & motion);
 
 	//部位の集合による誤差の最大フレームに紫色を設定(パターン)
 	void PartDepLine(Timeline * timeline, int part_num, int Track_num, DTWinformation * DTW, Motion & motion, int pattern);
 
 	//全部位との距離を取る
-	static float DistanceCalc( int num_segments, vector< Vector3f > v1, vector< Vector3f > v2);
+	static float DistanceCalc( int num_segments, vector< Vector3f > v1, vector< Vector3f > v2, float ** DistancePart);
 };
 
 
