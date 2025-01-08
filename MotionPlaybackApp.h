@@ -24,6 +24,9 @@ struct DTWinformation;
 struct DTWinformation
 {
 	public:
+
+		int DTWframe;
+
 		//各部位ごとの対応パス(segment,frame)
 		int ** PassPart;
 
@@ -46,31 +49,31 @@ struct DTWinformation
 		int * DTWforder;
 
 		//左脚の誤差
-		float  * left_leg;
+		vector< float > left_leg;
 
 		//右脚の誤差
-		float * right_leg;
+		vector< float > right_leg;
 
 		//脚全体の誤差
-		float * leg;
+		vector< float > leg;
 
 		//胸部の誤差
-		float * chest;
+		vector< float > chest;
 
 		//頭部の誤差
-		float * head;
+		vector< float > head;
 
 		//頭部と胸部の誤差
-		float * head_chest;
+		vector< float > head_chest;
 
 		//左腕の誤差
-		float * left_arm;
+		vector< float > left_arm;
 
 		//右腕の誤差
-		float * right_arm;
+		vector< float > right_arm;
 
 		//腕全体の誤差
-		float * arm;
+		vector< float > arm;
 
 	public:
 		//DTW初期化
@@ -200,10 +203,10 @@ class  MotionPlaybackApp : public GLUTBaseApp
 	void InitSegmentname(int num_segments);
 
 	//カラーバーの誤差による色の変化を設定
-	void ColorBarElement(Timeline * timeline, int segment_num, int Track_num, float * frame_dep, Motion & motion);
+	void ColorBarElement(Timeline * timeline, int segment_num, int Track_num, vector<float> frame_dis, Motion & motion);
 
 	//カラーバーの誤差による色の変化を設定
-	void ColorBarElement2(Timeline * timeline, int segment_num, int Track_num, vector<vector<float>> DistacneAll, vector<vector<int>> PassAll, Motion & motion);
+	void ColorBarElement2(Timeline * timeline, int segment_num, int Track_num, vector<float> Distacne, vector<vector<int>> PassAll, Motion & motion);
 
 	//カラーバーの誤差による色の変化を設定
 	void ColorBarElementGray(Timeline * timeline, int segment_num, int Track_num, float * frame_dep, Motion & motion);
@@ -213,6 +216,8 @@ class  MotionPlaybackApp : public GLUTBaseApp
 
 	//全部位との距離を取る
 	static float DistanceCalc( int num_segments, vector< Vector3f > v1, vector< Vector3f > v2, float ** DistancePart);
+
+	static float DistanceCalcPart(int frame1, int frame2, int num_segment, vector< vector< Vector3f > > v1, vector< vector< Vector3f > > v2 );
 };
 
 
