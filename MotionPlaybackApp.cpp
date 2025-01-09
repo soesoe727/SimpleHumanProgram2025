@@ -135,15 +135,30 @@ void  MotionPlaybackApp::Display()
 		
 		if(pattern != 5)
 		{
-			//1人目の動作の可視化(色付け)
-			curr_posture0 = motion->frames[DTWa->PassAll[0][frame_no]];
-			DrawPostureColor( curr_posture0, pattern, view_segment);
-			DrawPostureShadow( curr_posture0, shadow_dir, shadow_color );
+			if(sabun_flag == -1)
+			{
+				//1人目の動作の可視化(色付け)
+				curr_posture0 = motion->frames[DTWa->PassAll[0][frame_no]];
+				DrawPostureColor(curr_posture0, pattern, view_segment);
+				DrawPostureShadow(curr_posture0, shadow_dir, shadow_color);
 
-			//2人目の動作の可視化(白･灰)(パス対応)
-			curr_posture3 = motion2->frames[DTWa->PassAll[1][frame_no]];
-			DrawPostureGray(curr_posture3, pattern, view_segment);
-			DrawPostureShadow(curr_posture3, shadow_dir, shadow_color);
+				//2人目の動作の可視化(白･灰)(パス対応)
+				curr_posture3 = motion2->frames[DTWa->PassAll[1][frame_no]];
+				DrawPostureGray(curr_posture3, pattern, view_segment);
+				DrawPostureShadow(curr_posture3, shadow_dir, shadow_color);
+			}
+			else
+			{
+				//1人目の動作の可視化(色付け)
+				curr_posture0 = motion->frames[DTWa->PassAll[0][frame_no] - m1f];
+				DrawPostureColor(curr_posture0, pattern, view_segment);
+				DrawPostureShadow(curr_posture0, shadow_dir, shadow_color);
+
+				//2人目の動作の可視化(白･灰)(パス対応)
+				curr_posture3 = motion2->frames[DTWa->PassAll[1][frame_no] - m2f];
+				DrawPostureGray(curr_posture3, pattern, view_segment);
+				DrawPostureShadow(curr_posture3, shadow_dir, shadow_color);
+			}
 		}
 		else
 		{
@@ -300,11 +315,16 @@ void  MotionPlaybackApp::Keyboard( unsigned char key, int mx, int my )
 	//f
 	if(key == 'f')
 	{
-		m1f = DTWa->PassAll[0][frame_no];
-		m2f = DTWa->PassAll[1][frame_no];
-		std::cout << m1f << " " << m2f << std::endl;
+		if(sabun_flag == -1)
+		{
+			m1f = DTWa->PassAll[0][frame_no];
+			m2f = DTWa->PassAll[1][frame_no];
+		}
+		mf = frame_no;
+		sabun_flag *= -1;
+		frame_no = 0;
+		std::cout << m1f << " " << m2f << " " << mf << std::endl;
 	}
-
 	// s キーでアニメーションの停止・再開
 	if ( key == ' ' )
 		on_animation = !on_animation;
@@ -450,8 +470,10 @@ void  MotionPlaybackApp::Animation( float delta )
 	animation_time += delta * animation_speed;
 	if ( pattern == 5 && animation_time > motion->GetDuration() )
 		animation_time -= motion->GetDuration();
-	else if(animation_time > DTWa->DTWframe * motion->interval)
+	else if( sabun_flag == -1 && animation_time > DTWa->DTWframe * motion->interval)
 		animation_time -= DTWa->DTWframe * motion->interval;
+	else if( sabun_flag == 1 && animation_time > DTWa->DTWframe * motion->interval - mf)
+		animation_time -= DTWa->DTWframe * motion->interval - mf;
 	// 現在のフレーム番号を計算
 	frame_no = animation_time / motion->interval;
 
@@ -904,6 +926,8 @@ void MotionPlaybackApp::PatternTimeline(Timeline* timeline, Motion& motion, floa
 
 	// 動作再生時刻を表す縦線を設定
 	timeline->AddLine( curr_frame + num_space, Color4f( 1.0f, 1.0f, 1.0f, 1.0f ) );
+
+	//timeline->AddLine( mf + num_space, Color4f( 0.0f, 0.0f, 0.0f, 1.0f ) );
 }
 
 //

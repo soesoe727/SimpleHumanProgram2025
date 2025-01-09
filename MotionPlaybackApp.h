@@ -145,6 +145,8 @@ class  MotionPlaybackApp : public GLUTBaseApp
 	//sabun
 	int m1f = -1;
 	int m2f = -1;
+	int mf = -100;
+	int sabun_flag = -1;
 
   public:
 	// コンストラクタ
