@@ -150,12 +150,12 @@ void  MotionPlaybackApp::Display()
 			else
 			{
 				//1人目の動作の可視化(色付け)
-				curr_posture0 = motion->frames[DTWa->PassAll[0][frame_no] - m1f];
+				curr_posture0 = motion->frames[frame_no + m1f];
 				DrawPostureColor(curr_posture0, pattern, view_segment);
 				DrawPostureShadow(curr_posture0, shadow_dir, shadow_color);
 
 				//2人目の動作の可視化(白･灰)(パス対応)
-				curr_posture3 = motion2->frames[DTWa->PassAll[1][frame_no] - m2f];
+				curr_posture3 = motion2->frames[frame_no + m2f];
 				DrawPostureGray(curr_posture3, pattern, view_segment);
 				DrawPostureShadow(curr_posture3, shadow_dir, shadow_color);
 			}
@@ -472,8 +472,8 @@ void  MotionPlaybackApp::Animation( float delta )
 		animation_time -= motion->GetDuration();
 	else if( sabun_flag == -1 && animation_time > DTWa->DTWframe * motion->interval)
 		animation_time -= DTWa->DTWframe * motion->interval;
-	else if( sabun_flag == 1 && animation_time > DTWa->DTWframe * motion->interval - mf)
-		animation_time -= DTWa->DTWframe * motion->interval - mf;
+	else if( sabun_flag == 1 && animation_time > (motion2->num_frames - m2f) * motion->interval)
+		animation_time -= (motion2->num_frames - m2f) * motion->interval;
 	// 現在のフレーム番号を計算
 	frame_no = animation_time / motion->interval;
 
@@ -1046,7 +1046,7 @@ void MotionPlaybackApp::InitSegmentname(int num_segments)
 }
 
 //
-//カラーバーの誤差による色の変化を設定
+//カラーバーの誤差による色の変化を設定(num_frames)
 //
 void MotionPlaybackApp::ColorBarElement(Timeline* timeline, int segment_num, int Track_num, vector< float > frame_dis, Motion & motion)
 {
@@ -1080,6 +1080,9 @@ void MotionPlaybackApp::ColorBarElement(Timeline* timeline, int segment_num, int
 	}
 }
 
+//
+//カラーバーの誤差による色の変化を設定(DTWframe)
+//
 void MotionPlaybackApp::ColorBarElement2(Timeline* timeline, int segment_num, int Track_num, vector<float> Distance, vector<vector<int>> PassAll, Motion & motion)
 {
 	float red_ratio = 0.0f;
@@ -1307,9 +1310,9 @@ void DTWinformation::DTWinformation_init( int frames1, int frames2, const Motion
 	float dis1, dis2, dis3;
 	while(f1 != frames1 && f2 != frames2)
 	{
-		dis1 = this->DistanceAll[f1+1][f2+1];
-		dis2 = this->DistanceAll[f1+1][f2] + 0.002f * abs(f1+1-f2);
-		dis3 = this->DistanceAll[f1][f2+1] + 0.002f * abs(f1-(f2+1));
+		dis1 = this->DistanceAll[f1+1][f2+1] + 0.0005f * abs(f1-f2);
+		dis2 = this->DistanceAll[f1+1][f2] + 0.0005f * abs(f1+1-f2);
+		dis3 = this->DistanceAll[f1][f2+1] + 0.0005f * abs(f1-(f2+1));
 		if(dis1 < dis2 && dis1 < dis3)
 			if(dis2 < dis3)
 			{
