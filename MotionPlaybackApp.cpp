@@ -34,8 +34,6 @@ MotionPlaybackApp::MotionPlaybackApp()
 	animation_time = 0.0f;
 	animation_speed = 1.0f;
 	frame_no = 0;
-	area= -1;
-	trace = -1;
 	view_segment = 12;
 	DTWa = NULL;
 	flag = 1;
@@ -158,25 +156,6 @@ void  MotionPlaybackApp::Display()
 			DrawPostureGray(Pass_posture2, pattern, view_segment);
 			DrawPostureShadow(Pass_posture2, shadow_dir, shadow_color);
 		}
-
-		if(area == 1)
-		{
-			//一人目の動作の部位の領域変化(オレンジ)
-			glColor4f( 1.0f, 0.6f, 0.0f, 0.1f );
-			DrawPart(motion, view_segment);
-			//一人目の動作の部位の領域変化(水)
-			glColor4f( 0.7f, 0.8f, 0.9f, 0.1f );
-			DrawPart(motion2, view_segment);	
-		}
-
-		if(trace == 1)//軌跡の表示変化
-		{
-			glColor3f(1.0f, 0.0f, 0.0f);
-			DrawTrace(motion, view_segment);
-			glColor3f(0.0f, 0.0f, 1.0f);
-			DrawTrace(motion2, view_segment);
-		}	
-
 		glDisable(GL_BLEND);
 	}
 
@@ -186,42 +165,22 @@ void  MotionPlaybackApp::Display()
 		int Track_num = 0;
 		int name_space = 30.0f;
 		
-		
 		//部位の集合ごとの色付け
-		if(pattern == 0 )
-		{
-			for (int j = 12; j >= 11; j--)
-				timeline->SetElementColor(Track_num * DTWa->DTWframe + Track_num++, Pattern_Color(pattern, j));
-			for (int j = 10; j >= 7; j--)
-				timeline->SetElementColor(Track_num * DTWa->DTWframe + Track_num++, Pattern_Color(pattern, j));
-			timeline->SetElementColor(Track_num * DTWa->DTWframe + Track_num++, Pattern_Color(pattern, 0));
-			for (int j = 13; j <= 16; j++)
-				timeline->SetElementColor(Track_num * DTWa->DTWframe + Track_num++, Pattern_Color(pattern, j));
-			for (int j = 36; j <= 39; j++)
-				timeline->SetElementColor(Track_num * DTWa->DTWframe + Track_num++, Pattern_Color(pattern, j));
-			for (int j = 1; j <= 3; j++)
-				timeline->SetElementColor(Track_num * DTWa->DTWframe + Track_num++, Pattern_Color(pattern, j));
-			for (int j = 4; j <= 6; j++)
-				timeline->SetElementColor(Track_num * DTWa->DTWframe + Track_num++, Pattern_Color(pattern, j));
-		}
-		else
-		{
-			for (int j = 12; j >= 11; j--)
-				timeline->SetElementColor(Track_num * motion->num_frames + Track_num++, Pattern_Color(pattern, j));
-			for (int j = 10; j >= 7; j--)
-				timeline->SetElementColor(Track_num * motion->num_frames + Track_num++, Pattern_Color(pattern, j));
-			timeline->SetElementColor(Track_num * motion->num_frames + Track_num++, Pattern_Color(pattern, 0));
-			for (int j = 13; j <= 16; j++)
-				timeline->SetElementColor(Track_num * motion->num_frames + Track_num++, Pattern_Color(pattern, j));
-			for (int j = 36; j <= 39; j++)
-				timeline->SetElementColor(Track_num * motion->num_frames + Track_num++, Pattern_Color(pattern, j));
-			for (int j = 1; j <= 3; j++)
-				timeline->SetElementColor(Track_num * motion->num_frames + Track_num++, Pattern_Color(pattern, j));
-			for (int j = 4; j <= 6; j++)
-				timeline->SetElementColor(Track_num * motion->num_frames + Track_num++, Pattern_Color(pattern, j));
-		}
+		for (int j = 12; j >= 11; j--)
+			timeline->SetElementColor(Track_num * DTWa->DTWframe + Track_num++, Pattern_Color(pattern, j));
+		for (int j = 10; j >= 7; j--)
+			timeline->SetElementColor(Track_num * DTWa->DTWframe + Track_num++, Pattern_Color(pattern, j));
+		timeline->SetElementColor(Track_num * DTWa->DTWframe + Track_num++, Pattern_Color(pattern, 0));
+		for (int j = 13; j <= 16; j++)
+			timeline->SetElementColor(Track_num * DTWa->DTWframe + Track_num++, Pattern_Color(pattern, j));
+		for (int j = 36; j <= 39; j++)
+			timeline->SetElementColor(Track_num * DTWa->DTWframe + Track_num++, Pattern_Color(pattern, j));
+		for (int j = 1; j <= 3; j++)
+			timeline->SetElementColor(Track_num * DTWa->DTWframe + Track_num++, Pattern_Color(pattern, j));
+		for (int j = 4; j <= 6; j++)
+			timeline->SetElementColor(Track_num * DTWa->DTWframe + Track_num++, Pattern_Color(pattern, j));
+		
 		PatternTimeline(timeline, * motion, frame_no, DTWa);
-
 		timeline->SetLineTime( 1, animation_time / motion->interval + name_space );
 		timeline->DrawTimeline();
 	}
@@ -281,7 +240,8 @@ void  MotionPlaybackApp::Keyboard( unsigned char key, int mx, int my )
 {
 	GLUTBaseApp::Keyboard( key, mx, my );
 	int a;
-	//f
+
+	//f キーで再生方法切り替え
 	if(key == 'f')
 	{
 		if(sabun_flag == -1)
@@ -294,7 +254,7 @@ void  MotionPlaybackApp::Keyboard( unsigned char key, int mx, int my )
 		frame_no = 0;
 		std::cout << m1f << " " << m2f << " " << mf << std::endl;
 	}
-	// s キーでアニメーションの停止・再開
+	// space キーでアニメーションの停止・再開
 	if ( key == ' ' )
 		on_animation = !on_animation;
 
@@ -302,7 +262,7 @@ void  MotionPlaybackApp::Keyboard( unsigned char key, int mx, int my )
 	if ( key == 'w' )
 		animation_speed = ( animation_speed == 1.0f ) ? 0.1f : 1.0f;
 
-	// . キーで次のフレーム
+	// e キーで次のフレーム
 	if ( ( key == '.' ) && !on_animation && motion )
 	{
 		on_animation = true;
@@ -310,7 +270,7 @@ void  MotionPlaybackApp::Keyboard( unsigned char key, int mx, int my )
 		on_animation = false;
 	}
 
-	// , キーで前のフレーム
+	// q キーで前のフレーム
 	if ( ( key == ',' ) && !on_animation && motion && ( frame_no > 0 ) )
 	{
 		on_animation = true;
@@ -326,25 +286,13 @@ void  MotionPlaybackApp::Keyboard( unsigned char key, int mx, int my )
 	//	OpenNewBVH2();
 	//}
 
-	// a キーで領域の表示変更
-	if ( key == 'a' )
-		area *= -1;
-
-	// q キーで表示する領域の変更-
-	if ( key == 'q' )
-		view_segment = ViewSegment(-1, view_segment);
-
-	// e キーで表示する領域の変更+
-	if ( key == 'e' )
+	//d キーでview_segmentの変更+
+	if (key == 'd')
 		view_segment = ViewSegment(1, view_segment);
 
-	// t キーで軌跡の表示変更
-	if ( key == 't' )
-		trace *= -1;
-
-	// f キーでフレーム毎誤差表示
-	//if ( key == 'f' )
-	//	flag *= -1;
+	//q キーでview_segmentの変更-
+	if (key == 'q')
+		view_segment = ViewSegment(0, view_segment);
 
 	// 0 キーでパターン0
 	if ( key == '0' )
@@ -822,7 +770,7 @@ void MotionPlaybackApp::PatternTimeline(Timeline* timeline, Motion& motion, floa
 	// 動作再生時刻を表す縦線を設定
 	timeline->AddLine( curr_frame + num_space, Color4f( 1.0f, 1.0f, 1.0f, 1.0f ) );
 
-	//timeline->AddLine( mf + num_space, Color4f( 0.0f, 0.0f, 0.0f, 1.0f ) );
+	timeline->AddLine( motion.num_frames + num_space, Color4f( 0.0f, 0.0f, 0.0f, 1.0f ) );
 }
 
 //

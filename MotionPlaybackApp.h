@@ -119,12 +119,6 @@ class  MotionPlaybackApp : public GLUTBaseApp
 	// 現在の表示フレーム番号
 	int  frame_no;
 
-	//領域の表示
-	int area;
-
-	//軌跡の表示
-	int trace;
-
 	//体節の番目
 	int view_segment;
 
