@@ -25,10 +25,8 @@ struct DTWinformation
 {
 	public:
 
+		//パス作成後のフレーム数
 		int DTWframe;
-
-		//各部位ごとの対応パス(segment,frame)
-		int ** PassPart;
 
 		//全体の対応パス
 		vector< vector< int > > PassAll;
@@ -106,8 +104,8 @@ class  MotionPlaybackApp : public GLUTBaseApp
 	Posture *  curr_posture2;
 
 	//パス対応された比較用の姿勢
-	Posture  curr_posture0;
-	Posture  curr_posture3;
+	Posture  Pass_posture1;
+	Posture  Pass_posture2;
 
 	// アニメーション再生中かどうかを表すフラグ
 	bool  on_animation;
@@ -216,13 +214,10 @@ class  MotionPlaybackApp : public GLUTBaseApp
 	//カラーバーを全て灰色に設定
 	void ColorBarElementGray(Timeline * timeline, int segment_num, int Track_num, vector<vector<int>> PassAll, Motion & motion);
 
-	//部位の集合による誤差の最大フレームに紫色を設定(パターン)
-	void PartDepLine(Timeline * timeline, int part_num, int Track_num, DTWinformation * DTW, Motion & motion, int pattern);
-
 	//全部位との距離を取る
 	static float DistanceCalc( int num_segments, vector< Vector3f > v1, vector< Vector3f > v2);
 
-	//部位との距離を取る
+	//1部位との距離を取る
 	static float DistanceCalcPart(int frame1, int frame2, int num_segment, vector< vector< Vector3f > > v1, vector< vector< Vector3f > > v2 );
 };
 
