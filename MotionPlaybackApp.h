@@ -33,17 +33,20 @@ struct DTWinformation
 		//全体の対応パス
 		vector< vector< int > > PassAll;
 
-		//パス対応された各フレームの誤差(segment,frame)
-		float ** DistancePart;
+		//パス対応された各フレームの誤差(部位毎)
+		vector< vector< vector<float > > > DistancePart;
 
-		//パス対応された各フレームの誤差
+		//パス対応された各フレームの誤差(全体)
 		vector< vector< float > > DistanceAll;
 
 		//体節の順番を誤差の大きさ順に並べ替えた値
 		int * DTWorder;
 
 		//全体の誤差値の合計
-		float DTWtotal;
+		float DisTotalAll;
+
+		//部位毎の誤差値の合計
+		float * DisTotalPart;
 
 		//frame毎の誤差値の合計
 		int * DTWforder;
@@ -204,21 +207,22 @@ class  MotionPlaybackApp : public GLUTBaseApp
 	//体節の名前を入力
 	void InitSegmentname(int num_segments);
 
-	//カラーバーの誤差による色の変化を設定
-	void ColorBarElement(Timeline * timeline, int segment_num, int Track_num, vector<float> frame_dis, Motion & motion);
+	//部位の集合毎のカラーバーの誤差による色の変化を設定
+	void ColorBarElementSetPart(Timeline * timeline, int segment_num, int Track_num, vector<float> Distance, vector<vector<int>> PassAll, Motion & motion);
 
-	//カラーバーの誤差による色の変化を設定
-	void ColorBarElement2(Timeline * timeline, int segment_num, int Track_num, vector<float> Distacne, vector<vector<int>> PassAll, Motion & motion);
+	//部位毎のカラーバーの誤差による色の変化を設定
+	void ColorBarElementPart(Timeline * timeline, int segment_num, int Track_num, vector<vector<float>> Distanee, vector<vector<int>> PassAll, Motion & motion);
 
-	//カラーバーの誤差による色の変化を設定
-	void ColorBarElementGray(Timeline * timeline, int segment_num, int Track_num, float * frame_dep, Motion & motion);
+	//カラーバーを全て灰色に設定
+	void ColorBarElementGray(Timeline * timeline, int segment_num, int Track_num, vector<vector<int>> PassAll, Motion & motion);
 
 	//部位の集合による誤差の最大フレームに紫色を設定(パターン)
 	void PartDepLine(Timeline * timeline, int part_num, int Track_num, DTWinformation * DTW, Motion & motion, int pattern);
 
 	//全部位との距離を取る
-	static float DistanceCalc( int num_segments, vector< Vector3f > v1, vector< Vector3f > v2, float ** DistancePart);
+	static float DistanceCalc( int num_segments, vector< Vector3f > v1, vector< Vector3f > v2);
 
+	//部位との距離を取る
 	static float DistanceCalcPart(int frame1, int frame2, int num_segment, vector< vector< Vector3f > > v1, vector< vector< Vector3f > > v2 );
 };
 

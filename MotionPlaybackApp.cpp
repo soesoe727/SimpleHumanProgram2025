@@ -133,8 +133,7 @@ void  MotionPlaybackApp::Display()
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		
-		if(pattern != 5)
-		{
+
 			if(sabun_flag == -1)
 			{
 				//1人目の動作の可視化(色付け)
@@ -159,27 +158,27 @@ void  MotionPlaybackApp::Display()
 				DrawPostureGray(curr_posture3, pattern, view_segment);
 				DrawPostureShadow(curr_posture3, shadow_dir, shadow_color);
 			}
-		}
-		else
-		{
-			//1人目の動作の可視化(色付け)
-			DrawPostureColor( *curr_posture, pattern, view_segment);
-			DrawPostureShadow( *curr_posture, shadow_dir, shadow_color );
-			if(frame_no < motion->num_frames)
-			{
-				//2人目の動作の可視化(白･灰)(パス対応)
-				curr_posture3 = motion2->frames[DTWa->PassPart[view_segment][frame_no]];
-				DrawPostureGray(curr_posture3, pattern, view_segment);
-				DrawPostureShadow(curr_posture3, shadow_dir, shadow_color);
-			}
-			else
-			{
-				//2人目の動作の可視化(白･灰)(パス対応)
-				curr_posture3 = motion2->frames[DTWa->PassPart[view_segment][motion->num_frames - 1]];
-				DrawPostureGray(curr_posture3, pattern, view_segment);
-				DrawPostureShadow(curr_posture3, shadow_dir, shadow_color);
-			}
-		}
+
+		//else
+		//{
+		//	//1人目の動作の可視化(色付け)
+		//	DrawPostureColor( *curr_posture, pattern, view_segment);
+		//	DrawPostureShadow( *curr_posture, shadow_dir, shadow_color );
+		//	if(frame_no < motion->num_frames)
+		//	{
+		//		//2人目の動作の可視化(白･灰)(パス対応)
+		//		curr_posture3 = motion2->frames[DTWa->PassPart[view_segment][frame_no]];
+		//		DrawPostureGray(curr_posture3, pattern, view_segment);
+		//		DrawPostureShadow(curr_posture3, shadow_dir, shadow_color);
+		//	}
+		//	else
+		//	{
+		//		//2人目の動作の可視化(白･灰)(パス対応)
+		//		curr_posture3 = motion2->frames[DTWa->PassPart[view_segment][motion->num_frames - 1]];
+		//		DrawPostureGray(curr_posture3, pattern, view_segment);
+		//		DrawPostureShadow(curr_posture3, shadow_dir, shadow_color);
+		//	}
+		//}
 
 		if(area == 1)
 		{
@@ -258,17 +257,8 @@ void  MotionPlaybackApp::Display()
 	{
 		sprintf( message1, "%.2f (%d)", animation_time, frame_no );
 		sprintf( message2, "viewing %s", motion->body->segments[view_segment]->name.c_str() );
-		if(flag == 1)
-		{
-			for(int i = 0; i < 5; i++)
-				sprintf( messages[i], "%s : %.2f percent", motion->body->segments[DTWa->DTWorder[i]]->name.c_str(), 100 * DTWa->DistancePart[DTWa->DTWorder[i]][motion->num_frames] / DTWa->DTWtotal);
-		}
-		else
-		{
-			DTWa->DTWinformation_frame(frame_no, motion2->body->num_joints);
-			for(int i = 0; i < 5; i++)
-				sprintf( messages[i], "%s : %.2f", motion->body->segments[DTWa->DTWorder[i]]->name.c_str(), DTWa->DistancePart[DTWa->DTWforder[i]][frame_no]);
-		}
+		for(int i = 0; i < 5; i++)
+			sprintf( messages[i], "%s : %.2f percent", motion->body->segments[DTWa->DTWorder[i]]->name.c_str(), 100 * DTWa->DisTotalPart[DTWa->DTWorder[i]] / DTWa->DisTotalAll);
 		/*
 		if( pattern == 0 )
 			sprintf(message3, "leg:%.2f, chest:%.2f, arm:%.2f", DTWa->left_leg + DTWa->right_leg, DTWa->chest + DTWa->head, DTWa->left_arm + DTWa->right_arm);
@@ -677,248 +667,248 @@ void MotionPlaybackApp::PatternTimeline(Timeline* timeline, Motion& motion, floa
 		case 0:
 			for(int j = 12; j >= 11; j--)//頭部
 			{
-				ColorBarElement2(timeline, j, Track_num, DTW->head_chest, DTW->PassAll, motion);
+				ColorBarElementSetPart(timeline, j, Track_num, DTW->head_chest, DTW->PassAll, motion);
 				PartDepLine(timeline, 0, Track_num++, DTW, motion, pattern);
 			}
 			for(int j = 10; j >= 7; j--)//胸部
 			{
-				ColorBarElement2(timeline, j, Track_num, DTW->head_chest, DTW->PassAll, motion);
+				ColorBarElementSetPart(timeline, j, Track_num, DTW->head_chest, DTW->PassAll, motion);
 				PartDepLine(timeline, 1, Track_num++, DTW, motion, pattern);
 			}
-			ColorBarElement2(timeline, 0, Track_num, DTW->head_chest, DTW->PassAll, motion);//腰
+			ColorBarElementSetPart(timeline, 0, Track_num, DTW->head_chest, DTW->PassAll, motion);//腰
 			PartDepLine(timeline, 1, Track_num++, DTW, motion, pattern);
 			Track_num++;
 			for(int j = 13; j <= 16; j++)//右腕
 			{
-				ColorBarElement2(timeline, j, Track_num, DTW->arm, DTW->PassAll, motion);
+				ColorBarElementSetPart(timeline, j, Track_num, DTW->arm, DTW->PassAll, motion);
 				PartDepLine(timeline, 2, Track_num++, DTW, motion, pattern);
 			}
 			for(int j = 36; j <= 39; j++)//左腕
 			{
-				ColorBarElement2(timeline, j, Track_num, DTW->arm, DTW->PassAll, motion);
+				ColorBarElementSetPart(timeline, j, Track_num, DTW->arm, DTW->PassAll, motion);
 				PartDepLine(timeline, 3, Track_num++, DTW, motion, pattern);
 			}
 			Track_num++;
 			for(int j = 1; j <= 3; j++)//右脚
 			{
-				ColorBarElement2(timeline, j, Track_num, DTW->leg, DTW->PassAll, motion);
+				ColorBarElementSetPart(timeline, j, Track_num, DTW->leg, DTW->PassAll, motion);
 				PartDepLine(timeline, 4, Track_num++, DTW, motion, pattern);
 			}
 			for(int j = 4; j <= 6; j++)//左脚
 			{
-				ColorBarElement2(timeline, j, Track_num, DTW->leg, DTW->PassAll, motion);
+				ColorBarElementSetPart(timeline, j, Track_num, DTW->leg, DTW->PassAll, motion);
 				PartDepLine(timeline, 5, Track_num++, DTW, motion, pattern);
 			}
 			break;
 		case 1:
 			for(int j = 12; j >= 11; j--)//頭部
 			{
-				ColorBarElement2(timeline, j, Track_num, DTW->head, DTW->PassAll, motion);
+				ColorBarElementSetPart(timeline, j, Track_num, DTW->head, DTW->PassAll, motion);
 				PartDepLine(timeline, 0, Track_num++, DTW, motion, pattern);
 			}
 			Track_num++;
 			for(int j = 10; j >= 7; j--)//胸部
 			{
-				ColorBarElement2(timeline, j, Track_num, DTW->chest, DTW->PassAll, motion);
+				ColorBarElementSetPart(timeline, j, Track_num, DTW->chest, DTW->PassAll, motion);
 				PartDepLine(timeline, 1, Track_num++, DTW, motion, pattern);
 			}
-			ColorBarElement2(timeline, 0, Track_num, DTW->chest, DTW->PassAll, motion);//腰
+			ColorBarElementSetPart(timeline, 0, Track_num, DTW->chest, DTW->PassAll, motion);//腰
 			PartDepLine(timeline, 1, Track_num++, DTW, motion, pattern);
 			Track_num++;
 			for(int j = 13; j <= 16; j++)//右腕
 			{
-				ColorBarElement2(timeline, j, Track_num, DTW->arm, DTW->PassAll, motion);
+				ColorBarElementSetPart(timeline, j, Track_num, DTW->arm, DTW->PassAll, motion);
 				PartDepLine(timeline, 2, Track_num++, DTW, motion, pattern);
 			}
 			for(int j = 36; j <= 39; j++)//左腕
 			{
-				ColorBarElement2(timeline, j, Track_num, DTW->arm, DTW->PassAll, motion);
+				ColorBarElementSetPart(timeline, j, Track_num, DTW->arm, DTW->PassAll, motion);
 				PartDepLine(timeline, 3, Track_num++, DTW, motion, pattern);
 			}
 			Track_num++;
 			for(int j = 1; j <= 3; j++)//右脚
 			{
-				ColorBarElement2(timeline, j, Track_num, DTW->leg, DTW->PassAll, motion);
+				ColorBarElementSetPart(timeline, j, Track_num, DTW->leg, DTW->PassAll, motion);
 				PartDepLine(timeline, 4, Track_num++, DTW, motion, pattern);
 			}
 			for(int j = 4; j <= 6; j++)//左脚
 			{
-				ColorBarElement2(timeline, j, Track_num, DTW->leg, DTW->PassAll, motion);
+				ColorBarElementSetPart(timeline, j, Track_num, DTW->leg, DTW->PassAll, motion);
 				PartDepLine(timeline, 5, Track_num++, DTW, motion, pattern);
 			}
 			break;
 		case 2:
 			for(int j = 12; j >= 11; j--)//頭部
 			{
-				ColorBarElement2(timeline, j, Track_num, DTW->head_chest, DTW->PassAll, motion);
+				ColorBarElementSetPart(timeline, j, Track_num, DTW->head_chest, DTW->PassAll, motion);
 				PartDepLine(timeline, 0, Track_num++, DTW, motion, pattern);
 			}
 			for(int j = 10; j >= 7; j--)//胸部
 			{
-				ColorBarElement2(timeline, j, Track_num, DTW->head_chest, DTW->PassAll, motion);
+				ColorBarElementSetPart(timeline, j, Track_num, DTW->head_chest, DTW->PassAll, motion);
 				PartDepLine(timeline, 1, Track_num++, DTW, motion, pattern);
 			}
-			ColorBarElement2(timeline, 0, Track_num, DTW->head_chest, DTW->PassAll, motion);//腰
+			ColorBarElementSetPart(timeline, 0, Track_num, DTW->head_chest, DTW->PassAll, motion);//腰
 			PartDepLine(timeline, 1, Track_num++, DTW, motion, pattern);
 			Track_num++;
 			for(int j = 13; j <= 16; j++)//右腕
 			{
-				ColorBarElement2(timeline, j, Track_num, DTW->right_arm, DTW->PassAll, motion);
+				ColorBarElementSetPart(timeline, j, Track_num, DTW->right_arm, DTW->PassAll, motion);
 				PartDepLine(timeline, 2, Track_num++, DTW, motion, pattern);
 			}
 			Track_num++;
 			for(int j = 36; j <= 39; j++)//左腕
 			{
-				ColorBarElement2(timeline, j, Track_num, DTW->left_arm, DTW->PassAll, motion);
+				ColorBarElementSetPart(timeline, j, Track_num, DTW->left_arm, DTW->PassAll, motion);
 				PartDepLine(timeline, 3, Track_num++, DTW, motion, pattern);
 			}
 			Track_num++;
 			for(int j = 1; j <= 3; j++)//右脚
 			{
-				ColorBarElement2(timeline, j, Track_num, DTW->leg, DTW->PassAll, motion);
+				ColorBarElementSetPart(timeline, j, Track_num, DTW->leg, DTW->PassAll, motion);
 				PartDepLine(timeline, 4, Track_num++, DTW, motion, pattern);
 			}
 			for(int j = 4; j <= 6; j++)//左脚
 			{
-				ColorBarElement2(timeline, j, Track_num, DTW->leg, DTW->PassAll, motion);
+				ColorBarElementSetPart(timeline, j, Track_num, DTW->leg, DTW->PassAll, motion);
 				PartDepLine(timeline, 5, Track_num++, DTW, motion, pattern);
 			}
 			break;
 		case 3:
 			for(int j = 12; j >= 11; j--)//頭部
 			{
-				ColorBarElement2(timeline, j, Track_num, DTW->head_chest, DTW->PassAll, motion);
+				ColorBarElementSetPart(timeline, j, Track_num, DTW->head_chest, DTW->PassAll, motion);
 				PartDepLine(timeline, 0, Track_num++, DTW, motion, pattern);
 			}
 			for(int j = 10; j >= 7; j--)//胸部
 			{
-				ColorBarElement2(timeline, j, Track_num, DTW->head_chest, DTW->PassAll, motion);
+				ColorBarElementSetPart(timeline, j, Track_num, DTW->head_chest, DTW->PassAll, motion);
 				PartDepLine(timeline, 1, Track_num++, DTW, motion, pattern);
 			}
-			ColorBarElement2(timeline, 0, Track_num, DTW->head_chest, DTW->PassAll, motion);//腰
+			ColorBarElementSetPart(timeline, 0, Track_num, DTW->head_chest, DTW->PassAll, motion);//腰
 			PartDepLine(timeline, 1, Track_num++, DTW, motion, pattern);
 			Track_num++;
 			for(int j = 13; j <= 16; j++)//右腕
 			{
-				ColorBarElement2(timeline, j, Track_num, DTW->arm, DTW->PassAll, motion);
+				ColorBarElementSetPart(timeline, j, Track_num, DTW->arm, DTW->PassAll, motion);
 				PartDepLine(timeline, 2, Track_num++, DTW, motion, pattern);
 			}
 			for(int j = 36; j <= 39; j++)//左腕
 			{
-				ColorBarElement2(timeline, j, Track_num, DTW->arm, DTW->PassAll, motion);
+				ColorBarElementSetPart(timeline, j, Track_num, DTW->arm, DTW->PassAll, motion);
 				PartDepLine(timeline, 3, Track_num++, DTW, motion, pattern);
 			}
 			Track_num++;
 			for(int j = 1; j <= 3; j++)//右脚
 			{
-				ColorBarElement2(timeline, j, Track_num, DTW->right_leg, DTW->PassAll, motion);
+				ColorBarElementSetPart(timeline, j, Track_num, DTW->right_leg, DTW->PassAll, motion);
 				PartDepLine(timeline, 4, Track_num++, DTW, motion, pattern);
 			}
 			Track_num++;
 			for(int j = 4; j <= 6; j++)//左脚
 			{
-				ColorBarElement2(timeline, j, Track_num, DTW->left_leg, DTW->PassAll, motion);
+				ColorBarElementSetPart(timeline, j, Track_num, DTW->left_leg, DTW->PassAll, motion);
 				PartDepLine(timeline, 5, Track_num++, DTW, motion, pattern);
 			}
 			break;
 		case 4:
 			for(int j = 12; j >= 11; j--)//頭部
 			{
-				ColorBarElement2(timeline, j, Track_num, DTW->head, DTW->PassAll, motion);
+				ColorBarElementSetPart(timeline, j, Track_num, DTW->head, DTW->PassAll, motion);
 				PartDepLine(timeline, 0, Track_num++, DTW, motion, pattern);
 			}
 			Track_num++;
 			for(int j = 10; j >= 7; j--)//胸部
 			{
-				ColorBarElement2(timeline, j, Track_num, DTW->chest, DTW->PassAll, motion);
+				ColorBarElementSetPart(timeline, j, Track_num, DTW->chest, DTW->PassAll, motion);
 				PartDepLine(timeline, 1, Track_num++, DTW, motion, pattern);
 			}
-			ColorBarElement2(timeline, 0, Track_num, DTW->chest, DTW->PassAll, motion);//腰
+			ColorBarElementSetPart(timeline, 0, Track_num, DTW->chest, DTW->PassAll, motion);//腰
 			PartDepLine(timeline, 1, Track_num++, DTW, motion, pattern);
 			Track_num++;
 			for(int j = 13; j <= 16; j++)//右腕
 			{
-				ColorBarElement2(timeline, j, Track_num, DTW->right_arm, DTW->PassAll, motion);
+				ColorBarElementSetPart(timeline, j, Track_num, DTW->right_arm, DTW->PassAll, motion);
 				PartDepLine(timeline, 2, Track_num++, DTW, motion, pattern);
 			}
 			Track_num++;
 			for(int j = 36; j <= 39; j++)//左腕
 			{
-				ColorBarElement2(timeline, j, Track_num, DTW->left_arm, DTW->PassAll, motion);
+				ColorBarElementSetPart(timeline, j, Track_num, DTW->left_arm, DTW->PassAll, motion);
 				PartDepLine(timeline, 3, Track_num++, DTW, motion, pattern);
 			}
 			Track_num++;
 			for(int j = 1; j <= 3; j++)//右脚
 			{
-				ColorBarElement2(timeline, j, Track_num, DTW->right_leg, DTW->PassAll, motion);
+				ColorBarElementSetPart(timeline, j, Track_num, DTW->right_leg, DTW->PassAll, motion);
 				PartDepLine(timeline, 4, Track_num++, DTW, motion, pattern);
 			}
 			Track_num++;
 			for(int j = 4; j <= 6; j++)//左脚
 			{
-				ColorBarElement2(timeline, j, Track_num, DTW->left_leg, DTW->PassAll, motion);
+				ColorBarElementSetPart(timeline, j, Track_num, DTW->left_leg, DTW->PassAll, motion);
 				PartDepLine(timeline, 5, Track_num++, DTW, motion, pattern);
 			}
 			break;
 		case 5:
-			//for(int j = 12; j >= 11; j--)//頭部
-			//{
-			//	if(view_segment != j)
-			//		ColorBarElementGray(timeline, j, Track_num, DTW->DistancePart[j], motion);
-			//	else
-			//		ColorBarElement(timeline, j, Track_num, DTW->DistancePart[j], motion);
-			//	Track_num++;
-			//}
-			//Track_num++;
-			//for(int j = 10; j >= 7; j--)//胸部
-			//{
-			//	if(view_segment != j)
-			//		ColorBarElementGray(timeline, j, Track_num, DTW->DistancePart[j], motion);
-			//	else
-			//		ColorBarElement(timeline, j, Track_num, DTW->DistancePart[j], motion);
-			//	Track_num++;
-			//}
-			//if(view_segment != 0)//腰
-			//		ColorBarElementGray(timeline, 0, Track_num, DTW->DistancePart[0], motion);
-			//	else
-			//		ColorBarElement(timeline, 0, Track_num, DTW->DistancePart[0], motion);
-			//Track_num++;
-			//Track_num++;
-			//for(int j = 13; j <= 16; j++)//右腕
-			//{
-			//	if(view_segment != j)
-			//		ColorBarElementGray(timeline, j, Track_num, DTW->DistancePart[j], motion);
-			//	else
-			//		ColorBarElement(timeline, j, Track_num, DTW->DistancePart[j], motion);
-			//	Track_num++;
-			//}
-			//Track_num++;
-			//for(int j = 36; j <= 39; j++)//左腕
-			//{
-			//	if(view_segment != j)
-			//		ColorBarElementGray(timeline, j, Track_num, DTW->DistancePart[j], motion);
-			//	else
-			//		ColorBarElement(timeline, j, Track_num, DTW->DistancePart[j], motion);
-			//	Track_num++;
-			//}
-			//Track_num++;
-			//for(int j = 1; j <= 3; j++)//右脚
-			//{
-			//	if(view_segment != j)
-			//		ColorBarElementGray(timeline, j, Track_num, DTW->DistancePart[j], motion);
-			//	else
-			//		ColorBarElement(timeline, j, Track_num, DTW->DistancePart[j], motion);
-			//	Track_num++;
-			//}
-			//Track_num++;
-			//for(int j = 4; j <= 6; j++)//左脚
-			//{
-			//	if(view_segment != j)
-			//		ColorBarElementGray(timeline, j, Track_num, DTW->DistancePart[j], motion);
-			//	else
-			//		ColorBarElement(timeline, j, Track_num, DTW->DistancePart[j], motion);
-			//	Track_num++;
-			//}
+			for(int j = 12; j >= 11; j--)//頭部
+			{
+				if(view_segment != j)
+					ColorBarElementGray(timeline, j, Track_num, DTW->PassAll, motion);
+				else
+					ColorBarElementPart(timeline, j, Track_num, DTW->DistancePart[j], DTW->PassAll, motion);
+				Track_num++;
+			}
+			Track_num++;
+			for(int j = 10; j >= 7; j--)//胸部
+			{
+				if(view_segment != j)
+					ColorBarElementGray(timeline, j, Track_num, DTW->PassAll, motion);
+				else
+					ColorBarElementPart(timeline, j, Track_num, DTW->DistancePart[j], DTW->PassAll, motion);
+				Track_num++;
+			}
+			if(view_segment != 0)//腰
+					ColorBarElementGray(timeline, 0, Track_num, DTW->PassAll, motion);
+				else
+					ColorBarElementPart(timeline, 0, Track_num, DTW->DistancePart[0], DTW->PassAll, motion);
+			Track_num++;
+			Track_num++;
+			for(int j = 13; j <= 16; j++)//右腕
+			{
+				if(view_segment != j)
+					ColorBarElementGray(timeline, j, Track_num, DTW->PassAll, motion);
+				else
+					ColorBarElementPart(timeline, j, Track_num, DTW->DistancePart[j], DTW->PassAll, motion);
+				Track_num++;
+			}
+			Track_num++;
+			for(int j = 36; j <= 39; j++)//左腕
+			{
+				if(view_segment != j)
+					ColorBarElementGray(timeline, j, Track_num, DTW->PassAll, motion);
+				else
+					ColorBarElementPart(timeline, j, Track_num, DTW->DistancePart[j], DTW->PassAll, motion);
+				Track_num++;
+			}
+			Track_num++;
+			for(int j = 1; j <= 3; j++)//右脚
+			{
+				if(view_segment != j)
+					ColorBarElementGray(timeline, j, Track_num, DTW->PassAll, motion);
+				else
+					ColorBarElementPart(timeline, j, Track_num, DTW->DistancePart[j], DTW->PassAll, motion);
+				Track_num++;
+			}
+			Track_num++;
+			for(int j = 4; j <= 6; j++)//左脚
+			{
+				if(view_segment != j)
+					ColorBarElementGray(timeline, j, Track_num, DTW->PassAll, motion);
+				else
+					ColorBarElementPart(timeline, j, Track_num, DTW->DistancePart[j], DTW->PassAll, motion);
+				Track_num++;
+			}
 			break;
 		default:
 			break;
@@ -1045,57 +1035,23 @@ void MotionPlaybackApp::InitSegmentname(int num_segments)
 	motion->body->segments[39]->name = "L-Hand";
 }
 
-//
-//カラーバーの誤差による色の変化を設定(num_frames)
-//
-void MotionPlaybackApp::ColorBarElement(Timeline* timeline, int segment_num, int Track_num, vector< float > frame_dis, Motion & motion)
-{
-	float red_ratio = 0.0f;
-	float max_dep = 0.0f;
-	float max_frame = -1.0f;
-	float name_space = 30.0f;
-	//部位内での最大誤差値を求める
-	for(int i = 0; i < motion.num_frames; i++)
-	{
-		if(max_dep < frame_dis[i])
-		{
-			max_dep = frame_dis[i];
-			max_frame = i;
-		}
-	}
-				
-	//誤差の大きさと色付けしてフレーム毎に表示
-	for(int i = 0; i < motion.num_frames; i++)
-	{
-		if(i == 0)
-			timeline->AddElement( 0.0f, name_space, Pattern_Color(pattern, segment_num),  motion.body->segments[segment_num]->name.c_str(), Track_num );
-		red_ratio = frame_dis[i] / max_dep;
-		if(red_ratio > 0.6f)
-			timeline->AddElement( i + name_space, i + 1.0f + name_space, Color4f( 1.0f, (1.0f - red_ratio) * (5.0f / 4.0f) * 2.0f, 0.0f, 1.0f ), "", Track_num );
-		else
-			timeline->AddElement( i + name_space, i + 1.0f + name_space, Color4f( red_ratio * (5.0f / 6.0f) * 2.0f, 1.0f, 0.0f, 1.0f ), "", Track_num );
-
-		if(i == max_frame && max_frame != -1)
-			timeline->AddElement( i + name_space, i + 1.0f + name_space, Color4f( 0.0f, 0.0f, 0.0f, 1.0f ), "", Track_num );
-	}
-}
 
 //
 //カラーバーの誤差による色の変化を設定(DTWframe)
 //
-void MotionPlaybackApp::ColorBarElement2(Timeline* timeline, int segment_num, int Track_num, vector<float> Distance, vector<vector<int>> PassAll, Motion & motion)
+void MotionPlaybackApp::ColorBarElementSetPart(Timeline* timeline, int segment_num, int Track_num, vector<float> Distance, vector<vector<int>> PassAll, Motion & motion)
 {
 	float red_ratio = 0.0f;
 	float max_dep = 0.0f;
 	float max_frame = -1.0f;
 	float name_space = 30.0f;
-	//部位内での最大誤差値を求める
-	for(int i = 0; i < PassAll[0].size(); i++)
+	//frame内での最大誤差値を求める
+	for(int f = 0; f < PassAll[0].size(); f++)
 	{
-		if(max_dep < Distance[PassAll[0][i]])
+		if(max_dep < Distance[PassAll[0][f]])
 		{
-			max_dep = Distance[PassAll[0][i]];
-			max_frame = i;
+			max_dep = Distance[PassAll[0][f]];
+			max_frame = f;
 		}
 	}
 	
@@ -1117,12 +1073,46 @@ void MotionPlaybackApp::ColorBarElement2(Timeline* timeline, int segment_num, in
 	}
 }
 
-void MotionPlaybackApp::ColorBarElementGray(Timeline* timeline, int segment_num, int Track_num, float* frame_dep, Motion& motion)
+void MotionPlaybackApp::ColorBarElementPart(Timeline* timeline, int segment_num, int Track_num, vector<vector<float>> Distance, vector<vector<int>> PassAll, Motion& motion)
+{
+	float red_ratio = 0.0f;
+	float max_dep = 0.0f;
+	float max_frame = -1.0f;
+	float name_space = 30.0f;
+	//frame内での最大誤差値を求める
+	for(int f = 0; f < PassAll[0].size(); f++)
+	{
+		if(max_dep < Distance[PassAll[0][f]][PassAll[1][f]])
+		{
+			max_dep = Distance[PassAll[0][f]][PassAll[1][f]];
+			max_frame = f;
+		}
+	}
+	
+	//std::cout << max_frame << std::endl;
+
+	//誤差の大きさと色付けしてフレーム毎に表示
+	for(int i = 0; i < PassAll[0].size(); i++)
+	{
+		if(i == 0)
+			timeline->AddElement( 0.0f, name_space, Pattern_Color(pattern, segment_num),  motion.body->segments[segment_num]->name.c_str(), Track_num );
+		red_ratio = Distance[PassAll[0][i]][PassAll[1][i]] / max_dep;
+		if(red_ratio > 0.6f)
+			timeline->AddElement( i + name_space, i + 1.0f + name_space, Color4f( 1.0f, (1.0f - red_ratio) * (5.0f / 4.0f) * 2.0f, 0.0f, 1.0f ), "", Track_num );
+		else
+			timeline->AddElement( i + name_space, i + 1.0f + name_space, Color4f( red_ratio * (5.0f / 6.0f) * 2.0f, 1.0f, 0.0f, 1.0f ), "", Track_num );
+
+		if(i == max_frame && max_frame != -1)
+			timeline->AddElement( i + name_space, i + 1.0f + name_space, Color4f( 0.0f, 0.0f, 0.0f, 1.0f ), "", Track_num );
+	}
+}
+
+void MotionPlaybackApp::ColorBarElementGray(Timeline* timeline, int segment_num, int Track_num, vector<vector<int>> PassAll, Motion & motion)
 {
 	float name_space = 30.0f;
 				
 	//名前だけ表示
-	for(int i = 0; i < motion.num_frames; i++)
+	for(int i = 0; i < PassAll[0].size(); i++)
 		if(i == 0)
 			timeline->AddElement( 0.0f, name_space, Pattern_Color(pattern, segment_num),  motion.body->segments[segment_num]->name.c_str(), Track_num );
 }
@@ -1196,7 +1186,7 @@ void MotionPlaybackApp::PartDepLine(Timeline* timeline, int part_num, int Track_
 //
 //全部位との距離を取る
 //
-float MotionPlaybackApp::DistanceCalc(int num_segments, vector<Vector3f> v1, vector<Vector3f> v2, float ** DistancePart)
+float MotionPlaybackApp::DistanceCalc(int num_segments, vector<Vector3f> v1, vector<Vector3f> v2)
 {
 	float pos_dis = 0.0f;
 	for(int i = 0; i < num_segments; i++)
@@ -1213,6 +1203,9 @@ float MotionPlaybackApp::DistanceCalc(int num_segments, vector<Vector3f> v1, vec
 	return pos_dis;
 }
 
+//
+//1部位との距離を取る
+//
 float MotionPlaybackApp::DistanceCalcPart(int frame1, int frame2, int num_segment, vector<vector<Vector3f>> v1, vector<vector<Vector3f>> v2)
 {
 	float pos_dis;
@@ -1228,31 +1221,35 @@ void DTWinformation::DTWinformation_init( int frames1, int frames2, const Motion
 {
 	//iが体節、jがフレーム1、kがフレーム2
 	float min_distance = 100.0f;
+	int Num_segments = motion1.body->num_segments;
 	float distance, frame_dis, pos_dis, distance2, frame_dis2, pos_dis2;
 	this->PassPart = new int * [motion1.body->num_segments];
-	this->DistancePart = new float * [motion1.body->num_segments];
-	this->DistanceAll.resize(frames1 + 1, vector<float>(frames2 + 1, 100.0f));
-	this->DTWorder = new int[motion1.body->num_segments];
-	this->DTWforder = new int[motion1.body->num_segments];
-	this->DTWtotal = 0.0f;
+	//this->DistancePart = new float * [motion1.body->num_segments];
+	this->DistanceAll.resize(frames1 + 1, vector<float>(frames2 + 1, 0.0f));
+	this->DistancePart.resize(Num_segments,vector<vector<float>>(frames1 + 1, vector<float>(frames2 + 1, 0.0f)));
+	this->DTWorder = new int[Num_segments];
+	this->DTWforder = new int[Num_segments];
+	this->DisTotalAll = 0.0f;
+	this->DisTotalPart = new float [Num_segments];
 
 	vector< Matrix4f >  seg_frame_array1, seg_frame_array2, seg_frame_array0;
 	vector< Point3f >  joi_pos_array1, joi_pos_array2, joi_pos_array0;
 	Matrix4f  mat1, mat2, mat0;
 	Vector3f  v0;
-	vector< vector< Vector3f > > v1(frames1, vector< Vector3f >(motion1.body->num_segments));
-	vector< vector< Vector3f > > v2(frames2, vector< Vector3f >(motion2.body->num_segments));
+	vector< vector< Vector3f > > v1(frames1, vector< Vector3f >(Num_segments));
+	vector< vector< Vector3f > > v2(frames2, vector< Vector3f >(Num_segments));
 
 	int frame_ival = 20;
 
 	//初期化
-	for(int i = 0; i < motion1.body->num_segments; i++)
+	for(int i = 0; i < Num_segments; i++)
 	{
 		this->PassPart[i] = new int[frames1];
 		this->PassPart[i][0] = 0;
-		this->DistancePart[i] = new float[frames1 + 1];
+		//this->DistancePart[i] = new float[frames1 + 1];
 		this->DTWorder[i] = i;
 		this->DTWforder[i] = i;
+		this->DisTotalPart[i] = 0.0f;
 	}
 
 
@@ -1263,7 +1260,7 @@ void DTWinformation::DTWinformation_init( int frames1, int frames2, const Motion
 		for(int k = 0; k < frames2; k++)
 		{
 			ForwardKinematics( motion2.frames[ k ], seg_frame_array2, joi_pos_array2 );
-			for(int i = 0; i < motion1.body->num_segments; i++)
+			for(int i = 0; i < Num_segments; i++)
 			{
 				//手の部位は計算しない
 				while(i > 16 && i < 36)
@@ -1280,23 +1277,30 @@ void DTWinformation::DTWinformation_init( int frames1, int frames2, const Motion
 	}
 
 
-	//全体に対する距離の計算
+	//距離の計算
 	for(int j = 0; j <= frames1; j++)
 	{
 		for(int k = 0; k <= frames2; k++)
 		{
-			for(int i = 0; i < motion1.body->num_segments; i++)
+			for(int i = 0; i < Num_segments; i++)
 			{
 				//手の部位は計算しない
-				while(i > 16 && i < 36)
+				while (i > 16 && i < 36)
 					i++;
-				if(i > 39)
+				if (i > 39)
 					break;
 
 				if(j == frames1 || k == frames2)
+				{
 					this->DistanceAll[j][k] =100.0f;
-				else//2つの部位の位置の距離、フレームの差をそれぞれ取り、その和を誤差(コスト)とする
-					this->DistanceAll[j][k] = MotionPlaybackApp::DistanceCalc(motion1.body->num_segments, v1[j], v2[k], this->DistancePart);
+					this->DistancePart[i][j][k] = 100.0f;
+					break;
+				}
+				else
+				{
+					this->DistancePart[i][j][k] = sqrt(pow(v1[j][i].x - v2[k][i].x, 2.0) + pow(v1[j][i].y - v2[k][i].y, 2.0) + pow(v1[j][i].z - v2[k][i].z, 2.0));
+					this->DistanceAll[j][k] += this->DistancePart[i][j][k];
+				}
 			}
 		}
 	}
@@ -1332,55 +1336,37 @@ void DTWinformation::DTWinformation_init( int frames1, int frames2, const Motion
 	}
 	this->PassAll[0].erase(this->PassAll[0].end() - 1);
 	this->PassAll[1].erase(this->PassAll[1].end() - 1);
-	DTWframe = PassAll[0].size();
+	this->DTWframe = PassAll[0].size();
 
 	//部位の集合ごとの誤差
-	for(int f = 0; f < DTWframe; f++)
+	for(int f = 0; f < this->DTWframe; f++)
 	{
-		this->head.push_back(MotionPlaybackApp::DistanceCalcPart(PassAll[0][f],PassAll[1][f],11,v1,v2) + 
-			MotionPlaybackApp::DistanceCalcPart(PassAll[0][f],PassAll[1][f],12,v1,v2));
-		this->chest.push_back(MotionPlaybackApp::DistanceCalcPart(PassAll[0][f],PassAll[1][f],0,v1,v2) + 
-			MotionPlaybackApp::DistanceCalcPart(PassAll[0][f],PassAll[1][f],7,v1,v2) + 
-			MotionPlaybackApp::DistanceCalcPart(PassAll[0][f],PassAll[1][f],8,v1,v2) +
-			MotionPlaybackApp::DistanceCalcPart(PassAll[0][f],PassAll[1][f],9,v1,v2) +
-			MotionPlaybackApp::DistanceCalcPart(PassAll[0][f],PassAll[1][f],10,v1,v2));
-		this->head_chest.push_back(MotionPlaybackApp::DistanceCalcPart(PassAll[0][f],PassAll[1][f],0,v1,v2) +
-			MotionPlaybackApp::DistanceCalcPart(PassAll[0][f],PassAll[1][f],7,v1,v2) +
-			MotionPlaybackApp::DistanceCalcPart(PassAll[0][f],PassAll[1][f],8,v1,v2) +
-			MotionPlaybackApp::DistanceCalcPart(PassAll[0][f],PassAll[1][f],9,v1,v2) +
-			MotionPlaybackApp::DistanceCalcPart(PassAll[0][f],PassAll[1][f],10,v1,v2) +
-			MotionPlaybackApp::DistanceCalcPart(PassAll[0][f],PassAll[1][f],11,v1,v2) +
-			MotionPlaybackApp::DistanceCalcPart(PassAll[0][f],PassAll[1][f],12,v1,v2));
+		this->head.push_back(this->DistancePart[11][PassAll[0][f]][PassAll[1][f]] + 
+			this->DistancePart[12][PassAll[0][f]][PassAll[1][f]]);
+		this->chest.push_back(this->DistancePart[0][PassAll[0][f]][PassAll[1][f]] + 
+			this->DistancePart[7][PassAll[0][f]][PassAll[1][f]] + 
+			this->DistancePart[8][PassAll[0][f]][PassAll[1][f]] +
+			this->DistancePart[9][PassAll[0][f]][PassAll[1][f]] +
+			this->DistancePart[10][PassAll[0][f]][PassAll[1][f]]);
+		this->head_chest.push_back(this->head.back() + this->chest.back());
 
-		this->right_leg.push_back(MotionPlaybackApp::DistanceCalcPart(PassAll[0][f],PassAll[1][f],1,v1,v2) +
-			MotionPlaybackApp::DistanceCalcPart(PassAll[0][f],PassAll[1][f],2,v1,v2) +
-			MotionPlaybackApp::DistanceCalcPart(PassAll[0][f],PassAll[1][f],3,v1,v2));
-		this->left_leg.push_back(MotionPlaybackApp::DistanceCalcPart(PassAll[0][f],PassAll[1][f],4,v1,v2) +
-			MotionPlaybackApp::DistanceCalcPart(PassAll[0][f],PassAll[1][f],5,v1,v2) +
-			MotionPlaybackApp::DistanceCalcPart(PassAll[0][f],PassAll[1][f],6,v1,v2));
-		this->leg.push_back(MotionPlaybackApp::DistanceCalcPart(PassAll[0][f],PassAll[1][f],1,v1,v2) +
-			MotionPlaybackApp::DistanceCalcPart(PassAll[0][f],PassAll[1][f],2,v1,v2) +
-			MotionPlaybackApp::DistanceCalcPart(PassAll[0][f],PassAll[1][f],3,v1,v2) +
-			MotionPlaybackApp::DistanceCalcPart(PassAll[0][f],PassAll[1][f],4,v1,v2) +
-			MotionPlaybackApp::DistanceCalcPart(PassAll[0][f],PassAll[1][f],5,v1,v2) +
-			MotionPlaybackApp::DistanceCalcPart(PassAll[0][f],PassAll[1][f],6,v1,v2));
+		this->right_leg.push_back(this->DistancePart[1][PassAll[0][f]][PassAll[1][f]] +
+			this->DistancePart[2][PassAll[0][f]][PassAll[1][f]] +
+			this->DistancePart[3][PassAll[0][f]][PassAll[1][f]]);
+		this->left_leg.push_back(this->DistancePart[4][PassAll[0][f]][PassAll[1][f]] +
+			this->DistancePart[5][PassAll[0][f]][PassAll[1][f]] +
+			this->DistancePart[6][PassAll[0][f]][PassAll[1][f]]);
+		this->leg.push_back(this->right_leg.back() + this->left_leg.back());
 
-		this->right_arm.push_back(MotionPlaybackApp::DistanceCalcPart(PassAll[0][f],PassAll[1][f],13,v1,v2) +
-			MotionPlaybackApp::DistanceCalcPart(PassAll[0][f],PassAll[1][f],14,v1,v2) +
-			MotionPlaybackApp::DistanceCalcPart(PassAll[0][f],PassAll[1][f],15,v1,v2) +
-			MotionPlaybackApp::DistanceCalcPart(PassAll[0][f],PassAll[1][f],16,v1,v2));
-		this->left_arm.push_back(MotionPlaybackApp::DistanceCalcPart(PassAll[0][f],PassAll[1][f],36,v1,v2) +
-			MotionPlaybackApp::DistanceCalcPart(PassAll[0][f],PassAll[1][f],37,v1,v2) +
-			MotionPlaybackApp::DistanceCalcPart(PassAll[0][f],PassAll[1][f],38,v1,v2) +
-			MotionPlaybackApp::DistanceCalcPart(PassAll[0][f],PassAll[1][f],39,v1,v2));
-		this->arm.push_back(MotionPlaybackApp::DistanceCalcPart(PassAll[0][f],PassAll[1][f],13,v1,v2) +
-			MotionPlaybackApp::DistanceCalcPart(PassAll[0][f],PassAll[1][f],14,v1,v2) +
-			MotionPlaybackApp::DistanceCalcPart(PassAll[0][f],PassAll[1][f],15,v1,v2) +
-			MotionPlaybackApp::DistanceCalcPart(PassAll[0][f],PassAll[1][f],16,v1,v2) +
-			MotionPlaybackApp::DistanceCalcPart(PassAll[0][f],PassAll[1][f],36,v1,v2) +
-			MotionPlaybackApp::DistanceCalcPart(PassAll[0][f],PassAll[1][f],37,v1,v2) +
-			MotionPlaybackApp::DistanceCalcPart(PassAll[0][f],PassAll[1][f],38,v1,v2) +
-			MotionPlaybackApp::DistanceCalcPart(PassAll[0][f],PassAll[1][f],39,v1,v2));
+		this->right_arm.push_back(this->DistancePart[13][PassAll[0][f]][PassAll[1][f]] +
+			this->DistancePart[14][PassAll[0][f]][PassAll[1][f]] +
+			this->DistancePart[15][PassAll[0][f]][PassAll[1][f]] +
+			this->DistancePart[16][PassAll[0][f]][PassAll[1][f]]);
+		this->left_arm.push_back(this->DistancePart[36][PassAll[0][f]][PassAll[1][f]] +
+			this->DistancePart[37][PassAll[0][f]][PassAll[1][f]] +
+			this->DistancePart[38][PassAll[0][f]][PassAll[1][f]] +
+			this->DistancePart[39][PassAll[0][f]][PassAll[1][f]]);
+		this->arm.push_back(this->right_arm.back() + this->left_arm.back());
 	}
 
 
@@ -1453,18 +1439,18 @@ void DTWinformation::DTWinformation_init( int frames1, int frames2, const Motion
 	
 
 	//部位ごとのパス作成
-	for(int i = 0; i < motion1.body->num_segments; i++)
-	{
-		//手の部位は計算しない
-		while(i > 16 && i < 36)
-			i++;
-		if(i > 39)
-			break;
+	//for(int i = 0; i < motion1.body->num_segments; i++)
+	//{
+	//	//手の部位は計算しない
+	//	while(i > 16 && i < 36)
+	//		i++;
+	//	if(i > 39)
+	//		break;
 
-		for(int j = 0; j < frames1; j++)
-		{
-			if(j == 0)//部位の探索の最初にすること
-			{
+	//	for(int j = 0; j < frames1; j++)
+	//	{
+	//		if(j == 0)//部位の探索の最初にすること
+	//		{
 				//frame_ivalフレーム毎に探索してある程度の見立てを立てる
 				//for(int s = 0; s < frames1; s = s + frame_ival)
 				//{
@@ -1498,45 +1484,45 @@ void DTWinformation::DTWinformation_init( int frames1, int frames2, const Motion
 				//	min_departure = 100.0f;
 				//}
 				
-				for(int k = 0; k < frames2; k++)
-				{
-					//if(j % frame_ival == 0)
-					//	break;
+			//	for(int k = 0; k < frames2; k++)
+			//	{
+			//		//if(j % frame_ival == 0)
+			//		//	break;
 
-					//2つの部位の位置の距離、フレームの差をそれぞれ取り、その和を誤差(コスト)とする
-					pos_dis = sqrt(pow(v1[j][i].x - v2[k][i].x, 2.0) + pow(v1[j][i].y - v2[k][i].y, 2.0) + pow(v1[j][i].z - v2[k][i].z, 2.0));
-					frame_dis = 0.003f * abs(k - j);
-					distance = pos_dis + frame_dis;
+			//		//2つの部位の位置の距離、フレームの差をそれぞれ取り、その和を誤差(コスト)とする
+			//		pos_dis = sqrt(pow(v1[j][i].x - v2[k][i].x, 2.0) + pow(v1[j][i].y - v2[k][i].y, 2.0) + pow(v1[j][i].z - v2[k][i].z, 2.0));
+			//		frame_dis = 0.003f * abs(k - j);
+			//		distance = pos_dis + frame_dis;
 
-					//もし一番距離が小さいパスのコストより小さければ置き換える
-					if(min_distance > distance)
-					{
-						this->PassPart[i][j] = k;
-						min_distance = distance;
-						this->DistancePart[i][j] = pos_dis;
-					}
-				}
-			}
+			//		//もし一番距離が小さいパスのコストより小さければ置き換える
+			//		if(min_distance > distance)
+			//		{
+			//			this->PassPart[i][j] = k;
+			//			min_distance = distance;
+			//			this->DistancePart[i][j] = pos_dis;
+			//		}
+			//	}
+			//}
 
-			if(j != 0)
-				for(int k = this->PassPart[i][j - 1]; k < frames2; k++)
-				{
-					//if(j % frame_ival == 0)
-					//	break;
+			//if(j != 0)
+			//	for(int k = this->PassPart[i][j - 1]; k < frames2; k++)
+			//	{
+			//		//if(j % frame_ival == 0)
+			//		//	break;
 
-					//2つの部位の位置の距離、フレームの差をそれぞれ取り、その和を誤差(コスト)とする
-					pos_dis = sqrt(pow(v1[j][i].x - v2[k][i].x, 2.0) + pow(v1[j][i].y - v2[k][i].y, 2.0) + pow(v1[j][i].z - v2[k][i].z, 2.0));
-					frame_dis = 0.003f * abs(k - j);
-					distance = pos_dis + frame_dis;
+			//		//2つの部位の位置の距離、フレームの差をそれぞれ取り、その和を誤差(コスト)とする
+			//		pos_dis = sqrt(pow(v1[j][i].x - v2[k][i].x, 2.0) + pow(v1[j][i].y - v2[k][i].y, 2.0) + pow(v1[j][i].z - v2[k][i].z, 2.0));
+			//		frame_dis = 0.003f * abs(k - j);
+			//		distance = pos_dis + frame_dis;
 
-					//もし一番距離が小さいパスのコストより小さければ置き換える
-					if(min_distance > distance)
-					{
-						this->PassPart[i][j] = k;
-						min_distance = distance;
-						this->DistancePart[i][j] = min_distance;
-					}
-				}
+			//		//もし一番距離が小さいパスのコストより小さければ置き換える
+			//		if(min_distance > distance)
+			//		{
+			//			this->PassPart[i][j] = k;
+			//			min_distance = distance;
+			//			this->DistancePart[i][j] = min_distance;
+			//		}
+			//	}
 
 			//jのフレームのパスaと、j-1のフレームのパスbがあったとき、a<bとなると時間が逆になってしまうためそれを避ける
 			//if(j > 0 && this->DTWpass[i][j] < this->DTWpass[i][j-1])
@@ -1598,33 +1584,40 @@ void DTWinformation::DTWinformation_init( int frames1, int frames2, const Motion
 			//	this->arm[j] += this->DistancePart[i][j];
 			//}
 
-			min_distance = 100.0f;
-		}
-	}
+	//		min_distance = 100.0f;
+	//	}
+	//}
 
 	//部位毎の誤差の合計値を取る
-	for(int i = 0; i < seg_frame_array1.size(); i++)
+	for(int i = 0; i < Num_segments; i++)
 	{
-		this->DistancePart[i][frames1] = 0.0f;
-		if(i <= 16)
-			for(int j = 0; j < frames1; j++)
-				this->DistancePart[i][frames1] += this->DistancePart[i][j];
-		else if(i >= 36 && i <= 39)
-			for(int j = 0; j < frames1; j++)
-				this->DistancePart[i][frames1] += this->DistancePart[i][j];
+		//手の部位は計算しない
+		while (i > 16 && i < 36)
+			i++;
+		if (i > 39)
+			break;
+
+		for(int f = 0; f < this->DTWframe; f++)
+			this->DisTotalPart[i] += this->DistancePart[i][PassAll[0][f]][PassAll[1][f]];
 	}
 
 	//誤差の大きい順にDTWorderを並べ替える
-	for(int i = 0; i < motion1.body->num_segments - 1; i++)
-		for(int j = i; j < motion1.body->num_segments; j++)
-			if(this->DistancePart[this->DTWorder[i]][frames1] < this->DistancePart[this->DTWorder[j]][frames1])
+	for(int i = 0; i < Num_segments - 1; i++)
+		for(int j = i; j < Num_segments; j++)
+			if(this->DisTotalPart[i] < this->DisTotalPart[j])
 				std::swap(this->DTWorder[i], this->DTWorder[j]);
 
 	//誤差の合計を加算
-	for(int i = 0; i < motion1.body->num_segments; i++)
+	for(int i = 0; i < Num_segments; i++)
 	{
+		//手の部位は計算しない
+		while (i > 16 && i < 36)
+			i++;
+		if (i > 39)
+			break;
+
 		//全部位の誤差の合計を計算
-		this->DTWtotal += this->DistancePart[i][frames1];
+		this->DisTotalAll += this->DisTotalPart[i];
 
 		//誤差の合計を部位ごとに加算
 		//if(i == 0)
@@ -1642,7 +1635,7 @@ void DTWinformation::DTWinformation_init( int frames1, int frames2, const Motion
 		//else
 		//	this->left_arm[frames1] += this->DistancePart[i][frames1];
 
-		std::cout << " [ " << this->DTWorder[i] << " segment: " << this->DistancePart[this->DTWorder[i]][frames1] << " ] ";
+		std::cout << " [ " << this->DTWorder[i] << " segment: " << this->DisTotalPart[this->DTWorder[i]] << " ] ";
 	}
 	std::cout << std::endl;
 }
