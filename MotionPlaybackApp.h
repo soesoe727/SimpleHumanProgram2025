@@ -119,14 +119,17 @@ class  MotionPlaybackApp : public GLUTBaseApp
 	// 現在の表示フレーム番号
 	int  frame_no;
 
+	//
+	int frames;
+
+	// 現在の表示フレーム番号
+	int  DTWframe_no;
+
 	//体節の番目
 	int view_segment;
 
 	//DTWの情報
 	DTWinformation * DTWa;
-
-	//全体誤差かフレーム毎誤差を表示するか
-	int flag;
 
 	//姿勢の色パターン
 	int pattern;
@@ -138,10 +141,10 @@ class  MotionPlaybackApp : public GLUTBaseApp
 	float num_space = 30.0f;
 
 	//sabun
-	int m1f = -1;
-	int m2f = -1;
-	int mf = -100;
-	int sabun_flag = -1;
+	int m1f = -30;
+	int m2f = -30;
+	int mf = -30;
+	int sabun_flag = 1;
 
   public:
 	// コンストラクタ

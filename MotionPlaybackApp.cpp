@@ -33,10 +33,11 @@ MotionPlaybackApp::MotionPlaybackApp()
 	on_animation = true;
 	animation_time = 0.0f;
 	animation_speed = 1.0f;
+	DTWframe_no = 0;
 	frame_no = 0;
+	frames = 0;
 	view_segment = 12;
 	DTWa = NULL;
-	flag = 1;
 	pattern = 0;
 	timeline = NULL;
 }
@@ -91,8 +92,8 @@ void  MotionPlaybackApp::Initialize()
 			motion2->frames[i].root_pos -= root;
 
 		InitSegmentname(motion->body->num_segments);
-		PatternTimeline(timeline, * motion, frame_no, DTWa);
-	}	
+		PatternTimeline(timeline, * motion, DTWframe_no, DTWa);
+	}
 }
 
 //
@@ -106,6 +107,7 @@ void  MotionPlaybackApp::Start()
 	// アニメーション再生のための変数の初期化
 	on_animation = true;
 	animation_time = 0.0f;
+	DTWframe_no = 0;
 	frame_no = 0;
 
 	// アニメーション再生処理（姿勢の初期化）
@@ -132,29 +134,43 @@ void  MotionPlaybackApp::Display()
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		
 
-		if(sabun_flag == -1)
+		if(sabun_flag == 1)//DTWによる再生
 		{
 			//1人目の動作の可視化(色付け)
-			Pass_posture1 = motion->frames[DTWa->PassAll[0][frame_no]];
+			Pass_posture1 = motion->frames[DTWa->PassAll[0][DTWframe_no]];
 			DrawPostureColor(Pass_posture1, pattern, view_segment);
 			DrawPostureShadow(Pass_posture1, shadow_dir, shadow_color);
 
 			//2人目の動作の可視化(白･灰)(パス対応)
-			Pass_posture2 = motion2->frames[DTWa->PassAll[1][frame_no]];
+			Pass_posture2 = motion2->frames[DTWa->PassAll[1][DTWframe_no]];
 			DrawPostureGray(Pass_posture2, pattern, view_segment);
 			DrawPostureShadow(Pass_posture2, shadow_dir, shadow_color);
 		}
-		else
+		else//通常再生
 		{
-			//1人目の動作の可視化(色付け)
-			Pass_posture1 = motion->frames[frame_no + m1f];
-			DrawPostureColor(Pass_posture1, pattern, view_segment);
-			DrawPostureShadow(Pass_posture1, shadow_dir, shadow_color);
+			if(frame_no <= mf)
+			{
+				//1人目の動作の可視化(色付け)
+				Pass_posture1 = motion->frames[DTWa->PassAll[0][frame_no]];
+				DrawPostureColor(Pass_posture1, pattern, view_segment);
+				DrawPostureShadow(Pass_posture1, shadow_dir, shadow_color);
 
-			//2人目の動作の可視化(白･灰)(パス対応)
-			Pass_posture2 = motion2->frames[frame_no + m2f];
-			DrawPostureGray(Pass_posture2, pattern, view_segment);
-			DrawPostureShadow(Pass_posture2, shadow_dir, shadow_color);
+				//2人目の動作の可視化(白･灰)(パス対応)
+				Pass_posture2 = motion2->frames[DTWa->PassAll[1][frame_no]];
+				DrawPostureGray(Pass_posture2, pattern, view_segment);
+				DrawPostureShadow(Pass_posture2, shadow_dir, shadow_color);
+			}
+			else
+			{
+				//1人目の動作の可視化(色付け)
+				Pass_posture1 = motion->frames[DTWa->PassAll[0][mf] + frame_no - m1f];
+				DrawPostureColor(Pass_posture1, pattern, view_segment);
+				DrawPostureShadow(Pass_posture1, shadow_dir, shadow_color);
+				//2人目の動作の可視化(白･灰)(パス対応)
+				Pass_posture2 = motion2->frames[DTWa->PassAll[1][mf] + frame_no - m2f];
+				DrawPostureGray(Pass_posture2, pattern, view_segment);
+				DrawPostureShadow(Pass_posture2, shadow_dir, shadow_color);
+			}
 		}
 		glDisable(GL_BLEND);
 	}
@@ -166,22 +182,41 @@ void  MotionPlaybackApp::Display()
 		int name_space = 30.0f;
 		
 		//部位の集合ごとの色付け
-		for (int j = 12; j >= 11; j--)
-			timeline->SetElementColor(Track_num * DTWa->DTWframe + Track_num++, Pattern_Color(pattern, j));
-		for (int j = 10; j >= 7; j--)
-			timeline->SetElementColor(Track_num * DTWa->DTWframe + Track_num++, Pattern_Color(pattern, j));
-		timeline->SetElementColor(Track_num * DTWa->DTWframe + Track_num++, Pattern_Color(pattern, 0));
-		for (int j = 13; j <= 16; j++)
-			timeline->SetElementColor(Track_num * DTWa->DTWframe + Track_num++, Pattern_Color(pattern, j));
-		for (int j = 36; j <= 39; j++)
-			timeline->SetElementColor(Track_num * DTWa->DTWframe + Track_num++, Pattern_Color(pattern, j));
-		for (int j = 1; j <= 3; j++)
-			timeline->SetElementColor(Track_num * DTWa->DTWframe + Track_num++, Pattern_Color(pattern, j));
-		for (int j = 4; j <= 6; j++)
-			timeline->SetElementColor(Track_num * DTWa->DTWframe + Track_num++, Pattern_Color(pattern, j));
-		
-		PatternTimeline(timeline, * motion, frame_no, DTWa);
-		timeline->SetLineTime( 1, animation_time / motion->interval + name_space );
+		if(sabun_flag == 1)
+		{
+			for (int j = 12; j >= 11; j--)
+				timeline->SetElementColor(Track_num * DTWa->DTWframe + Track_num++, Pattern_Color(pattern, j));
+			for (int j = 10; j >= 7; j--)
+				timeline->SetElementColor(Track_num * DTWa->DTWframe + Track_num++, Pattern_Color(pattern, j));
+			timeline->SetElementColor(Track_num * DTWa->DTWframe + Track_num++, Pattern_Color(pattern, 0));
+			for (int j = 13; j <= 16; j++)
+				timeline->SetElementColor(Track_num * DTWa->DTWframe + Track_num++, Pattern_Color(pattern, j));
+			for (int j = 36; j <= 39; j++)
+				timeline->SetElementColor(Track_num * DTWa->DTWframe + Track_num++, Pattern_Color(pattern, j));
+			for (int j = 1; j <= 3; j++)
+				timeline->SetElementColor(Track_num * DTWa->DTWframe + Track_num++, Pattern_Color(pattern, j));
+			for (int j = 4; j <= 6; j++)
+				timeline->SetElementColor(Track_num * DTWa->DTWframe + Track_num++, Pattern_Color(pattern, j));
+			PatternTimeline(timeline, * motion, DTWframe_no, DTWa);
+		}
+		else
+		{
+			for (int j = 12; j >= 11; j--)
+				timeline->SetElementColor(Track_num * frames + Track_num++, Color4f(0.8f, 0.2f, 0.2f, 1.0f));
+			for (int j = 10; j >= 7; j--)
+				timeline->SetElementColor(Track_num * frames + Track_num++, Color4f(0.8f, 0.2f, 0.2f, 1.0f));
+			timeline->SetElementColor(Track_num * frames + Track_num++, Color4f(0.8f, 0.2f, 0.2f, 1.0f));
+			for (int j = 13; j <= 16; j++)
+				timeline->SetElementColor(Track_num * frames + Track_num++, Color4f(0.2f, 0.8f, 0.2f, 1.0f));
+			for (int j = 36; j <= 39; j++)
+				timeline->SetElementColor(Track_num * frames + Track_num++, Color4f(0.2f, 0.2f, 0.8f, 1.0f));
+			for (int j = 1; j <= 3; j++)
+				timeline->SetElementColor(Track_num * frames + Track_num++, Color4f(0.2f, 0.2f, 0.8f, 1.0f));
+			for (int j = 4; j <= 6; j++)
+				timeline->SetElementColor(Track_num * frames + Track_num++, Color4f(0.2f, 0.2f, 0.8f, 1.0f));
+			PatternTimeline(timeline, *motion, frame_no, DTWa);
+		}
+
 		timeline->DrawTimeline();
 	}
 
@@ -193,10 +228,17 @@ void  MotionPlaybackApp::Display()
 	char messages[5][64]{};
 	if ( motion && motion2 )
 	{
-		sprintf( message1, "%.2f (%d)", animation_time, frame_no );
+		if (sabun_flag == 1)
+			sprintf(message1, "%.2f (%d)", animation_time, DTWframe_no);
+		else
+			sprintf(message1, "%.2f (%d)", animation_time, frame_no);
 		sprintf( message2, "viewing %s", motion->body->segments[view_segment]->name.c_str() );
 		for(int i = 0; i < 5; i++)
 			sprintf( messages[i], "%s : %.2f percent", motion->body->segments[DTWa->DTWorder[i]]->name.c_str(), 100 * DTWa->DisTotalPart[DTWa->DTWorder[i]] / DTWa->DisTotalAll);
+		if (sabun_flag == 1)
+			sprintf(message3, "DTW_reproduction");
+		else
+			sprintf(message3, "usual_reproduction");
 		/*
 		if( pattern == 0 )
 			sprintf(message3, "leg:%.2f, chest:%.2f, arm:%.2f", DTWa->left_leg + DTWa->right_leg, DTWa->chest + DTWa->head, DTWa->left_arm + DTWa->right_arm);
@@ -211,7 +253,7 @@ void  MotionPlaybackApp::Display()
 		DrawTextInformation( 2, message2 );
 		for(int i = 0; i < 5; i++)
 			DrawTextInformation( 3+i, messages[i] );
-		//DrawTextInformation( 8, message3 );
+		DrawTextInformation( 8, message3 );
 	}
 	else
 	{
@@ -239,21 +281,7 @@ void MotionPlaybackApp::Reshape(int w, int h)
 void  MotionPlaybackApp::Keyboard( unsigned char key, int mx, int my )
 {
 	GLUTBaseApp::Keyboard( key, mx, my );
-	int a;
 
-	//f キーで再生方法切り替え
-	if(key == 'f')
-	{
-		if(sabun_flag == -1)
-		{
-			m1f = DTWa->PassAll[0][frame_no];
-			m2f = DTWa->PassAll[1][frame_no];
-		}
-		mf = frame_no;
-		sabun_flag *= -1;
-		frame_no = 0;
-		std::cout << m1f << " " << m2f << " " << mf << std::endl;
-	}
 	// space キーでアニメーションの停止・再開
 	if ( key == ' ' )
 		on_animation = !on_animation;
@@ -263,20 +291,20 @@ void  MotionPlaybackApp::Keyboard( unsigned char key, int mx, int my )
 		animation_speed = ( animation_speed == 1.0f ) ? 0.1f : 1.0f;
 
 	// e キーで次のフレーム
-	if ( ( key == '.' ) && !on_animation && motion )
-	{
-		on_animation = true;
-		Animation( motion->interval );
-		on_animation = false;
-	}
+	//if ( ( key == '.' ) && !on_animation && motion )
+	//{
+	//	on_animation = true;
+	//	Animation( motion->interval );
+	//	on_animation = false;
+	//}
 
 	// q キーで前のフレーム
-	if ( ( key == ',' ) && !on_animation && motion && ( frame_no > 0 ) )
-	{
-		on_animation = true;
-		Animation( - motion->interval );
-		on_animation = false;
-	}
+	if ( ( key == ',' ) && !on_animation && motion && ( DTWframe_no > 0 ) )
+	//{
+	//	on_animation = true;
+	//	Animation( - motion->interval );
+	//	on_animation = false;
+	//}
 	
 	// L キーで再生動作の変更
 	//if ( key == 'L' )
@@ -291,7 +319,7 @@ void  MotionPlaybackApp::Keyboard( unsigned char key, int mx, int my )
 		view_segment = ViewSegment(1, view_segment);
 
 	//q キーでview_segmentの変更-
-	if (key == 'q')
+	if (key == 'a')
 		view_segment = ViewSegment(0, view_segment);
 
 	// 0 キーでパターン0
@@ -312,6 +340,29 @@ void  MotionPlaybackApp::Keyboard( unsigned char key, int mx, int my )
 	// 5 キーでパターン5
 	if ( key == '5' )
 		pattern = 5;
+
+	//f キーで再生方法切り替え
+	if(key == 'f')
+	{
+		if(sabun_flag == 1)
+		{
+			m1f = DTWa->PassAll[0][DTWframe_no];
+			m2f = DTWa->PassAll[1][DTWframe_no];
+			mf = DTWframe_no;
+			frames = mf + motion->num_frames - m1f;
+			frame_no = 0;
+			std::cout << m1f << " " << m2f << " " << mf << std::endl;
+			sabun_flag *= -1;
+		}
+		else
+		{
+			m1f = -30;
+			m2f = -30;
+			mf = -30;
+			DTWframe_no = 0;
+			sabun_flag *= -1;
+		}
+	}
 }
 
 //
@@ -328,8 +379,10 @@ void  MotionPlaybackApp::MouseDrag( int mx, int my )
 
 	if(selected_time < 0)
 		selected_time = 0.0f;
-	else if(selected_time > DTWa->DTWframe - 1)
+	else if(sabun_flag == 1 && selected_time > DTWa->DTWframe - 1)
 		selected_time = DTWa->DTWframe - 1;
+	else if (sabun_flag == -1 && selected_time > frames - 1)
+		selected_time = frames - 1;
 
 	// 変形動作の再生時刻を変更
 	if ( drag_mouse_l )
@@ -355,8 +408,10 @@ void MotionPlaybackApp::MouseClick(int button, int state, int mx, int my)
 
 	if(selected_time < 0)
 		selected_time = 0.0f;
-	else if(selected_time > DTWa->DTWframe - 1)
+	else if(sabun_flag == 1 && selected_time > DTWa->DTWframe - 1)
 		selected_time = DTWa->DTWframe - 1;
+	else if (sabun_flag == -1 && selected_time > frames - 1)
+		selected_time = frames - 1;
 
 	// 入力動作トラック上のクリック位置に応じて、変形動作の再生時刻を変更
 	if ( drag_mouse_l )
@@ -385,18 +440,26 @@ void  MotionPlaybackApp::Animation( float delta )
 
 	// 時間を進める
 	animation_time += delta * animation_speed;
-	if ( pattern == 5 && animation_time > motion->GetDuration() )
-		animation_time -= motion->GetDuration();
-	else if( sabun_flag == -1 && animation_time > DTWa->DTWframe * motion->interval)
-		animation_time -= DTWa->DTWframe * motion->interval;
-	else if( sabun_flag == 1 && animation_time > (motion2->num_frames - m2f) * motion->interval)
-		animation_time -= (motion2->num_frames - m2f) * motion->interval;
+	//if ( animation_time > motion->GetDuration() )
+	//	animation_time -= motion->GetDuration();
+	if( sabun_flag == 1)
+	{
+		if(animation_time >= DTWa->DTWframe * motion->interval)
+			animation_time = 0.0f;
+		DTWframe_no = animation_time / motion->interval;
+	}
+	else if( sabun_flag == -1)
+	{
+		if(animation_time >= frames * motion->interval)
+			animation_time = 0.0f;
+		frame_no = animation_time / motion->interval;
+	}
 	// 現在のフレーム番号を計算
-	frame_no = animation_time / motion->interval;
+	//DTWframe_no = animation_time / motion->interval;
 
 	// 動作データから現在時刻の姿勢を取得
-	motion->GetPosture( animation_time, *curr_posture );
-	motion2->GetPosture( animation_time, *curr_posture2 );
+	//motion->GetPosture( animation_time, *curr_posture );
+	//motion2->GetPosture( animation_time, *curr_posture2 );
 
 }
 
@@ -770,7 +833,7 @@ void MotionPlaybackApp::PatternTimeline(Timeline* timeline, Motion& motion, floa
 	// 動作再生時刻を表す縦線を設定
 	timeline->AddLine( curr_frame + num_space, Color4f( 1.0f, 1.0f, 1.0f, 1.0f ) );
 
-	timeline->AddLine( motion.num_frames + num_space, Color4f( 0.0f, 0.0f, 0.0f, 1.0f ) );
+	timeline->AddLine( mf + num_space, Color4f( 0.0f, 0.0f, 0.0f, 1.0f ) );
 }
 
 //
@@ -1122,6 +1185,9 @@ void DTWinformation::DTWinformation_init( int frames1, int frames2, const Motion
 	this->PassAll[0].erase(this->PassAll[0].end() - 1);
 	this->PassAll[1].erase(this->PassAll[1].end() - 1);
 	this->DTWframe = PassAll[0].size();
+
+	for(int f = 0; f < this->PassAll[0].size(); f++)
+		std::cout << "[" << this->PassAll[0][f] << "," << this->PassAll[1][f] << "]" << std::endl;
 
 	//部位の集合ごとの誤差
 	for(int f = 0; f < this->DTWframe; f++)
