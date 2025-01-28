@@ -273,16 +273,16 @@ void  DrawBone( float x0, float y0, float z0, float x1, float y1, float z1, floa
 void  DrawPosture( const Posture & posture );
 
 // 姿勢の描画（スティックフィギュアで描画）
-void  DrawPostureColor( const Posture & posture, int pattern, int view_segment );
+void  DrawPostureColor( const Posture & posture, int pattern, int view_segment, vector<int> view_segments );
 
 // 姿勢の描画（スティックフィギュアで描画）
-void  DrawPostureGray( const Posture & posture, int pattern, int view_segment );
+void  DrawPostureGray( const Posture & posture, int pattern, int view_segment, vector<int> view_segments );
 
 //部位の描画
-void DrawPart( const Motion * motion, const int part_num );
+//void DrawPart( const Motion * motion, const int part_num );
 
 //軌跡の描画
-void DrawTrace( const Motion * motion, const int part_num );
+//void DrawTrace( const Motion * motion, const int part_num );
 
 // 姿勢の影の描画（スティックフィギュアで描画）
 void  DrawPostureShadow( const Posture & posture, const Vector3f & light_dir, const Color4f & color );

@@ -46,42 +46,37 @@ struct DTWinformation
 		//部位毎の誤差値の合計
 		float * DisTotalPart;
 
-		//frame毎の誤差値の合計
-		int * DTWforder;
-
-		//左脚の誤差
-		vector< float > left_leg;
-
-		//右脚の誤差
-		vector< float > right_leg;
-
-		//脚全体の誤差
-		vector< float > leg;
+		//頭部の誤差
+		vector< vector< float > > head;
 
 		//胸部の誤差
-		vector< float > chest;
-
-		//頭部の誤差
-		vector< float > head;
+		vector< vector< float > > chest;
 
 		//頭部と胸部の誤差
-		vector< float > head_chest;
-
-		//左腕の誤差
-		vector< float > left_arm;
+		vector< vector< float > > head_chest;
 
 		//右腕の誤差
-		vector< float > right_arm;
+		vector< vector< float > > right_arm;
+
+		//左腕の誤差
+		vector< vector< float > > left_arm;
 
 		//腕全体の誤差
-		vector< float > arm;
+		vector< vector< float > > arm;
+
+		//右脚の誤差
+		vector< vector< float > > right_leg;
+
+		//左脚の誤差
+		vector< vector< float > > left_leg;
+
+		//脚全体の誤差
+		vector< vector< float > > leg;
 
 	public:
 		//DTW初期化
 		void DTWinformation_init( int frames1, int frames2, const Motion & motion1, const Motion & motion2 );	
 
-		//DTWフレーム毎の誤差
-		void DTWinformation_frame(int now_frame, int num_segments);
 };
 
 //
@@ -116,17 +111,20 @@ class  MotionPlaybackApp : public GLUTBaseApp
 	// アニメーションの再生速度
 	float  animation_speed;
 
-	// 現在の表示フレーム番号
-	int  frame_no;
-
-	//
+	//再生切り替え後の全フレーム数
 	int frames;
 
-	// 現在の表示フレーム番号
+	// 現在の表示フレーム番号(frames)
+	int  frame_no;
+
+	// 現在の表示フレーム番号(DTWframes)
 	int  DTWframe_no;
 
 	//体節の番目
 	int view_segment;
+
+	//体節の色付け設定
+	vector<int> view_segments;
 
 	//DTWの情報
 	DTWinformation * DTWa;
@@ -194,7 +192,7 @@ class  MotionPlaybackApp : public GLUTBaseApp
 	void  OpenNewBVH2();
 
 	//タイムラインのパターン毎読み込み
-	void  PatternTimeline( Timeline * timeline, Motion & motion, float curr_frame, DTWinformation * DTW);
+	void  PatternTimeline( Timeline * timeline, Motion & motion, Motion & motion2, float curr_frame, DTWinformation * DTW);
 
 	//パターンによるカラーバーの部位名前の色変化
 	Color4f Pattern_Color(int pattern, int num_segment);
@@ -203,19 +201,25 @@ class  MotionPlaybackApp : public GLUTBaseApp
 	void InitSegmentname(int num_segments);
 
 	//部位の集合毎のカラーバーの誤差による色の変化を設定
-	void ColorBarElementSetPart(Timeline * timeline, int segment_num, int Track_num, vector<float> Distance, vector<vector<int>> PassAll, Motion & motion);
+	//void ColorBarElementSetPart(Timeline * timeline, int segment_num, int Track_num, vector<float> Distance, vector<vector<int>> PassAll, Motion & motion);
 
-	//部位毎のカラーバーの誤差による色の変化を設定
-	void ColorBarElementPart(Timeline * timeline, int segment_num, int Track_num, vector<vector<float>> Distanee, vector<vector<int>> PassAll, Motion & motion);
+	//カラーバーの誤差による色の変化を設定(DTWframe)
+	void ColorBarElementPart(Timeline * timeline, int segment_num, int Track_num, vector<vector<float>> Distance, vector<vector<int>> PassAll, Motion & motion);
 
-	//カラーバーを全て灰色に設定
+	//カラーバーの誤差による色の変化を設定(再生切り替え用)
+	void ColorBarElementRepPart(Timeline * timeline, int segment_num, int Track_num, vector<vector<float>> Distance, vector<vector<int>> PassAll, Motion & motion, Motion & motion2);
+
+	//カラーバーを全て灰色に設定(DTWframe)
 	void ColorBarElementGray(Timeline * timeline, int segment_num, int Track_num, vector<vector<int>> PassAll, Motion & motion);
 
+	//カラーバーを全て灰色に設定(再生切り替え用)
+	void ColorBarElementRepGray(Timeline * timeline, int segment_num, int Track_num, vector<vector<int>> PassAll, Motion & motion);
+	
 	//全部位との距離を取る
-	static float DistanceCalc( int num_segments, vector< Vector3f > v1, vector< Vector3f > v2);
+	//static float DistanceCalc( int num_segments, vector< Vector3f > v1, vector< Vector3f > v2);
 
 	//1部位との距離を取る
-	static float DistanceCalcPart(int frame1, int frame2, int num_segment, vector< vector< Vector3f > > v1, vector< vector< Vector3f > > v2 );
+	//static float DistanceCalcPart(int frame1, int frame2, int num_segment, vector< vector< Vector3f > > v1, vector< vector< Vector3f > > v2 );
 };
 
 
