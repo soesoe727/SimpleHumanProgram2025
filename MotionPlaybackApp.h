@@ -25,53 +25,74 @@ struct DTWinformation
 {
 	public:
 
-		//パス作成後のフレーム数
-		int DTWframe;
+		//位置誤差対応パス作成後のフレーム数
+		int DisFrame;
 
-		//全体の対応パス
-		vector< vector< int > > PassAll;
+		//角度誤差対応パス作成後のフレーム数
+		int AngFrame;
 
-		//パス対応された各フレームの誤差(部位毎)
+		//全体の位置誤差対応パス
+		vector< vector< int > > DisPassAll;
+
+		//全体の角度誤差対応パス
+		vector< vector< int > > AngPassAll;
+
+		//パス対応された各フレームの位置誤差(部位毎)
 		vector< vector< vector<float > > > DistancePart;
 
-		//パス対応された各フレームの誤差(全体)
+		//パス対応された各フレームの角度誤差(部位毎)
+		vector< vector< vector<float > > > AnglePart;
+
+		//パス対応された各フレームの位置誤差(全体)
 		vector< vector< float > > DistanceAll;
 
-		//体節の順番を誤差の大きさ順に並べ替えた値
-		int * DTWorder;
+		//パス対応された各フレームの角度誤差(全体)
+		vector< vector<float > > AngleAll;
 
-		//全体の誤差値の合計
-		float DisTotalAll;
+		//体節の順番を位置誤差の大きさ順に並べ替えた値
+		int * DisOrder;
 
-		//部位毎の誤差値の合計
-		float * DisTotalPart;
+		//体節の順番を角度誤差の大きさ順に並べ替えた値
+		int * AngOrder;
+
+		//全体の位置誤差値の合計
+		float ErrorDisTotalAll;
+
+		//部位毎の位置誤差値の合計
+		float * ErrorDisTotalPart;
+
+		//全体の角度誤差値の合計
+		float ErrorAngTotalAll;
+
+		//部位毎の角度誤差値の合計
+		float * ErrorAngTotalPart;
 
 		//頭部の誤差
-		vector< vector< float > > head;
+		vector< vector< float > > Dis_head, Ang_head;
 
 		//胸部の誤差
-		vector< vector< float > > chest;
+		vector< vector< float > > Dis_chest, Ang_chest;
 
 		//頭部と胸部の誤差
-		vector< vector< float > > head_chest;
+		vector< vector< float > > Dis_head_chest, Ang_head_chest;
 
 		//右腕の誤差
-		vector< vector< float > > right_arm;
+		vector< vector< float > > Dis_right_arm, Ang_right_arm;
 
 		//左腕の誤差
-		vector< vector< float > > left_arm;
+		vector< vector< float > > Dis_left_arm, Ang_left_arm;
 
 		//腕全体の誤差
-		vector< vector< float > > arm;
+		vector< vector< float > > Dis_arm, Ang_arm;
 
 		//右脚の誤差
-		vector< vector< float > > right_leg;
+		vector< vector< float > > Dis_right_leg, Ang_right_leg;
 
 		//左脚の誤差
-		vector< vector< float > > left_leg;
+		vector< vector< float > > Dis_left_leg, Ang_left_leg;
 
 		//脚全体の誤差
-		vector< vector< float > > leg;
+		vector< vector< float > > Dis_leg, Ang_leg;
 
 	public:
 		//DTW初期化
@@ -143,6 +164,9 @@ class  MotionPlaybackApp : public GLUTBaseApp
 	int m2f = -30;
 	int mf = -30;
 	int sabun_flag = 1;
+
+	//位置誤差(1)と角度誤差(-1)の切り替え
+	int error_flag = 1;
 
   public:
 	// コンストラクタ

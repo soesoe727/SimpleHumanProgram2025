@@ -77,16 +77,16 @@ struct  Joint
 class  Skeleton
 {
   public:
-	// 関節数
+	// 体節数
 	int  num_segments;
 
-	// 関節の配列 [関節番号]
+	// 体節の配列 [体節番号]
 	Segment **  segments;
 
-	// 体節数
+	// 関節数
 	int  num_joints;
 
-	// 体節の配列 [体節番号]
+	// 関節の配列 [関節番号]
 	Joint **  joints;
 
 
