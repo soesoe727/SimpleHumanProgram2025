@@ -98,6 +98,11 @@ struct DTWinformation
 		//DTW初期化
 		void DTWinformation_init( int frames1, int frames2, const Motion & motion1, const Motion & motion2 );	
 
+		//累積コストの計算
+		float DisCostAcummurate(int j, int k);
+
+		//累積コストの計算
+		float AngCostAcummurate(int j, int k);
 };
 
 //

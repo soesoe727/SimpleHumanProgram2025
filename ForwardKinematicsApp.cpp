@@ -64,40 +64,40 @@ void  ForwardKinematicsApp::Display()
 	// デプステストを無効にして、前面に上書きする
 	glDisable( GL_DEPTH_TEST );
 
-	// 関節点を描画（球を描画）
-	for ( int i=0; i<joint_positions.size(); i++ )
-	{
-		// 関節位置に球を描画
-		const Point3f &  pos = joint_positions[ i ];
-		glColor3f( 0.0f, 0.0f, 1.0f );
-		glPushMatrix();
-		glTranslatef( pos.x, pos.y, pos.z );
-		glutSolidSphere( 0.025f, 16, 16 );
-		glPopMatrix();
-	}
+	//// 関節点を描画（球を描画）
+	//for ( int i=0; i<joint_positions.size(); i++ )
+	//{
+	//	// 関節位置に球を描画
+	//	const Point3f &  pos = joint_positions[ i ];
+	//	glColor3f( 0.0f, 0.0f, 1.0f );
+	//	glPushMatrix();
+	//	glTranslatef( pos.x, pos.y, pos.z );
+	//	glutSolidSphere( 0.025f, 16, 16 );
+	//	glPopMatrix();
+	//}
 
-	// 体節の座標系を描画（座標軸を描画）
-	glGetFloatv( GL_LINE_WIDTH, &line_width );
-	glLineWidth( 2.0f );
-	for ( int i=0; i<segment_frames.size(); i++ )
-	{
-		glPushMatrix();
-		frame.transpose( segment_frames[ i ] );
-		glMultMatrixf( & frame.m00 );
-		glBegin( GL_LINES );
-			glColor3f( 1.0f, 0.0f, 0.0f );
-			glVertex3f( 0.0f, 0.0f, 0.0f );
-			glVertex3f( axis_length, 0.0f, 0.0f );
-			glColor3f( 0.0f, 1.0f, 0.0f );
-			glVertex3f( 0.0f, 0.0f, 0.0f );
-			glVertex3f( 0.0f, axis_length, 0.0f );
-			glColor3f( 0.0f, 0.0f, 1.0f );
-			glVertex3f( 0.0f, 0.0f, 0.0f );
-			glVertex3f( 0.0f, 0.0f, axis_length );
-		glEnd();
-		glPopMatrix();
-	}
-	glLineWidth( line_width );
+	//// 体節の座標系を描画（座標軸を描画）
+	//glGetFloatv( GL_LINE_WIDTH, &line_width );
+	//glLineWidth( 2.0f );
+	//for ( int i=0; i<segment_frames.size(); i++ )
+	//{
+	//	glPushMatrix();
+	//	frame.transpose( segment_frames[ i ] );
+	//	glMultMatrixf( & frame.m00 );
+	//	glBegin( GL_LINES );
+	//		glColor3f( 1.0f, 0.0f, 0.0f );
+	//		glVertex3f( 0.0f, 0.0f, 0.0f );
+	//		glVertex3f( axis_length, 0.0f, 0.0f );
+	//		glColor3f( 0.0f, 1.0f, 0.0f );
+	//		glVertex3f( 0.0f, 0.0f, 0.0f );
+	//		glVertex3f( 0.0f, axis_length, 0.0f );
+	//		glColor3f( 0.0f, 0.0f, 1.0f );
+	//		glVertex3f( 0.0f, 0.0f, 0.0f );
+	//		glVertex3f( 0.0f, 0.0f, axis_length );
+	//	glEnd();
+	//	glPopMatrix();
+	//}
+	//glLineWidth( line_width );
 
 	glEnable( GL_DEPTH_TEST );
 

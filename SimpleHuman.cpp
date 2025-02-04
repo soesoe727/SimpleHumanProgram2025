@@ -1044,6 +1044,11 @@ void  DrawPosture( const Posture & posture )
 	// 各体節の描画
 	for ( int i = 0; i < seg_frame_array.size(); i++ )
 	{
+		while(i > 16 && i < 36)
+			i++;
+		if(i > 39)
+			break;
+
 		const Segment *  segment = posture.body->segments[i];
 		const int  num_joints = segment->num_joints;
 
@@ -1062,9 +1067,9 @@ void  DrawPosture( const Posture & posture )
 		// １つの関節から仮の末端点（重心へのベクトルを２倍した位置）へボーン（楕円体）を描画
 		else if ( ( num_joints == 1 ) && !segment->has_site )
 		{
-			v1 = segment->joint_positions[ 0 ];
-			v2.negate( v1 );
-			DrawBone( v1.x, v1.y, v1.z, v2.x, v2.y, v2.z, radius );
+			//v1 = segment->joint_positions[ 0 ];
+			//v2.negate( v1 );
+			//DrawBone( v1.x, v1.y, v1.z, v2.x, v2.y, v2.z, radius );
 		}
 		// ２つの関節を接続するボーン（楕円体）を描画
 		else if ( num_joints == 2 )

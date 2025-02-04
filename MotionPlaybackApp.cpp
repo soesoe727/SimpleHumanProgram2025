@@ -287,6 +287,7 @@ void  MotionPlaybackApp::Display()
 	char  message1[64];
 	char  message2[64];
 	char message3[64];
+	char message4[64];
 	char messages[5][64]{};
 	if ( motion && motion2 )
 	{
@@ -304,6 +305,10 @@ void  MotionPlaybackApp::Display()
 			sprintf(message3, "DTW_reproduction");
 		else
 			sprintf(message3, "usual_reproduction");
+		if (error_flag == 1)
+			sprintf(message4, "position_error");
+		else
+			sprintf(message4, "angle_error");
 		/*
 		if( pattern == 0 )
 			sprintf(message3, "leg:%.2f, chest:%.2f, arm:%.2f", DTWa->left_leg + DTWa->right_leg, DTWa->chest + DTWa->head, DTWa->left_arm + DTWa->right_arm);
@@ -319,6 +324,7 @@ void  MotionPlaybackApp::Display()
 		for(int i = 0; i < 5; i++)
 			DrawTextInformation( 3+i, messages[i] );
 		DrawTextInformation( 8, message3 );
+		DrawTextInformation( 9, message4 );
 	}
 	else
 	{
@@ -2050,7 +2056,7 @@ void DTWinformation::DTWinformation_init( int frames1, int frames2, const Motion
 						(sqrt(pow(j1[j][i].x, 2.0) + pow(j1[j][i].y, 2.0) + pow(j1[j][i].z, 2.0)) *
 						sqrt(pow(j2[k][i].x, 2.0) + pow(j2[k][i].y, 2.0) + pow(j2[k][i].z, 2.0)));
 					this->AnglePart[i][j][k] *= -0.5;
-					this->AnglePart[i][j][k] += 1.0f;
+					this->AnglePart[i][j][k] += 0.5f;
 
 					this->AngleAll[j][k] += this->AnglePart[i][j][k];
 					if (i == 11 || i == 12)
@@ -2099,67 +2105,109 @@ void DTWinformation::DTWinformation_init( int frames1, int frames2, const Motion
 	//}
 
 	//位置誤差の全体に対するパスの作成
-	int f1 = 0, f2 = 0;
+	int f1 = frames1 - 1, f2 = frames2 - 1;
 	this->DisPassAll.resize(2, vector<int>());
-	this->DisPassAll[0].push_back(0);
-	this->DisPassAll[1].push_back(0);
 	float dis1, dis2, dis3;
-	while(f1 < frames1 && f2 < frames2)
+	
+	for (int j = 0; j < frames1; j++)
+		for (int k = 0; k < frames2; k++)
+			DistanceAll[j][k] += 0.02f * abs(j - k);
+	for(int j = 0; j < frames1; j++)
+		for (int k = 0; k < frames2; k++)
+			DistanceAll[j][k] += DisCostAcummurate(j, k);
+
+	while (f1 >= 0 && f2 >= 0)
 	{
-		dis1 = this->DistanceAll[f1+1][f2+1] + 0.01f * abs(f1-f2);
-		dis2 = this->DistanceAll[f1+1][f2] + 0.01f * abs(f1+1-f2);
-		dis3 = this->DistanceAll[f1][f2+1] + 0.01f * abs(f1-(f2+1));
-		if(dis1 > dis2 || dis1 > dis3)
-			if(dis2 > dis3)
-			{
-				this->DisPassAll[0].push_back(f1);
-				this->DisPassAll[1].push_back(++f2);
-			}
-			else
-			{
-				this->DisPassAll[0].push_back(++f1);
-				this->DisPassAll[1].push_back(f2);
-			}
+		if (f1 == 0 && f2 == 0)
+			break;
+		else if(f1 == 0 && f2 != 0)
+		{
+			this->DisPassAll[0].push_back(f1);
+			this->DisPassAll[1].push_back(--f2);
+		}
+		else if (f1 != 0 && f2 == 0)
+		{
+			this->DisPassAll[0].push_back(--f1);
+			this->DisPassAll[1].push_back(f2);
+		}
 		else
 		{
-			this->DisPassAll[0].push_back(++f1);
-			this->DisPassAll[1].push_back(++f2);
+			dis1 = this->DistanceAll[f1 - 1][f2 - 1];
+			dis2 = this->DistanceAll[f1 - 1][f2];
+			dis3 = this->DistanceAll[f1][f2 - 1];
+			if (dis1 > dis2 || dis1 > dis3)
+				if (dis2 > dis3)
+				{
+					this->DisPassAll[0].push_back(f1);
+					this->DisPassAll[1].push_back(--f2);
+				}
+				else
+				{
+					this->DisPassAll[0].push_back(--f1);
+					this->DisPassAll[1].push_back(f2);
+				}
+			else
+			{
+				this->DisPassAll[0].push_back(--f1);
+				this->DisPassAll[1].push_back(--f2);
+			}
 		}
 	}
-	this->DisPassAll[0].erase(this->DisPassAll[0].end() - 1);
-	this->DisPassAll[1].erase(this->DisPassAll[1].end() - 1);
+	std::reverse(this->DisPassAll[0].begin(), this->DisPassAll[0].end());
+	std::reverse(this->DisPassAll[1].begin(), this->DisPassAll[1].end());
 	this->DisFrame = DisPassAll[0].size();
 
 	//角度誤差の全体に対するパスの作成
-	f1 = 0, f2 = 0;
+	f1 = frames1 - 1, f2 = frames2 - 1;
 	this->AngPassAll.resize(2, vector<int>());
-	this->AngPassAll[0].push_back(0);
-	this->AngPassAll[1].push_back(0);
+
+	for (int j = 0; j < frames1; j++)
+		for (int k = 0; k < frames2; k++)
+			AngleAll[j][k] += 0.05f * abs(j - k);
+	for(int j = 0; j < frames1; j++)
+		for (int k = 0; k < frames2; k++)
+			AngleAll[j][k] += DisCostAcummurate(j, k);
+
 	float ang1, ang2, ang3;
-	while(f1 < frames1 && f2 < frames2)
+	while (f1 >= 0 && f2 >= 0)
 	{
-		ang1 = this->AngleAll[f1+1][f2+1] + 0.05f * abs(f1-f2);
-		ang2 = this->AngleAll[f1+1][f2] + 0.05f * abs(f1+1-f2);
-		ang3 = this->AngleAll[f1][f2+1] + 0.05f * abs(f1-(f2+1));
-		if(ang1 > ang2 || ang1 > ang3)
-			if(ang2 > ang3)
-			{
-				this->AngPassAll[0].push_back(f1);
-				this->AngPassAll[1].push_back(++f2);
-			}
-			else
-			{
-				this->AngPassAll[0].push_back(++f1);
-				this->AngPassAll[1].push_back(f2);
-			}
+		if (f1 == 0 && f2 == 0)
+			break;
+		else if(f1 == 0 && f2 != 0)
+		{
+			this->AngPassAll[0].push_back(f1);
+			this->AngPassAll[1].push_back(--f2);
+		}
+		else if (f1 != 0 && f2 == 0)
+		{
+			this->AngPassAll[0].push_back(--f1);
+			this->AngPassAll[1].push_back(f2);
+		}
 		else
 		{
-			this->AngPassAll[0].push_back(++f1);
-			this->AngPassAll[1].push_back(++f2);
+			ang1 = this->AngleAll[f1 - 1][f2 - 1];
+			ang2 = this->AngleAll[f1 - 1][f2];
+			ang3 = this->AngleAll[f1][f2 - 1];
+			if (ang1 > ang2 || ang1 > ang3)
+				if (ang2 > ang3)
+				{
+					this->AngPassAll[0].push_back(f1);
+					this->AngPassAll[1].push_back(--f2);
+				}
+				else
+				{
+					this->AngPassAll[0].push_back(--f1);
+					this->AngPassAll[1].push_back(f2);
+				}
+			else
+			{
+				this->AngPassAll[0].push_back(--f1);
+				this->AngPassAll[1].push_back(--f2);
+			}
 		}
 	}
-	this->AngPassAll[0].erase(this->AngPassAll[0].end() - 1);
-	this->AngPassAll[1].erase(this->AngPassAll[1].end() - 1);
+	std::reverse(this->AngPassAll[0].begin(), this->AngPassAll[0].end());
+	std::reverse(this->AngPassAll[1].begin(), this->AngPassAll[1].end());
 	this->AngFrame = AngPassAll[0].size();
 
 	//位置誤差のパスの表示
@@ -2251,6 +2299,30 @@ void DTWinformation::DTWinformation_init( int frames1, int frames2, const Motion
 			this->ErrorAngTotalPart[this->AngOrder[i]] << " ] ";
 	}
 	std::cout << std::endl;
+}
+
+float DTWinformation::DisCostAcummurate(int j, int k)
+{
+	if(j == 0 && k == 0)
+		return 0.0f;
+	else if(j == 0 && k != 0)
+		return DistanceAll[j][k - 1];
+	else if(j != 0 && k == 0)
+		return DistanceAll[j - 1][k];
+	else
+		return min(min(DistanceAll[j][k - 1], DistanceAll[j - 1][k]), DistanceAll[j - 1][k - 1]);
+}
+
+float DTWinformation::AngCostAcummurate(int j, int k)
+{
+	if(j == 0 && k == 0)
+		return 0.0f;
+	else if(j == 0 && k != 0)
+		return AngleAll[j][k - 1];
+	else if(j != 0 && k == 0)
+		return AngleAll[j - 1][k];
+	else
+		return min(min(AngleAll[j][k - 1], AngleAll[j - 1][k]), AngleAll[j - 1][k - 1]);
 }
 
 //mat1.get(&rot1);
