@@ -223,64 +223,12 @@ void  MotionPlaybackApp::Display()
 
 	// タイムラインを描画
 	if ( timeline )
-	{
-		int Track_num = 0;
-		int name_space = 30.0f;
-		
+	{	
 		//部位の集合ごとの色付け
-		if(sabun_flag == 1)
-		{
-			//if(error_flag == 1)
-			//{
-			//	for (int j = 12; j >= 11; j--)
-			//		timeline->SetElementColor(Track_num * DTWa->DisFrame + Track_num++, Pattern_Color(pattern, j));
-			//	for (int j = 10; j >= 7; j--)
-			//		timeline->SetElementColor(Track_num * DTWa->DisFrame + Track_num++, Pattern_Color(pattern, j));
-			//	timeline->SetElementColor(Track_num * DTWa->DisFrame + Track_num++, Pattern_Color(pattern, 0));
-			//	for (int j = 13; j <= 16; j++)
-			//		timeline->SetElementColor(Track_num * DTWa->DisFrame + Track_num++, Pattern_Color(pattern, j));
-			//	for (int j = 36; j <= 39; j++)
-			//		timeline->SetElementColor(Track_num * DTWa->DisFrame + Track_num++, Pattern_Color(pattern, j));
-			//	for (int j = 1; j <= 3; j++)
-			//		timeline->SetElementColor(Track_num * DTWa->DisFrame + Track_num++, Pattern_Color(pattern, j));
-			//	for (int j = 4; j <= 6; j++)
-			//		timeline->SetElementColor(Track_num * DTWa->DisFrame + Track_num++, Pattern_Color(pattern, j));
-			//}
-			//else
-			//{
-			//	for (int j = 12; j >= 11; j--)
-			//		timeline->SetElementColor(Track_num * DTWa->AngFrame + Track_num++, Pattern_Color(pattern, j));
-			//	for (int j = 10; j >= 7; j--)
-			//		timeline->SetElementColor(Track_num * DTWa->AngFrame + Track_num++, Pattern_Color(pattern, j));
-			//	timeline->SetElementColor(Track_num * DTWa->AngFrame + Track_num++, Pattern_Color(pattern, 0));
-			//	for (int j = 13; j <= 16; j++)
-			//		timeline->SetElementColor(Track_num * DTWa->AngFrame + Track_num++, Pattern_Color(pattern, j));
-			//	for (int j = 36; j <= 39; j++)
-			//		timeline->SetElementColor(Track_num * DTWa->AngFrame + Track_num++, Pattern_Color(pattern, j));
-			//	for (int j = 1; j <= 3; j++)
-			//		timeline->SetElementColor(Track_num * DTWa->AngFrame + Track_num++, Pattern_Color(pattern, j));
-			//	for (int j = 4; j <= 6; j++)
-			//		timeline->SetElementColor(Track_num * DTWa->AngFrame + Track_num++, Pattern_Color(pattern, j));
-			//}
+		if(sabun_flag == 1)//ワーピング・パスによる再生
 			PatternTimeline(timeline, * motion, *motion2, DTWframe_no, DTWa);
-		}
-		else
-		{
-			//for (int j = 12; j >= 11; j--)
-			//	timeline->SetElementColor(Track_num * frames + Track_num++, Color4f(0.8f, 0.2f, 0.2f, 1.0f));
-			//for (int j = 10; j >= 7; j--)
-			//	timeline->SetElementColor(Track_num * frames + Track_num++, Color4f(0.8f, 0.2f, 0.2f, 1.0f));
-			//timeline->SetElementColor(Track_num * frames + Track_num++, Color4f(0.8f, 0.2f, 0.2f, 1.0f));
-			//for (int j = 13; j <= 16; j++)
-			//	timeline->SetElementColor(Track_num * frames + Track_num++, Color4f(0.2f, 0.8f, 0.2f, 1.0f));
-			//for (int j = 36; j <= 39; j++)
-			//	timeline->SetElementColor(Track_num * frames + Track_num++, Color4f(0.2f, 0.2f, 0.8f, 1.0f));
-			//for (int j = 1; j <= 3; j++)
-			//	timeline->SetElementColor(Track_num * frames + Track_num++, Color4f(0.2f, 0.2f, 0.8f, 1.0f));
-			//for (int j = 4; j <= 6; j++)
-			//	timeline->SetElementColor(Track_num * frames + Track_num++, Color4f(0.2f, 0.2f, 0.8f, 1.0f));
+		else//ワーピング・パスによる再生から通常再生
 			PatternTimeline(timeline, *motion, *motion2, frame_no, DTWa);
-		}
 
 		timeline->DrawTimeline();
 	}
@@ -805,114 +753,114 @@ void MotionPlaybackApp::PatternTimeline(Timeline* timeline, Motion& motion, Moti
 			{
 			case 0:
 				for (int j = 12; j >= 11; j--)//頭部
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_head_chest, DTW->DisPassAll, motion);
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_head_chest, DTW->DisPassAll, motion, curr_frame, &DTW->Pa_Color[2]);
 				for (int j = 10; j >= 7; j--)//胸部
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_head_chest, DTW->DisPassAll, motion);
-				ColorBarElementPart(timeline, 0, Track_num++, DTW->Dis_head_chest, DTW->DisPassAll, motion);//腰
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_head_chest, DTW->DisPassAll, motion, curr_frame, &DTW->Pa_Color[2]);
+				ColorBarElementPart(timeline, 0, Track_num++, DTW->Dis_head_chest, DTW->DisPassAll, motion, curr_frame, &DTW->Pa_Color[2]);//腰
 				Track_num++;
 
 				for (int j = 13; j <= 16; j++)//右腕
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_arm, DTW->DisPassAll, motion);
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_arm, DTW->DisPassAll, motion, curr_frame, &DTW->Pa_Color[5]);
 				for (int j = 36; j <= 39; j++)//左腕
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_arm, DTW->DisPassAll, motion);
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_arm, DTW->DisPassAll, motion, curr_frame, &DTW->Pa_Color[5]);
 				Track_num++;
 
 				for (int j = 1; j <= 3; j++)//右脚
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_leg, DTW->DisPassAll, motion);
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_leg, DTW->DisPassAll, motion, curr_frame, &DTW->Pa_Color[8]);
 				for (int j = 4; j <= 6; j++)//左脚
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_leg, DTW->DisPassAll, motion);
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_leg, DTW->DisPassAll, motion, curr_frame, &DTW->Pa_Color[8]);
 				break;
 
 			case 1:
 				for (int j = 12; j >= 11; j--)//頭部
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_head, DTW->DisPassAll, motion);
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_head, DTW->DisPassAll, motion, curr_frame, &DTW->Pa_Color[0]);
 				Track_num++;
 
 				for (int j = 10; j >= 7; j--)//胸部
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_chest, DTW->DisPassAll, motion);
-				ColorBarElementPart(timeline, 0, Track_num++, DTW->Dis_chest, DTW->DisPassAll, motion);//腰
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_chest, DTW->DisPassAll, motion, curr_frame, &DTW->Pa_Color[1]);
+				ColorBarElementPart(timeline, 0, Track_num++, DTW->Dis_chest, DTW->DisPassAll, motion, curr_frame, &DTW->Pa_Color[1]);//腰
 				Track_num++;
 
 				for (int j = 13; j <= 16; j++)//右腕
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_arm, DTW->DisPassAll, motion);
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_arm, DTW->DisPassAll, motion, curr_frame, &DTW->Pa_Color[5]);
 				for (int j = 36; j <= 39; j++)//左腕
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_arm, DTW->DisPassAll, motion);
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_arm, DTW->DisPassAll, motion, curr_frame, &DTW->Pa_Color[5]);
 				Track_num++;
 
 				for (int j = 1; j <= 3; j++)//右脚
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_leg, DTW->DisPassAll, motion);
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_leg, DTW->DisPassAll, motion, curr_frame, &DTW->Pa_Color[8]);
 				for (int j = 4; j <= 6; j++)//左脚
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_leg, DTW->DisPassAll, motion);
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_leg, DTW->DisPassAll, motion, curr_frame, &DTW->Pa_Color[8]);
 				break;
 
 			case 2:
 				for (int j = 12; j >= 11; j--)//頭部
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_head_chest, DTW->DisPassAll, motion);
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_head_chest, DTW->DisPassAll, motion, curr_frame, &DTW->Pa_Color[2]);
 				for (int j = 10; j >= 7; j--)//胸部
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_head_chest, DTW->DisPassAll, motion);
-				ColorBarElementPart(timeline, 0, Track_num++, DTW->Dis_head_chest, DTW->DisPassAll, motion);//腰
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_head_chest, DTW->DisPassAll, motion, curr_frame, &DTW->Pa_Color[2]);
+				ColorBarElementPart(timeline, 0, Track_num++, DTW->Dis_head_chest, DTW->DisPassAll, motion, curr_frame, &DTW->Pa_Color[2]);//腰
 				Track_num++;
 
 				for (int j = 13; j <= 16; j++)//右腕
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_right_arm, DTW->DisPassAll, motion);
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_right_arm, DTW->DisPassAll, motion, curr_frame, &DTW->Pa_Color[3]);
 				Track_num++;
 
 				for (int j = 36; j <= 39; j++)//左腕
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_left_arm, DTW->DisPassAll, motion);
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_left_arm, DTW->DisPassAll, motion, curr_frame, &DTW->Pa_Color[4]);
 				Track_num++;
 
 				for (int j = 1; j <= 3; j++)//右脚
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_leg, DTW->DisPassAll, motion);
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_leg, DTW->DisPassAll, motion, curr_frame, &DTW->Pa_Color[8]);
 				for (int j = 4; j <= 6; j++)//左脚
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_leg, DTW->DisPassAll, motion);
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_leg, DTW->DisPassAll, motion, curr_frame, &DTW->Pa_Color[8]);
 				break;
 
 			case 3:
 				for (int j = 12; j >= 11; j--)//頭部
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_head_chest, DTW->DisPassAll, motion);
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_head_chest, DTW->DisPassAll, motion, curr_frame, &DTW->Pa_Color[2]);
 				for (int j = 10; j >= 7; j--)//胸部
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_head_chest, DTW->DisPassAll, motion);
-				ColorBarElementPart(timeline, 0, Track_num++, DTW->Dis_head_chest, DTW->DisPassAll, motion);//腰
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_head_chest, DTW->DisPassAll, motion, curr_frame, &DTW->Pa_Color[2]);
+				ColorBarElementPart(timeline, 0, Track_num++, DTW->Dis_head_chest, DTW->DisPassAll, motion, curr_frame, &DTW->Pa_Color[2]);//腰
 				Track_num++;
 
 				for (int j = 13; j <= 16; j++)//右腕
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_arm, DTW->DisPassAll, motion);
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_arm, DTW->DisPassAll, motion, curr_frame, &DTW->Pa_Color[5]);
 				for (int j = 36; j <= 39; j++)//左腕
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_arm, DTW->DisPassAll, motion);
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_arm, DTW->DisPassAll, motion, curr_frame, &DTW->Pa_Color[5]);
 				Track_num++;
 
 				for (int j = 1; j <= 3; j++)//右脚
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_right_leg, DTW->DisPassAll, motion);
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_right_leg, DTW->DisPassAll, motion, curr_frame, &DTW->Pa_Color[6]);
 				Track_num++;
 
 				for (int j = 4; j <= 6; j++)//左脚
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_left_leg, DTW->DisPassAll, motion);
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_left_leg, DTW->DisPassAll, motion, curr_frame, &DTW->Pa_Color[7]);
 				break;
 
 			case 4:
 				for (int j = 12; j >= 11; j--)//頭部
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_head, DTW->DisPassAll, motion);
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_head, DTW->DisPassAll, motion, curr_frame, &DTW->Pa_Color[0]);
 				Track_num++;
 
 				for (int j = 10; j >= 7; j--)//胸部
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_chest, DTW->DisPassAll, motion);
-				ColorBarElementPart(timeline, 0, Track_num++, DTW->Dis_chest, DTW->DisPassAll, motion);//腰
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_chest, DTW->DisPassAll, motion, curr_frame, &DTW->Pa_Color[1]);
+				ColorBarElementPart(timeline, 0, Track_num++, DTW->Dis_chest, DTW->DisPassAll, motion, curr_frame, &DTW->Pa_Color[1]);//腰
 				Track_num++;
 
 				for (int j = 13; j <= 16; j++)//右腕
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_right_arm, DTW->DisPassAll, motion);
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_right_arm, DTW->DisPassAll, motion, curr_frame, &DTW->Pa_Color[3]);
 				Track_num++;
 
 				for (int j = 36; j <= 39; j++)//左腕
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_left_arm, DTW->DisPassAll, motion);
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_left_arm, DTW->DisPassAll, motion, curr_frame, &DTW->Pa_Color[4]);
 				Track_num++;
 
 				for (int j = 1; j <= 3; j++)//右脚
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_right_leg, DTW->DisPassAll, motion);
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_right_leg, DTW->DisPassAll, motion, curr_frame, &DTW->Pa_Color[6]);
 				Track_num++;
 
 				for (int j = 4; j <= 6; j++)//左脚
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_left_leg, DTW->DisPassAll, motion);
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Dis_left_leg, DTW->DisPassAll, motion, curr_frame, &DTW->Pa_Color[7]);
 				break;
 
 			case 5:
@@ -921,7 +869,7 @@ void MotionPlaybackApp::PatternTimeline(Timeline* timeline, Motion& motion, Moti
 					if (view_segment != j && view_segments[j] != 1)
 						ColorBarElementGray(timeline, j, Track_num, DTW->DisPassAll, motion);
 					else
-						ColorBarElementPart(timeline, j, Track_num, DTW->DistancePart[j], DTW->DisPassAll, motion);
+						ColorBarElementPart(timeline, j, Track_num, DTW->DistancePart[j], DTW->DisPassAll, motion, curr_frame, &DTW->Seg_Color[j]);
 					Track_num++;
 				}
 				Track_num++;
@@ -930,13 +878,13 @@ void MotionPlaybackApp::PatternTimeline(Timeline* timeline, Motion& motion, Moti
 					if (view_segment != j && view_segments[j] != 1)
 						ColorBarElementGray(timeline, j, Track_num, DTW->DisPassAll, motion);
 					else
-						ColorBarElementPart(timeline, j, Track_num, DTW->DistancePart[j], DTW->DisPassAll, motion);
+						ColorBarElementPart(timeline, j, Track_num, DTW->DistancePart[j], DTW->DisPassAll, motion, curr_frame, &DTW->Seg_Color[j]);
 					Track_num++;
 				}
 				if (view_segment != 0 && view_segments[0] != 1)//腰
 					ColorBarElementGray(timeline, 0, Track_num, DTW->DisPassAll, motion);
 				else
-					ColorBarElementPart(timeline, 0, Track_num, DTW->DistancePart[0], DTW->DisPassAll, motion);
+					ColorBarElementPart(timeline, 0, Track_num, DTW->DistancePart[0], DTW->DisPassAll, motion, curr_frame, &DTW->Seg_Color[0]);
 				Track_num++;
 				Track_num++;
 				for (int j = 13; j <= 16; j++)//右腕
@@ -944,7 +892,7 @@ void MotionPlaybackApp::PatternTimeline(Timeline* timeline, Motion& motion, Moti
 					if (view_segment != j && view_segments[j] != 1)
 						ColorBarElementGray(timeline, j, Track_num, DTW->DisPassAll, motion);
 					else
-						ColorBarElementPart(timeline, j, Track_num, DTW->DistancePart[j], DTW->DisPassAll, motion);
+						ColorBarElementPart(timeline, j, Track_num, DTW->DistancePart[j], DTW->DisPassAll, motion, curr_frame, &DTW->Seg_Color[j]);
 					Track_num++;
 				}
 				Track_num++;
@@ -953,7 +901,7 @@ void MotionPlaybackApp::PatternTimeline(Timeline* timeline, Motion& motion, Moti
 					if (view_segment != j && view_segments[j] != 1)
 						ColorBarElementGray(timeline, j, Track_num, DTW->DisPassAll, motion);
 					else
-						ColorBarElementPart(timeline, j, Track_num, DTW->DistancePart[j], DTW->DisPassAll, motion);
+						ColorBarElementPart(timeline, j, Track_num, DTW->DistancePart[j], DTW->DisPassAll, motion, curr_frame, &DTW->Seg_Color[j]);
 					Track_num++;
 				}
 				Track_num++;
@@ -962,7 +910,7 @@ void MotionPlaybackApp::PatternTimeline(Timeline* timeline, Motion& motion, Moti
 					if (view_segment != j && view_segments[j] != 1)
 						ColorBarElementGray(timeline, j, Track_num, DTW->DisPassAll, motion);
 					else
-						ColorBarElementPart(timeline, j, Track_num, DTW->DistancePart[j], DTW->DisPassAll, motion);
+						ColorBarElementPart(timeline, j, Track_num, DTW->DistancePart[j], DTW->DisPassAll, motion, curr_frame, &DTW->Seg_Color[j]);
 					Track_num++;
 				}
 				Track_num++;
@@ -971,7 +919,7 @@ void MotionPlaybackApp::PatternTimeline(Timeline* timeline, Motion& motion, Moti
 					if (view_segment != j && view_segments[j] != 1)
 						ColorBarElementGray(timeline, j, Track_num, DTW->DisPassAll, motion);
 					else
-						ColorBarElementPart(timeline, j, Track_num, DTW->DistancePart[j], DTW->DisPassAll, motion);
+						ColorBarElementPart(timeline, j, Track_num, DTW->DistancePart[j], DTW->DisPassAll, motion, curr_frame, &DTW->Seg_Color[j]);
 					Track_num++;
 				}
 				break;
@@ -983,114 +931,114 @@ void MotionPlaybackApp::PatternTimeline(Timeline* timeline, Motion& motion, Moti
 			{
 			case 0:
 				for (int j = 12; j >= 11; j--)//頭部
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_head_chest, DTW->DisPassAll, motion, motion2);
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_head_chest, DTW->DisPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[2]);
 				for (int j = 10; j >= 7; j--)//胸部
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_head_chest, DTW->DisPassAll, motion, motion2);
-				ColorBarElementRepPart(timeline, 0, Track_num++, DTW->Dis_head_chest, DTW->DisPassAll, motion, motion2);//腰
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_head_chest, DTW->DisPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[2]);
+				ColorBarElementRepPart(timeline, 0, Track_num++, DTW->Dis_head_chest, DTW->DisPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[2]);//腰
 				Track_num++;
 
 				for (int j = 13; j <= 16; j++)//右腕
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_arm, DTW->DisPassAll, motion, motion2);
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_arm, DTW->DisPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[5]);
 				for (int j = 36; j <= 39; j++)//左腕
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_arm, DTW->DisPassAll, motion, motion2);
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_arm, DTW->DisPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[5]);
 				Track_num++;
 
 				for (int j = 1; j <= 3; j++)//右脚
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_leg, DTW->DisPassAll, motion, motion2);
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_leg, DTW->DisPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[8]);
 				for (int j = 4; j <= 6; j++)//左脚
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_leg, DTW->DisPassAll, motion, motion2);
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_leg, DTW->DisPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[8]);
 				break;
 
 			case 1:
 				for (int j = 12; j >= 11; j--)//頭部
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_head, DTW->DisPassAll, motion, motion2);
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_head, DTW->DisPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[0]);
 				Track_num++;
 
 				for (int j = 10; j >= 7; j--)//胸部
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_chest, DTW->DisPassAll, motion, motion2);
-				ColorBarElementRepPart(timeline, 0, Track_num++, DTW->Dis_chest, DTW->DisPassAll, motion, motion2);//腰
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_chest, DTW->DisPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[1]);
+				ColorBarElementRepPart(timeline, 0, Track_num++, DTW->Dis_chest, DTW->DisPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[1]);//腰
 				Track_num++;
 
 				for (int j = 13; j <= 16; j++)//右腕
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_arm, DTW->DisPassAll, motion, motion2);
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_arm, DTW->DisPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[5]);
 				for (int j = 36; j <= 39; j++)//左腕
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_arm, DTW->DisPassAll, motion, motion2);
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_arm, DTW->DisPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[5]);
 				Track_num++;
 
 				for (int j = 1; j <= 3; j++)//右脚
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_leg, DTW->DisPassAll, motion, motion2);
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_leg, DTW->DisPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[8]);
 				for (int j = 4; j <= 6; j++)//左脚
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_leg, DTW->DisPassAll, motion, motion2);
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_leg, DTW->DisPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[8]);
 				break;
 
 			case 2:
 				for (int j = 12; j >= 11; j--)//頭部
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_head_chest, DTW->DisPassAll, motion, motion2);
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_head_chest, DTW->DisPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[2]);
 				for (int j = 10; j >= 7; j--)//胸部
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_head_chest, DTW->DisPassAll, motion, motion2);
-				ColorBarElementRepPart(timeline, 0, Track_num++, DTW->Dis_head_chest, DTW->DisPassAll, motion, motion2);//腰
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_head_chest, DTW->DisPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[2]);
+				ColorBarElementRepPart(timeline, 0, Track_num++, DTW->Dis_head_chest, DTW->DisPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[2]);//腰
 				Track_num++;
 
 				for (int j = 13; j <= 16; j++)//右腕
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_right_arm, DTW->DisPassAll, motion, motion2);
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_right_arm, DTW->DisPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[3]);
 				Track_num++;
 
 				for (int j = 36; j <= 39; j++)//左腕
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_left_arm, DTW->DisPassAll, motion, motion2);
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_left_arm, DTW->DisPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[4]);
 				Track_num++;
 
 				for (int j = 1; j <= 3; j++)//右脚
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_leg, DTW->DisPassAll, motion, motion2);
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_leg, DTW->DisPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[8]);
 				for (int j = 4; j <= 6; j++)//左脚
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_leg, DTW->DisPassAll, motion, motion2);
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_leg, DTW->DisPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[8]);
 				break;
 
 			case 3:
 				for (int j = 12; j >= 11; j--)//頭部
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_head_chest, DTW->DisPassAll, motion, motion2);
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_head_chest, DTW->DisPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[2]);
 				for (int j = 10; j >= 7; j--)//胸部
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_head_chest, DTW->DisPassAll, motion, motion2);
-				ColorBarElementRepPart(timeline, 0, Track_num++, DTW->Dis_head_chest, DTW->DisPassAll, motion, motion2);//腰
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_head_chest, DTW->DisPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[2]);
+				ColorBarElementRepPart(timeline, 0, Track_num++, DTW->Dis_head_chest, DTW->DisPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[2]);//腰
 				Track_num++;
 
 				for (int j = 13; j <= 16; j++)//右腕
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_arm, DTW->DisPassAll, motion, motion2);
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_arm, DTW->DisPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[5]);
 				for (int j = 36; j <= 39; j++)//左腕
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_arm, DTW->DisPassAll, motion, motion2);
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_arm, DTW->DisPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[5]);
 				Track_num++;
 
 				for (int j = 1; j <= 3; j++)//右脚
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_right_leg, DTW->DisPassAll, motion, motion2);
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_right_leg, DTW->DisPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[6]);
 				Track_num++;
 
 				for (int j = 4; j <= 6; j++)//左脚
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_left_leg, DTW->DisPassAll, motion, motion2);
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_left_leg, DTW->DisPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[7]);
 				break;
 
 			case 4:
 				for (int j = 12; j >= 11; j--)//頭部
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_head, DTW->DisPassAll, motion, motion2);
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_head, DTW->DisPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[0]);
 				Track_num++;
 
 				for (int j = 10; j >= 7; j--)//胸部
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_chest, DTW->DisPassAll, motion, motion2);
-				ColorBarElementRepPart(timeline, 0, Track_num++, DTW->Dis_chest, DTW->DisPassAll, motion, motion2);//腰
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_chest, DTW->DisPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[1]);
+				ColorBarElementRepPart(timeline, 0, Track_num++, DTW->Dis_chest, DTW->DisPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[1]);//腰
 				Track_num++;
 
 				for (int j = 13; j <= 16; j++)//右腕
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_right_arm, DTW->DisPassAll, motion, motion2);
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_right_arm, DTW->DisPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[3]);
 				Track_num++;
 
 				for (int j = 36; j <= 39; j++)//左腕
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_left_arm, DTW->DisPassAll, motion, motion2);
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_left_arm, DTW->DisPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[4]);
 				Track_num++;
 
 				for (int j = 1; j <= 3; j++)//右脚
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_right_leg, DTW->DisPassAll, motion, motion2);
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_right_leg, DTW->DisPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[6]);
 				Track_num++;
 
 				for (int j = 4; j <= 6; j++)//左脚
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_left_leg, DTW->DisPassAll, motion, motion2);
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_left_leg, DTW->DisPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[7]);
 				break;
 
 			case 5:
@@ -1099,7 +1047,7 @@ void MotionPlaybackApp::PatternTimeline(Timeline* timeline, Motion& motion, Moti
 					if (view_segment != j && view_segments[j] != 1)
 						ColorBarElementRepGray(timeline, j, Track_num, DTW->DisPassAll, motion);
 					else
-						ColorBarElementRepPart(timeline, j, Track_num, DTW->DistancePart[j], DTW->DisPassAll, motion, motion2);
+						ColorBarElementRepPart(timeline, j, Track_num, DTW->DistancePart[j], DTW->DisPassAll, motion, motion2, curr_frame, &DTW->Seg_Color[j]);
 					Track_num++;
 				}
 				Track_num++;
@@ -1108,13 +1056,13 @@ void MotionPlaybackApp::PatternTimeline(Timeline* timeline, Motion& motion, Moti
 					if (view_segment != j && view_segments[j] != 1)
 						ColorBarElementRepGray(timeline, j, Track_num, DTW->DisPassAll, motion);
 					else
-						ColorBarElementRepPart(timeline, j, Track_num, DTW->DistancePart[j], DTW->DisPassAll, motion, motion2);
+						ColorBarElementRepPart(timeline, j, Track_num, DTW->DistancePart[j], DTW->DisPassAll, motion, motion2, curr_frame, &DTW->Seg_Color[j]);
 					Track_num++;
 				}
 				if (view_segment != 0 && view_segments[0] != 1)//腰
 					ColorBarElementRepGray(timeline, 0, Track_num, DTW->DisPassAll, motion);
 				else
-					ColorBarElementRepPart(timeline, 0, Track_num, DTW->DistancePart[0], DTW->DisPassAll, motion, motion2);
+					ColorBarElementRepPart(timeline, 0, Track_num, DTW->DistancePart[0], DTW->DisPassAll, motion, motion2, curr_frame, &DTW->Seg_Color[0]);
 				Track_num++;
 				Track_num++;
 				for (int j = 13; j <= 16; j++)//右腕
@@ -1122,7 +1070,7 @@ void MotionPlaybackApp::PatternTimeline(Timeline* timeline, Motion& motion, Moti
 					if (view_segment != j && view_segments[j] != 1)
 						ColorBarElementRepGray(timeline, j, Track_num, DTW->DisPassAll, motion);
 					else
-						ColorBarElementRepPart(timeline, j, Track_num, DTW->DistancePart[j], DTW->DisPassAll, motion, motion2);
+						ColorBarElementRepPart(timeline, j, Track_num, DTW->DistancePart[j], DTW->DisPassAll, motion, motion2, curr_frame, &DTW->Seg_Color[j]);
 					Track_num++;
 				}
 				Track_num++;
@@ -1131,7 +1079,7 @@ void MotionPlaybackApp::PatternTimeline(Timeline* timeline, Motion& motion, Moti
 					if (view_segment != j && view_segments[j] != 1)
 						ColorBarElementRepGray(timeline, j, Track_num, DTW->DisPassAll, motion);
 					else
-						ColorBarElementRepPart(timeline, j, Track_num, DTW->DistancePart[j], DTW->DisPassAll, motion, motion2);
+						ColorBarElementRepPart(timeline, j, Track_num, DTW->DistancePart[j], DTW->DisPassAll, motion, motion2, curr_frame, &DTW->Seg_Color[j]);
 					Track_num++;
 				}
 				Track_num++;
@@ -1140,7 +1088,7 @@ void MotionPlaybackApp::PatternTimeline(Timeline* timeline, Motion& motion, Moti
 					if (view_segment != j && view_segments[j] != 1)
 						ColorBarElementRepGray(timeline, j, Track_num, DTW->DisPassAll, motion);
 					else
-						ColorBarElementRepPart(timeline, j, Track_num, DTW->DistancePart[j], DTW->DisPassAll, motion, motion2);
+						ColorBarElementRepPart(timeline, j, Track_num, DTW->DistancePart[j], DTW->DisPassAll, motion, motion2, curr_frame, &DTW->Seg_Color[j]);
 					Track_num++;
 				}
 				Track_num++;
@@ -1149,7 +1097,7 @@ void MotionPlaybackApp::PatternTimeline(Timeline* timeline, Motion& motion, Moti
 					if (view_segment != j && view_segments[j] != 1)
 						ColorBarElementRepGray(timeline, j, Track_num, DTW->DisPassAll, motion);
 					else
-						ColorBarElementRepPart(timeline, j, Track_num, DTW->DistancePart[j], DTW->DisPassAll, motion, motion2);
+						ColorBarElementRepPart(timeline, j, Track_num, DTW->DistancePart[j], DTW->DisPassAll, motion, motion2, curr_frame, &DTW->Seg_Color[j]);
 					Track_num++;
 				}
 				break;
@@ -1164,114 +1112,114 @@ void MotionPlaybackApp::PatternTimeline(Timeline* timeline, Motion& motion, Moti
 			{
 			case 0:
 				for (int j = 12; j >= 11; j--)//頭部
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_head_chest, DTW->AngPassAll, motion);
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_head_chest, DTW->AngPassAll, motion, curr_frame, &DTW->Pa_Color[2]);
 				for (int j = 10; j >= 7; j--)//胸部
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_head_chest, DTW->AngPassAll, motion);
-				ColorBarElementPart(timeline, 0, Track_num++, DTW->Ang_head_chest, DTW->AngPassAll, motion);//腰
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_head_chest, DTW->AngPassAll, motion, curr_frame, &DTW->Pa_Color[2]);
+				ColorBarElementPart(timeline, 0, Track_num++, DTW->Ang_head_chest, DTW->AngPassAll, motion, curr_frame, &DTW->Pa_Color[2]);//腰
 				Track_num++;
 
 				for (int j = 13; j <= 16; j++)//右腕
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_arm, DTW->AngPassAll, motion);
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_arm, DTW->AngPassAll, motion, curr_frame, &DTW->Pa_Color[5]);
 				for (int j = 36; j <= 39; j++)//左腕
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_arm, DTW->AngPassAll, motion);
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_arm, DTW->AngPassAll, motion, curr_frame, &DTW->Pa_Color[5]);
 				Track_num++;
 
 				for (int j = 1; j <= 3; j++)//右脚
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_leg, DTW->AngPassAll, motion);
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_leg, DTW->AngPassAll, motion, curr_frame, &DTW->Pa_Color[8]);
 				for (int j = 4; j <= 6; j++)//左脚
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_leg, DTW->AngPassAll, motion);
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_leg, DTW->AngPassAll, motion, curr_frame, &DTW->Pa_Color[8]);
 				break;
 
 			case 1:
 				for (int j = 12; j >= 11; j--)//頭部
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_head, DTW->AngPassAll, motion);
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_head, DTW->AngPassAll, motion, curr_frame, &DTW->Pa_Color[0]);
 				Track_num++;
 
 				for (int j = 10; j >= 7; j--)//胸部
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_chest, DTW->AngPassAll, motion);
-				ColorBarElementPart(timeline, 0, Track_num++, DTW->Ang_chest, DTW->AngPassAll, motion);//腰
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_chest, DTW->AngPassAll, motion, curr_frame, &DTW->Pa_Color[1]);
+				ColorBarElementPart(timeline, 0, Track_num++, DTW->Ang_chest, DTW->AngPassAll, motion, curr_frame, &DTW->Pa_Color[1]);//腰
 				Track_num++;
 
 				for (int j = 13; j <= 16; j++)//右腕
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_arm, DTW->AngPassAll, motion);
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_arm, DTW->AngPassAll, motion, curr_frame, &DTW->Pa_Color[5]);
 				for (int j = 36; j <= 39; j++)//左腕
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_arm, DTW->AngPassAll, motion);
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_arm, DTW->AngPassAll, motion, curr_frame, &DTW->Pa_Color[5]);
 				Track_num++;
 
 				for (int j = 1; j <= 3; j++)//右脚
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_leg, DTW->AngPassAll, motion);
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_leg, DTW->AngPassAll, motion, curr_frame, &DTW->Pa_Color[8]);
 				for (int j = 4; j <= 6; j++)//左脚
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_leg, DTW->AngPassAll, motion);
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_leg, DTW->AngPassAll, motion, curr_frame, &DTW->Pa_Color[8]);
 				break;
 
 			case 2:
 				for (int j = 12; j >= 11; j--)//頭部
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_head_chest, DTW->AngPassAll, motion);
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_head_chest, DTW->AngPassAll, motion, curr_frame, &DTW->Pa_Color[2]);
 				for (int j = 10; j >= 7; j--)//胸部
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_head_chest, DTW->AngPassAll, motion);
-				ColorBarElementPart(timeline, 0, Track_num++, DTW->Ang_head_chest, DTW->AngPassAll, motion);//腰
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_head_chest, DTW->AngPassAll, motion, curr_frame, &DTW->Pa_Color[2]);
+				ColorBarElementPart(timeline, 0, Track_num++, DTW->Ang_head_chest, DTW->AngPassAll, motion, curr_frame, &DTW->Pa_Color[2]);//腰
 				Track_num++;
 
 				for (int j = 13; j <= 16; j++)//右腕
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_right_arm, DTW->AngPassAll, motion);
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_right_arm, DTW->AngPassAll, motion, curr_frame, &DTW->Pa_Color[3]);
 				Track_num++;
 
 				for (int j = 36; j <= 39; j++)//左腕
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_left_arm, DTW->AngPassAll, motion);
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_left_arm, DTW->AngPassAll, motion, curr_frame, &DTW->Pa_Color[4]);
 				Track_num++;
 
 				for (int j = 1; j <= 3; j++)//右脚
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_leg, DTW->AngPassAll, motion);
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_leg, DTW->AngPassAll, motion, curr_frame, &DTW->Pa_Color[8]);
 				for (int j = 4; j <= 6; j++)//左脚
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_leg, DTW->AngPassAll, motion);
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_leg, DTW->AngPassAll, motion, curr_frame, &DTW->Pa_Color[8]);
 				break;
 
 			case 3:
 				for (int j = 12; j >= 11; j--)//頭部
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_head_chest, DTW->AngPassAll, motion);
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_head_chest, DTW->AngPassAll, motion, curr_frame, &DTW->Pa_Color[2]);
 				for (int j = 10; j >= 7; j--)//胸部
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_head_chest, DTW->AngPassAll, motion);
-				ColorBarElementPart(timeline, 0, Track_num++, DTW->Ang_head_chest, DTW->AngPassAll, motion);//腰
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_head_chest, DTW->AngPassAll, motion, curr_frame, &DTW->Pa_Color[2]);
+				ColorBarElementPart(timeline, 0, Track_num++, DTW->Ang_head_chest, DTW->AngPassAll, motion, curr_frame, &DTW->Pa_Color[2]);//腰
 				Track_num++;
 
 				for (int j = 13; j <= 16; j++)//右腕
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_arm, DTW->AngPassAll, motion);
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_arm, DTW->AngPassAll, motion, curr_frame, &DTW->Pa_Color[5]);
 				for (int j = 36; j <= 39; j++)//左腕
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_arm, DTW->AngPassAll, motion);
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_arm, DTW->AngPassAll, motion, curr_frame, &DTW->Pa_Color[5]);
 				Track_num++;
 
 				for (int j = 1; j <= 3; j++)//右脚
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_right_leg, DTW->AngPassAll, motion);
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_right_leg, DTW->AngPassAll, motion, curr_frame, &DTW->Pa_Color[6]);
 				Track_num++;
 
 				for (int j = 4; j <= 6; j++)//左脚
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_left_leg, DTW->AngPassAll, motion);
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_left_leg, DTW->AngPassAll, motion, curr_frame, &DTW->Pa_Color[7]);
 				break;
 
 			case 4:
 				for (int j = 12; j >= 11; j--)//頭部
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_head, DTW->AngPassAll, motion);
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_head, DTW->AngPassAll, motion, curr_frame, &DTW->Pa_Color[0]);
 				Track_num++;
 
 				for (int j = 10; j >= 7; j--)//胸部
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_chest, DTW->AngPassAll, motion);
-				ColorBarElementPart(timeline, 0, Track_num++, DTW->Ang_chest, DTW->AngPassAll, motion);//腰
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_chest, DTW->AngPassAll, motion, curr_frame, &DTW->Pa_Color[1]);
+				ColorBarElementPart(timeline, 0, Track_num++, DTW->Ang_chest, DTW->AngPassAll, motion, curr_frame, &DTW->Pa_Color[1]);//腰
 				Track_num++;
 
 				for (int j = 13; j <= 16; j++)//右腕
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_right_arm, DTW->AngPassAll, motion);
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_right_arm, DTW->AngPassAll, motion, curr_frame, &DTW->Pa_Color[3]);
 				Track_num++;
 
 				for (int j = 36; j <= 39; j++)//左腕
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_left_arm, DTW->AngPassAll, motion);
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_left_arm, DTW->AngPassAll, motion, curr_frame, &DTW->Pa_Color[4]);
 				Track_num++;
 
 				for (int j = 1; j <= 3; j++)//右脚
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_right_leg, DTW->AngPassAll, motion);
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_right_leg, DTW->AngPassAll, motion, curr_frame, &DTW->Pa_Color[6]);
 				Track_num++;
 
 				for (int j = 4; j <= 6; j++)//左脚
-					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_left_leg, DTW->AngPassAll, motion);
+					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_left_leg, DTW->AngPassAll, motion, curr_frame, &DTW->Pa_Color[7]);
 				break;
 
 			case 5:
@@ -1280,7 +1228,7 @@ void MotionPlaybackApp::PatternTimeline(Timeline* timeline, Motion& motion, Moti
 					if (view_segment != j && view_segments[j] != 1)
 						ColorBarElementGray(timeline, j, Track_num, DTW->AngPassAll, motion);
 					else
-						ColorBarElementPart(timeline, j, Track_num, DTW->AnglePart[j], DTW->AngPassAll, motion);
+						ColorBarElementPart(timeline, j, Track_num, DTW->AnglePart[j], DTW->AngPassAll, motion, curr_frame, &DTW->Seg_Color[j]);
 					Track_num++;
 				}
 				Track_num++;
@@ -1289,13 +1237,13 @@ void MotionPlaybackApp::PatternTimeline(Timeline* timeline, Motion& motion, Moti
 					if (view_segment != j && view_segments[j] != 1)
 						ColorBarElementGray(timeline, j, Track_num, DTW->AngPassAll, motion);
 					else
-						ColorBarElementPart(timeline, j, Track_num, DTW->AnglePart[j], DTW->AngPassAll, motion);
+						ColorBarElementPart(timeline, j, Track_num, DTW->AnglePart[j], DTW->AngPassAll, motion, curr_frame, &DTW->Seg_Color[j]);
 					Track_num++;
 				}
 				if (view_segment != 0 && view_segments[0] != 1)//腰
 					ColorBarElementGray(timeline, 0, Track_num, DTW->AngPassAll, motion);
 				else
-					ColorBarElementPart(timeline, 0, Track_num, DTW->AnglePart[0], DTW->AngPassAll, motion);
+					ColorBarElementPart(timeline, 0, Track_num, DTW->AnglePart[0], DTW->AngPassAll, motion, curr_frame, &DTW->Seg_Color[0]);
 				Track_num++;
 				Track_num++;
 				for (int j = 13; j <= 16; j++)//右腕
@@ -1303,7 +1251,7 @@ void MotionPlaybackApp::PatternTimeline(Timeline* timeline, Motion& motion, Moti
 					if (view_segment != j && view_segments[j] != 1)
 						ColorBarElementGray(timeline, j, Track_num, DTW->AngPassAll, motion);
 					else
-						ColorBarElementPart(timeline, j, Track_num, DTW->AnglePart[j], DTW->AngPassAll, motion);
+						ColorBarElementPart(timeline, j, Track_num, DTW->AnglePart[j], DTW->AngPassAll, motion, curr_frame, &DTW->Seg_Color[j]);
 					Track_num++;
 				}
 				Track_num++;
@@ -1312,7 +1260,7 @@ void MotionPlaybackApp::PatternTimeline(Timeline* timeline, Motion& motion, Moti
 					if (view_segment != j && view_segments[j] != 1)
 						ColorBarElementGray(timeline, j, Track_num, DTW->AngPassAll, motion);
 					else
-						ColorBarElementPart(timeline, j, Track_num, DTW->AnglePart[j], DTW->AngPassAll, motion);
+						ColorBarElementPart(timeline, j, Track_num, DTW->AnglePart[j], DTW->AngPassAll, motion, curr_frame, &DTW->Seg_Color[j]);
 					Track_num++;
 				}
 				Track_num++;
@@ -1321,7 +1269,7 @@ void MotionPlaybackApp::PatternTimeline(Timeline* timeline, Motion& motion, Moti
 					if (view_segment != j && view_segments[j] != 1)
 						ColorBarElementGray(timeline, j, Track_num, DTW->AngPassAll, motion);
 					else
-						ColorBarElementPart(timeline, j, Track_num, DTW->AnglePart[j], DTW->AngPassAll, motion);
+						ColorBarElementPart(timeline, j, Track_num, DTW->AnglePart[j], DTW->AngPassAll, motion, curr_frame, &DTW->Seg_Color[j]);
 					Track_num++;
 				}
 				Track_num++;
@@ -1330,7 +1278,7 @@ void MotionPlaybackApp::PatternTimeline(Timeline* timeline, Motion& motion, Moti
 					if (view_segment != j && view_segments[j] != 1)
 						ColorBarElementGray(timeline, j, Track_num, DTW->AngPassAll, motion);
 					else
-						ColorBarElementPart(timeline, j, Track_num, DTW->AnglePart[j], DTW->AngPassAll, motion);
+						ColorBarElementPart(timeline, j, Track_num, DTW->AnglePart[j], DTW->AngPassAll, motion, curr_frame, &DTW->Seg_Color[j]);
 					Track_num++;
 				}
 				break;
@@ -1342,114 +1290,114 @@ void MotionPlaybackApp::PatternTimeline(Timeline* timeline, Motion& motion, Moti
 			{
 			case 0:
 				for (int j = 12; j >= 11; j--)//頭部
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_head_chest, DTW->AngPassAll, motion, motion2);
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_head_chest, DTW->AngPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[2]);
 				for (int j = 10; j >= 7; j--)//胸部
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_head_chest, DTW->AngPassAll, motion, motion2);
-				ColorBarElementRepPart(timeline, 0, Track_num++, DTW->Ang_head_chest, DTW->AngPassAll, motion, motion2);//腰
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_head_chest, DTW->AngPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[2]);
+				ColorBarElementRepPart(timeline, 0, Track_num++, DTW->Ang_head_chest, DTW->AngPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[2]);//腰
 				Track_num++;
 
 				for (int j = 13; j <= 16; j++)//右腕
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_arm, DTW->AngPassAll, motion, motion2);
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_arm, DTW->AngPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[5]);
 				for (int j = 36; j <= 39; j++)//左腕
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_arm, DTW->AngPassAll, motion, motion2);
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_arm, DTW->AngPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[5]);
 				Track_num++;
 
 				for (int j = 1; j <= 3; j++)//右脚
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_leg, DTW->AngPassAll, motion, motion2);
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_leg, DTW->AngPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[8]);
 				for (int j = 4; j <= 6; j++)//左脚
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_leg, DTW->AngPassAll, motion, motion2);
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_leg, DTW->AngPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[8]);
 				break;
 
 			case 1:
 				for (int j = 12; j >= 11; j--)//頭部
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_head, DTW->AngPassAll, motion, motion2);
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_head, DTW->AngPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[0]);
 				Track_num++;
 
 				for (int j = 10; j >= 7; j--)//胸部
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_chest, DTW->AngPassAll, motion, motion2);
-				ColorBarElementRepPart(timeline, 0, Track_num++, DTW->Ang_chest, DTW->AngPassAll, motion, motion2);//腰
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_chest, DTW->AngPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[1]);
+				ColorBarElementRepPart(timeline, 0, Track_num++, DTW->Ang_chest, DTW->AngPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[1]);//腰
 				Track_num++;
 
 				for (int j = 13; j <= 16; j++)//右腕
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_arm, DTW->AngPassAll, motion, motion2);
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_arm, DTW->AngPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[5]);
 				for (int j = 36; j <= 39; j++)//左腕
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_arm, DTW->AngPassAll, motion, motion2);
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_arm, DTW->AngPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[5]);
 				Track_num++;
 
 				for (int j = 1; j <= 3; j++)//右脚
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_leg, DTW->AngPassAll, motion, motion2);
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_leg, DTW->AngPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[8]);
 				for (int j = 4; j <= 6; j++)//左脚
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_leg, DTW->AngPassAll, motion, motion2);
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_leg, DTW->AngPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[8]);
 				break;
 
 			case 2:
 				for (int j = 12; j >= 11; j--)//頭部
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_head_chest, DTW->AngPassAll, motion, motion2);
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_head_chest, DTW->AngPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[2]);
 				for (int j = 10; j >= 7; j--)//胸部
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_head_chest, DTW->AngPassAll, motion, motion2);
-				ColorBarElementRepPart(timeline, 0, Track_num++, DTW->Ang_head_chest, DTW->AngPassAll, motion, motion2);//腰
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_head_chest, DTW->AngPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[2]);
+				ColorBarElementRepPart(timeline, 0, Track_num++, DTW->Ang_head_chest, DTW->AngPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[2]);//腰
 				Track_num++;
 
 				for (int j = 13; j <= 16; j++)//右腕
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_right_arm, DTW->AngPassAll, motion, motion2);
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_right_arm, DTW->AngPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[3]);
 				Track_num++;
 
 				for (int j = 36; j <= 39; j++)//左腕
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_left_arm, DTW->AngPassAll, motion, motion2);
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_left_arm, DTW->AngPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[4]);
 				Track_num++;
 
 				for (int j = 1; j <= 3; j++)//右脚
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_leg, DTW->AngPassAll, motion, motion2);
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_leg, DTW->AngPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[8]);
 				for (int j = 4; j <= 6; j++)//左脚
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_leg, DTW->AngPassAll, motion, motion2);
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_leg, DTW->AngPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[8]);
 				break;
 
 			case 3:
 				for (int j = 12; j >= 11; j--)//頭部
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_head_chest, DTW->AngPassAll, motion, motion2);
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_head_chest, DTW->AngPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[2]);
 				for (int j = 10; j >= 7; j--)//胸部
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_head_chest, DTW->AngPassAll, motion, motion2);
-				ColorBarElementRepPart(timeline, 0, Track_num++, DTW->Ang_head_chest, DTW->AngPassAll, motion, motion2);//腰
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_head_chest, DTW->AngPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[2]);
+				ColorBarElementRepPart(timeline, 0, Track_num++, DTW->Ang_head_chest, DTW->AngPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[2]);//腰
 				Track_num++;
 
 				for (int j = 13; j <= 16; j++)//右腕
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_arm, DTW->AngPassAll, motion, motion2);
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_arm, DTW->AngPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[5]);
 				for (int j = 36; j <= 39; j++)//左腕
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_arm, DTW->AngPassAll, motion, motion2);
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_arm, DTW->AngPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[5]);
 				Track_num++;
 
 				for (int j = 1; j <= 3; j++)//右脚
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_right_leg, DTW->AngPassAll, motion, motion2);
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_right_leg, DTW->AngPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[6]);
 				Track_num++;
 
 				for (int j = 4; j <= 6; j++)//左脚
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_left_leg, DTW->AngPassAll, motion, motion2);
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_left_leg, DTW->AngPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[7]);
 				break;
 
 			case 4:
 				for (int j = 12; j >= 11; j--)//頭部
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_head, DTW->AngPassAll, motion, motion2);
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_head, DTW->AngPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[0]);
 				Track_num++;
 
 				for (int j = 10; j >= 7; j--)//胸部
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_chest, DTW->AngPassAll, motion, motion2);
-				ColorBarElementRepPart(timeline, 0, Track_num++, DTW->Ang_chest, DTW->AngPassAll, motion, motion2);//腰
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_chest, DTW->AngPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[1]);
+				ColorBarElementRepPart(timeline, 0, Track_num++, DTW->Ang_chest, DTW->AngPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[1]);//腰
 				Track_num++;
 
 				for (int j = 13; j <= 16; j++)//右腕
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_right_arm, DTW->AngPassAll, motion, motion2);
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_right_arm, DTW->AngPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[3]);
 				Track_num++;
 
 				for (int j = 36; j <= 39; j++)//左腕
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_left_arm, DTW->AngPassAll, motion, motion2);
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_left_arm, DTW->AngPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[4]);
 				Track_num++;
 
 				for (int j = 1; j <= 3; j++)//右脚
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_right_leg, DTW->AngPassAll, motion, motion2);
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_right_leg, DTW->AngPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[6]);
 				Track_num++;
 
 				for (int j = 4; j <= 6; j++)//左脚
-					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_left_leg, DTW->AngPassAll, motion, motion2);
+					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_left_leg, DTW->AngPassAll, motion, motion2, curr_frame, &DTW->Pa_Color[7]);
 				break;
 
 			case 5:
@@ -1458,7 +1406,7 @@ void MotionPlaybackApp::PatternTimeline(Timeline* timeline, Motion& motion, Moti
 					if (view_segment != j && view_segments[j] != 1)
 						ColorBarElementRepGray(timeline, j, Track_num, DTW->AngPassAll, motion);
 					else
-						ColorBarElementRepPart(timeline, j, Track_num, DTW->AnglePart[j], DTW->AngPassAll, motion, motion2);
+						ColorBarElementRepPart(timeline, j, Track_num, DTW->AnglePart[j], DTW->AngPassAll, motion, motion2, curr_frame, &DTW->Seg_Color[j]);
 					Track_num++;
 				}
 				Track_num++;
@@ -1467,13 +1415,13 @@ void MotionPlaybackApp::PatternTimeline(Timeline* timeline, Motion& motion, Moti
 					if (view_segment != j && view_segments[j] != 1)
 						ColorBarElementRepGray(timeline, j, Track_num, DTW->AngPassAll, motion);
 					else
-						ColorBarElementRepPart(timeline, j, Track_num, DTW->AnglePart[j], DTW->AngPassAll, motion, motion2);
+						ColorBarElementRepPart(timeline, j, Track_num, DTW->AnglePart[j], DTW->AngPassAll, motion, motion2, curr_frame, &DTW->Seg_Color[j]);
 					Track_num++;
 				}
 				if (view_segment != 0 && view_segments[0] != 1)//腰
 					ColorBarElementRepGray(timeline, 0, Track_num, DTW->AngPassAll, motion);
 				else
-					ColorBarElementRepPart(timeline, 0, Track_num, DTW->AnglePart[0], DTW->AngPassAll, motion, motion2);
+					ColorBarElementRepPart(timeline, 0, Track_num, DTW->AnglePart[0], DTW->AngPassAll, motion, motion2, curr_frame, &DTW->Seg_Color[0]);
 				Track_num++;
 				Track_num++;
 				for (int j = 13; j <= 16; j++)//右腕
@@ -1481,7 +1429,7 @@ void MotionPlaybackApp::PatternTimeline(Timeline* timeline, Motion& motion, Moti
 					if (view_segment != j && view_segments[j] != 1)
 						ColorBarElementRepGray(timeline, j, Track_num, DTW->AngPassAll, motion);
 					else
-						ColorBarElementRepPart(timeline, j, Track_num, DTW->AnglePart[j], DTW->AngPassAll, motion, motion2);
+						ColorBarElementRepPart(timeline, j, Track_num, DTW->AnglePart[j], DTW->AngPassAll, motion, motion2, curr_frame, &DTW->Seg_Color[j]);
 					Track_num++;
 				}
 				Track_num++;
@@ -1490,7 +1438,7 @@ void MotionPlaybackApp::PatternTimeline(Timeline* timeline, Motion& motion, Moti
 					if (view_segment != j && view_segments[j] != 1)
 						ColorBarElementRepGray(timeline, j, Track_num, DTW->AngPassAll, motion);
 					else
-						ColorBarElementRepPart(timeline, j, Track_num, DTW->AnglePart[j], DTW->AngPassAll, motion, motion2);
+						ColorBarElementRepPart(timeline, j, Track_num, DTW->AnglePart[j], DTW->AngPassAll, motion, motion2, curr_frame, &DTW->Seg_Color[j]);
 					Track_num++;
 				}
 				Track_num++;
@@ -1499,7 +1447,7 @@ void MotionPlaybackApp::PatternTimeline(Timeline* timeline, Motion& motion, Moti
 					if (view_segment != j && view_segments[j] != 1)
 						ColorBarElementRepGray(timeline, j, Track_num, DTW->AngPassAll, motion);
 					else
-						ColorBarElementRepPart(timeline, j, Track_num, DTW->AnglePart[j], DTW->AngPassAll, motion, motion2);
+						ColorBarElementRepPart(timeline, j, Track_num, DTW->AnglePart[j], DTW->AngPassAll, motion, motion2, curr_frame, &DTW->Seg_Color[j]);
 					Track_num++;
 				}
 				Track_num++;
@@ -1508,7 +1456,7 @@ void MotionPlaybackApp::PatternTimeline(Timeline* timeline, Motion& motion, Moti
 					if (view_segment != j && view_segments[j] != 1)
 						ColorBarElementRepGray(timeline, j, Track_num, DTW->AngPassAll, motion);
 					else
-						ColorBarElementRepPart(timeline, j, Track_num, DTW->AnglePart[j], DTW->AngPassAll, motion, motion2);
+						ColorBarElementRepPart(timeline, j, Track_num, DTW->AnglePart[j], DTW->AngPassAll, motion, motion2, curr_frame, &DTW->Seg_Color[j]);
 					Track_num++;
 				}
 				break;
@@ -1681,13 +1629,15 @@ void MotionPlaybackApp::InitSegmentname(int num_segments)
 //
 //カラーバーの誤差による色の変化を設定(DTWframe)
 //
-void MotionPlaybackApp::ColorBarElementPart(Timeline* timeline, int segment_num, int Track_num, vector<vector<float>> Error, vector<vector<int>> PassAll, Motion& motion)
+void MotionPlaybackApp::ColorBarElementPart(Timeline* timeline, int segment_num, int Track_num, vector<vector<float>> Error, vector<vector<int>> PassAll, Motion& motion, float curr_frame, Color4f * curr_c)
 {
 	float red_ratio = 0.0f;
 	float max_error = 0.0f;
 	float min_error = 100.0f;
 	float max_frame = -1.0f;
 	float name_space = 30.0f;
+	Color4f c;
+
 	//frame内での最大誤差値を求める
 	for(int f = 0; f < PassAll[0].size(); f++)
 	{
@@ -1703,35 +1653,40 @@ void MotionPlaybackApp::ColorBarElementPart(Timeline* timeline, int segment_num,
 	max_error = max_error - min_error;
 
 	//誤差の大きさと色付けしてフレーム毎に表示
-	for(int i = 0; i < PassAll[0].size(); i++)
+	for(int f = 0; f < PassAll[0].size(); f++)
 	{
-		if(i == 0)
+		if(f == 0)
 			timeline->AddElement( 0.0f, name_space, Pattern_Color(pattern, segment_num),  motion.body->segments[segment_num]->name.c_str(), Track_num );
-		red_ratio = (Error[PassAll[0][i]][PassAll[1][i]] - min_error) / max_error;
-		if(red_ratio > 0.75)
-			timeline->AddElement( i + name_space, i + 1.0f + name_space, Color4f( 1.0f, (1.0f - red_ratio) * 4.0f, 0.0f, 1.0f ), "", Track_num );
+		red_ratio = (Error[PassAll[0][f]][PassAll[1][f]] - min_error) / max_error;
+		if (red_ratio == 1.0)
+			c = Color4f( 0.0f, 0.0f, 0.0f, 1.0f );
+		else if(red_ratio > 0.75)
+			c = Color4f( 1.0f, (1.0f - red_ratio) * 4.0f, 0.0f, 1.0f );
 		else if (red_ratio > 0.5)
-			timeline->AddElement(i + name_space, i + 1.0f + name_space, Color4f((red_ratio - 0.5f) * 4.0f, 1.0f, 0.0f, 1.0f), "", Track_num);
+			c = Color4f((red_ratio - 0.5f) * 4.0f, 1.0f, 0.0f, 1.0f);
 		else if (red_ratio > 0.25)
-			timeline->AddElement(i + name_space, i + 1.0f + name_space, Color4f(0.0f, 1.0f, (0.5f - red_ratio) * 4.0f, 1.0f), "", Track_num);
+			c = Color4f(0.0f, 1.0f, (0.5f - red_ratio) * 4.0f, 1.0f);
 		else
-			timeline->AddElement( i + name_space, i + 1.0f + name_space, Color4f( 0.0f, red_ratio * 4.0f, 1.0f, 1.0f ), "", Track_num );
+			c = Color4f( 0.0f, red_ratio * 4.0f, 1.0f, 1.0f );
 
-		if(i == max_frame && max_frame != -1)
-			timeline->AddElement( i + name_space, i + 1.0f + name_space, Color4f( 0.0f, 0.0f, 0.0f, 1.0f ), "", Track_num );
+		timeline->AddElement( f + name_space, f + 1.0f + name_space, c, "", Track_num );
+		if(f == curr_frame)
+			*curr_c = c;
 	}
 }
 
 //
 //カラーバーの誤差による色の変化を設定(再生切り替え用)
 //
-void MotionPlaybackApp::ColorBarElementRepPart(Timeline* timeline, int segment_num, int Track_num, vector<vector<float>> Error, vector<vector<int>> PassAll, Motion& motion, Motion& motion2)
+void MotionPlaybackApp::ColorBarElementRepPart(Timeline* timeline, int segment_num, int Track_num, vector<vector<float>> Error, vector<vector<int>> PassAll, Motion& motion, Motion& motion2, float curr_frame, Color4f * curr_c)
 {
 	float red_ratio = 0.0f;
 	float max_error = 0.0f;
 	float min_error = 100.0f;
 	float max_frame = -1.0f;
 	float name_space = 30.0f;
+	Color4f c;
+
 	//frame内での最大誤差値を求める
 	for(int f = 0; f <= mf; f++)
 	{
@@ -1768,17 +1723,20 @@ void MotionPlaybackApp::ColorBarElementRepPart(Timeline* timeline, int segment_n
 		else
 			red_ratio = (Error[min(motion.num_frames - 1, f - mf + m1f)][min(motion2.num_frames - 1, f - mf + m2f)] - min_error) / max_error;
 		
-		if(red_ratio > 0.75)
-			timeline->AddElement( f + name_space, f + 1.0f + name_space, Color4f( 1.0f, (1.0f - red_ratio) * 4.0f, 0.0f, 1.0f ), "", Track_num );
+		if (red_ratio == 1.0)
+			c = Color4f( 0.0f, 0.0f, 0.0f, 1.0f );
+		else if(red_ratio > 0.75)
+			c = Color4f( 1.0f, (1.0f - red_ratio) * 4.0f, 0.0f, 1.0f );
 		else if (red_ratio > 0.5)
-			timeline->AddElement(f + name_space, f + 1.0f + name_space, Color4f((red_ratio - 0.5f) * 4.0f, 1.0f, 0.0f, 1.0f), "", Track_num);
+			c = Color4f((red_ratio - 0.5f) * 4.0f, 1.0f, 0.0f, 1.0f);
 		else if (red_ratio > 0.25)
-			timeline->AddElement(f + name_space, f + 1.0f + name_space, Color4f(0.0f, 1.0f, (0.5f - red_ratio) * 4.0f, 1.0f), "", Track_num);
+			c = Color4f(0.0f, 1.0f, (0.5f - red_ratio) * 4.0f, 1.0f);
 		else
-			timeline->AddElement( f + name_space, f + 1.0f + name_space, Color4f( 0.0f, red_ratio * 4.0f, 1.0f, 1.0f ), "", Track_num );
+			c = Color4f( 0.0f, red_ratio * 4.0f, 1.0f, 1.0f );
 
-		if(f == max_frame && max_frame != -1)
-			timeline->AddElement( f + name_space, f + 1.0f + name_space, Color4f( 0.0f, 0.0f, 0.0f, 1.0f ), "", Track_num );
+		timeline->AddElement( f + name_space, f + 1.0f + name_space, c, "", Track_num );
+		if(f == curr_frame)
+			*curr_c = c;
 	}
 }
 
@@ -1808,36 +1766,6 @@ void MotionPlaybackApp::ColorBarElementRepGray(Timeline* timeline, int segment_n
 			timeline->AddElement( 0.0f, name_space, Pattern_Color(pattern, segment_num),  motion.body->segments[segment_num]->name.c_str(), Track_num );
 }
 
-//
-//全部位との距離を取る
-//
-//float MotionPlaybackApp::DistanceCalc(int num_segments, vector<Vector3f> v1, vector<Vector3f> v2)
-//{
-//	float pos_dis = 0.0f;
-//	for(int i = 0; i < num_segments; i++)
-//	{
-//		//手の部位は計算しない
-//		while(i > 16 && i < 36)
-//			i++;
-//		if(i > 39)
-//			break;
-//
-//		pos_dis += sqrt(pow(v1[i].x - v2[i].x, 2.0) + pow(v1[i].y - v2[i].y, 2.0) + pow(v1[i].z - v2[i].z, 2.0));
-//	}
-//
-//	return pos_dis;
-//}
-
-//
-//1部位との距離を取る
-//
-//float MotionPlaybackApp::DistanceCalcPart(int frame1, int frame2, int num_segment, vector<vector<Vector3f>> v1, vector<vector<Vector3f>> v2)
-//{
-//	float pos_dis;
-//	pos_dis = sqrt(pow(v1[frame1][num_segment].x - v2[frame2][num_segment].x, 2.0) + pow(v1[frame1][num_segment].y - v2[frame2][num_segment].y, 2.0) + pow(v1[frame1][num_segment].z - v2[frame2][num_segment].z, 2.0));
-//	return pos_dis;
-//}
-
 
 //
 //DTW初期化
@@ -1846,6 +1774,8 @@ void DTWinformation::DTWinformation_init( int frames1, int frames2, const Motion
 {
 	//iが体節、jがフレーム1、kがフレーム2
 	int Num_segments = motion1.body->num_segments;
+	this->Seg_Color = new Color4f[Num_segments];
+	this->Pa_Color = new Color4f[9];
 
 	this->DistanceAll.resize(frames1 + 1, vector<float>(frames2 + 1, 0.0f));
 	this->DistancePart.resize(Num_segments,vector<vector<float>>(frames1 + 1, vector<float>(frames2 + 1, 0.0f)));
@@ -1881,11 +1811,8 @@ void DTWinformation::DTWinformation_init( int frames1, int frames2, const Motion
 	vector< Matrix4f >  seg_frame_array1, seg_frame_array2;
 	vector< Point3f >  joi_pos_array1, joi_pos_array2;
 	Matrix4f  mat1, mat2;
-	//Matrix3f  rot1, rot2;
 	vector< vector< Vector3f > > v1(frames1, vector< Vector3f >(Num_segments));
 	vector< vector< Vector3f > > v2(frames2, vector< Vector3f >(Num_segments));
-	//vector< vector< Point3f > > e1(frames1, vector< Point3f >(Num_segments));
-	//vector< vector< Point3f > > e2(frames2, vector< Point3f >(Num_segments));
 	vector< vector< Vector3f > > j1(frames1, vector< Vector3f >(Num_segments));
 	vector< vector< Vector3f > > j2(frames2, vector< Vector3f >(Num_segments));
 
@@ -2001,7 +1928,7 @@ void DTWinformation::DTWinformation_init( int frames1, int frames2, const Motion
 					else if (i == 0 || (i >= 7 && i <= 10))
 					{
 						this->Dis_chest[j][k] += this->DistancePart[i][j][k];
-						this->Dis_head_chest[j][k] += this->AnglePart[i][j][k];
+						this->Dis_head_chest[j][k] += this->DistancePart[i][j][k];
 					}
 					else if (i >= 13 && i <= 16)
 					{
@@ -2116,9 +2043,6 @@ void DTWinformation::DTWinformation_init( int frames1, int frames2, const Motion
 	this->DisPassAll.resize(2, vector<int>());
 	float dis1, dis2, dis3;
 	
-	//for (int j = 0; j < frames1; j++)
-	//	for (int k = 0; k < frames2; k++)
-	//		DistanceAll[j][k] += 0.05f * abs(j - k);
 	for(int j = 0; j < frames1; j++)
 		for (int k = 0; k < frames2; k++)
 			DistanceAll[j][k] += DisCostAcummurate(j, k);
@@ -2168,12 +2092,9 @@ void DTWinformation::DTWinformation_init( int frames1, int frames2, const Motion
 	f1 = frames1 - 1, f2 = frames2 - 1;
 	this->AngPassAll.resize(2, vector<int>());
 
-	//for (int j = 0; j < frames1; j++)
-	//	for (int k = 0; k < frames2; k++)
-	//		AngleAll[j][k] += 0.05f * abs(j - k);
 	for(int j = 0; j < frames1; j++)
 		for (int k = 0; k < frames2; k++)
-			AngleAll[j][k] += DisCostAcummurate(j, k);
+			AngleAll[j][k] += AngCostAcummurate(j, k);
 
 	float ang1, ang2, ang3;
 	while (f1 >= 0 && f2 >= 0)

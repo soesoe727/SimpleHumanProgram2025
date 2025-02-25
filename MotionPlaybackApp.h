@@ -94,6 +94,13 @@ struct DTWinformation
 		//脚全体の誤差
 		vector< vector< float > > Dis_leg, Ang_leg;
 
+		//体節ごとのリアルタイムでの誤差の色相(パターン5で使用)
+		Color4f * Seg_Color;
+
+		//パターンごとのリアルタイムでの誤差の色相(パターン1-4で使用)
+		//0-head,1-chest,2-head_chest,3-r_arm,4-l_arm,5-arm,6-r_leg,7-l_leg,8-leg
+		Color4f * Pa_Color;
+
 	public:
 		//DTW初期化
 		void DTWinformation_init( int frames1, int frames2, const Motion & motion1, const Motion & motion2 );	
@@ -233,10 +240,10 @@ class  MotionPlaybackApp : public GLUTBaseApp
 	//void ColorBarElementSetPart(Timeline * timeline, int segment_num, int Track_num, vector<float> Distance, vector<vector<int>> PassAll, Motion & motion);
 
 	//カラーバーの誤差による色の変化を設定(DTWframe)
-	void ColorBarElementPart(Timeline * timeline, int segment_num, int Track_num, vector<vector<float>> Distance, vector<vector<int>> PassAll, Motion & motion);
+	void ColorBarElementPart(Timeline * timeline, int segment_num, int Track_num, vector<vector<float>> Distance, vector<vector<int>> PassAll, Motion & motion, float curr_frame, Color4f * curr_c);
 
 	//カラーバーの誤差による色の変化を設定(再生切り替え用)
-	void ColorBarElementRepPart(Timeline * timeline, int segment_num, int Track_num, vector<vector<float>> Distance, vector<vector<int>> PassAll, Motion & motion, Motion & motion2);
+	void ColorBarElementRepPart(Timeline * timeline, int segment_num, int Track_num, vector<vector<float>> Distance, vector<vector<int>> PassAll, Motion & motion, Motion & motion2, float curr_frame, Color4f * curr_c);
 
 	//カラーバーを全て灰色に設定(DTWframe)
 	void ColorBarElementGray(Timeline * timeline, int segment_num, int Track_num, vector<vector<int>> PassAll, Motion & motion);
@@ -244,11 +251,6 @@ class  MotionPlaybackApp : public GLUTBaseApp
 	//カラーバーを全て灰色に設定(再生切り替え用)
 	void ColorBarElementRepGray(Timeline * timeline, int segment_num, int Track_num, vector<vector<int>> PassAll, Motion & motion);
 	
-	//全部位との距離を取る
-	//static float DistanceCalc( int num_segments, vector< Vector3f > v1, vector< Vector3f > v2);
-
-	//1部位との距離を取る
-	//static float DistanceCalcPart(int frame1, int frame2, int num_segment, vector< vector< Vector3f > > v1, vector< vector< Vector3f > > v2 );
 };
 
 
