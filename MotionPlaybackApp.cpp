@@ -131,6 +131,18 @@ void  MotionPlaybackApp::Display()
 	// 基底クラスの処理を実行
 	GLUTBaseApp::Display();
 
+
+		// タイムラインを描画
+	if ( timeline )
+	{	
+		//部位の集合ごとの色付け
+		if(sabun_flag == 1)//ワーピング・パスによる再生
+			PatternTimeline(timeline, * motion, *motion2, DTWframe_no, DTWa);
+		else//ワーピング・パスによる再生から通常再生
+			PatternTimeline(timeline, *motion, *motion2, frame_no, DTWa);
+
+		//timeline->DrawTimeline();
+	}
 	// キャラクタを描画
 	
 	if(curr_posture && curr_posture2)
@@ -144,7 +156,7 @@ void  MotionPlaybackApp::Display()
 			{
 				//1人目の動作の可視化(色付け)
 				Pass_posture1 = motion->frames[DTWa->DisPassAll[0][DTWframe_no]];
-				DrawPostureColor(Pass_posture1, pattern, view_segment, view_segments);
+				DrawPostureColor(Pass_posture1, pattern, view_segment, view_segments, DTWa->Seg_Color, DTWa->Pa_Color);
 				DrawPostureShadow(Pass_posture1, shadow_dir, shadow_color);
 
 				//2人目の動作の可視化(白･灰)(パス対応)
@@ -158,7 +170,7 @@ void  MotionPlaybackApp::Display()
 				{
 					//1人目の動作の可視化(色付け)
 					Pass_posture1 = motion->frames[DTWa->DisPassAll[0][frame_no]];
-					DrawPostureColor(Pass_posture1, pattern, view_segment, view_segments);
+					DrawPostureColor(Pass_posture1, pattern, view_segment, view_segments, DTWa->Seg_Color, DTWa->Pa_Color);
 					DrawPostureShadow(Pass_posture1, shadow_dir, shadow_color);
 
 					//2人目の動作の可視化(白･灰)(パス対応)
@@ -170,7 +182,7 @@ void  MotionPlaybackApp::Display()
 				{
 					//1人目の動作の可視化(色付け)
 					Pass_posture1 = motion->frames[min(motion->num_frames - 1, m1f + frame_no - mf)];
-					DrawPostureColor(Pass_posture1, pattern, view_segment, view_segments);
+					DrawPostureColor(Pass_posture1, pattern, view_segment, view_segments, DTWa->Seg_Color, DTWa->Pa_Color);
 					DrawPostureShadow(Pass_posture1, shadow_dir, shadow_color);
 					//2人目の動作の可視化(白･灰)(パス対応)
 					Pass_posture2 = motion2->frames[min(motion2->num_frames - 1, m2f + frame_no - mf)];
@@ -185,7 +197,7 @@ void  MotionPlaybackApp::Display()
 			{
 				//1人目の動作の可視化(色付け)
 				Pass_posture1 = motion->frames[DTWa->AngPassAll[0][DTWframe_no]];
-				DrawPostureColor(Pass_posture1, pattern, view_segment, view_segments);
+				DrawPostureColor(Pass_posture1, pattern, view_segment, view_segments, DTWa->Seg_Color, DTWa->Pa_Color);
 				DrawPostureShadow(Pass_posture1, shadow_dir, shadow_color);
 				//2人目の動作の可視化(白･灰)(パス対応)
 				Pass_posture2 = motion2->frames[DTWa->AngPassAll[1][DTWframe_no]];
@@ -198,7 +210,7 @@ void  MotionPlaybackApp::Display()
 				{
 					//1人目の動作の可視化(色付け)
 					Pass_posture1 = motion->frames[DTWa->AngPassAll[0][frame_no]];
-					DrawPostureColor(Pass_posture1, pattern, view_segment, view_segments);
+					DrawPostureColor(Pass_posture1, pattern, view_segment, view_segments, DTWa->Seg_Color, DTWa->Pa_Color);
 					DrawPostureShadow(Pass_posture1, shadow_dir, shadow_color);
 					//2人目の動作の可視化(白･灰)(パス対応)
 					Pass_posture2 = motion2->frames[DTWa->AngPassAll[1][frame_no]];
@@ -209,7 +221,7 @@ void  MotionPlaybackApp::Display()
 				{
 					//1人目の動作の可視化(色付け)
 					Pass_posture1 = motion->frames[min(motion->num_frames - 1, m1f + frame_no - mf)];
-					DrawPostureColor(Pass_posture1, pattern, view_segment, view_segments);
+					DrawPostureColor(Pass_posture1, pattern, view_segment, view_segments, DTWa->Seg_Color, DTWa->Pa_Color);
 					DrawPostureShadow(Pass_posture1, shadow_dir, shadow_color);
 					//2人目の動作の可視化(白･灰)(パス対応)
 					Pass_posture2 = motion2->frames[min(motion2->num_frames - 1, m2f + frame_no - mf)];
@@ -225,10 +237,10 @@ void  MotionPlaybackApp::Display()
 	if ( timeline )
 	{	
 		//部位の集合ごとの色付け
-		if(sabun_flag == 1)//ワーピング・パスによる再生
-			PatternTimeline(timeline, * motion, *motion2, DTWframe_no, DTWa);
-		else//ワーピング・パスによる再生から通常再生
-			PatternTimeline(timeline, *motion, *motion2, frame_no, DTWa);
+		//if(sabun_flag == 1)//ワーピング・パスによる再生
+		//	PatternTimeline(timeline, * motion, *motion2, DTWframe_no, DTWa);
+		//else//ワーピング・パスによる再生から通常再生
+		//	PatternTimeline(timeline, *motion, *motion2, frame_no, DTWa);
 
 		timeline->DrawTimeline();
 	}
@@ -311,30 +323,6 @@ void  MotionPlaybackApp::Keyboard( unsigned char key, int mx, int my )
 	// w キーでアニメーションの再生速度を変更
 	if ( key == 'w' )
 		animation_speed = ( animation_speed == 1.0f ) ? 0.1f : 1.0f;
-
-	// e キーで次のフレーム
-	//if ( ( key == '.' ) && !on_animation && motion )
-	//{
-	//	on_animation = true;
-	//	Animation( motion->interval );
-	//	on_animation = false;
-	//}
-
-	// q キーで前のフレーム
-	//if ( ( key == ',' ) && !on_animation && motion && ( DTWframe_no > 0 ) )
-	//{
-	//	on_animation = true;
-	//	Animation( - motion->interval );
-	//	on_animation = false;
-	//}
-	
-	// L キーで再生動作の変更
-	//if ( key == 'L' )
-	//{
-	//	// ファイルダイアログを表示してBVHファイルを選択・読み込み
-	//	OpenNewBVH();
-	//	OpenNewBVH2();
-	//}
 
 	//d キーでview_segmentの変更+
 	if (key == 'd')

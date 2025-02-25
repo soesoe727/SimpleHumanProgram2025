@@ -171,13 +171,19 @@ class  MotionPlaybackApp : public GLUTBaseApp
 	//num_space
 	float num_space = 30.0f;
 
-	//sabun
+	//1つ目の動作の再生切り替えフレーム
 	int m1f = -30;
+
+	//2つ目の動作の再生切り替えフレーム
 	int m2f = -30;
+
+	//ワーピング・パス再生時のフレームにおける動作の再生切り替えフレーム
 	int mf = -30;
+
+	//再生切り替え無(1)と再生切り替え有(-1)
 	int sabun_flag = 1;
 
-	//位置誤差(1)と角度誤差(-1)の切り替え
+	//位置誤差(1)と角度誤差(-1)
 	int error_flag = 1;
 
   public:
@@ -235,9 +241,6 @@ class  MotionPlaybackApp : public GLUTBaseApp
 
 	//体節の名前を入力
 	void InitSegmentname(int num_segments);
-
-	//部位の集合毎のカラーバーの誤差による色の変化を設定
-	//void ColorBarElementSetPart(Timeline * timeline, int segment_num, int Track_num, vector<float> Distance, vector<vector<int>> PassAll, Motion & motion);
 
 	//カラーバーの誤差による色の変化を設定(DTWframe)
 	void ColorBarElementPart(Timeline * timeline, int segment_num, int Track_num, vector<vector<float>> Distance, vector<vector<int>> PassAll, Motion & motion, float curr_frame, Color4f * curr_c);

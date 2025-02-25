@@ -1097,7 +1097,7 @@ void  DrawPosture( const Posture & posture )
 //
 //  姿勢の描画（スティックフィギュアで描画）
 //
-void DrawPostureColor(const Posture& posture, int pattern, int view_segment, vector<int> view_segments )
+void DrawPostureColor(const Posture& posture, int pattern, int view_segment, vector<int> view_segments, Color4f * segment_color, Color4f * pattern_color )
 {
 	if ( !posture.body )
 		return;
@@ -1118,81 +1118,154 @@ void DrawPostureColor(const Posture& posture, int pattern, int view_segment, vec
 			i++;
 		if(i > 39)
 			break;
-
 		switch (pattern)
 		{
 			case 0: //全体3色
 				if( 1 <= i && i <= 6 )
-					glColor3f( 0.8f, 0.2f, 0.2f );
+					glColor3f( pattern_color[8].x, pattern_color[8].y, pattern_color[8].z );
 				else if( i <= 12 )
-					glColor3f( 0.2f, 0.8f, 0.2f );
+					glColor3f( pattern_color[2].x, pattern_color[2].y, pattern_color[2].z );
 				else
-					glColor3f( 0.2f, 0.2f, 0.8f );
+					glColor3f( pattern_color[5].x, pattern_color[5].y, pattern_color[5].z );
 				break;
 			case 1: //頭部と胸部2色
 				if( i == 0 )
-					glColor3f( 0.5f, 0.8f, 0.2f );
+					glColor3f( pattern_color[1].x, pattern_color[1].y, pattern_color[1].z );
 				else if( 7 <= i && i <= 10 )
-					glColor3f( 0.5f, 0.8f, 0.2f );
+					glColor3f( pattern_color[1].x, pattern_color[1].y, pattern_color[1].z );
 				else if( i == 11 || i == 12 )
-					glColor3f( 0.2f, 0.8f, 0.5f );
+					glColor3f( pattern_color[0].x, pattern_color[0].y, pattern_color[0].z );
 				else
 					glColor3f( 0.4f, 0.4f, 0.4f );
 				break;
 			case 2: //腕2色
-				if( 13 <= i && i <= 35 )
-					glColor3f( 0.4f, 0.2f, 0.8f );
+				if( 13 <= i )
+					glColor3f( pattern_color[3].x, pattern_color[3].y, pattern_color[3].z );
 				else if( 36 <= i )
-					glColor3f( 0.2f, 0.4f, 0.8f );
+					glColor3f( pattern_color[4].x, pattern_color[4].y, pattern_color[4].z );
 				else
 					glColor3f( 0.4f, 0.4f, 0.4f );
 				break;
 			case 3: //脚2色
 				if( 1 <= i && i <= 3 )
-					glColor3f( 0.8f, 0.4f, 0.2f );
+					glColor3f( pattern_color[6].x, pattern_color[6].y, pattern_color[6].z );
 				else if( 4 <= i && i <= 6 )
-					glColor3f( 0.8f, 0.2f, 0.4f );
+					glColor3f( pattern_color[7].x, pattern_color[7].y, pattern_color[7].z );
 				else
 					glColor3f( 0.4f, 0.4f, 0.4f );
 				break;
 			case 4: //全体6色
 				if( i == 0 )
-					glColor3f( 0.5f, 0.8f, 0.2f );
+					glColor3f( pattern_color[1].x, pattern_color[1].y, pattern_color[1].z );
 				else if( 1 <= i && i <= 3 )
-					glColor3f( 0.8f, 0.4f, 0.2f );
+					glColor3f( pattern_color[6].x, pattern_color[6].y, pattern_color[6].z );
 				else if( 4 <= i && i <= 6 )
-					glColor3f( 0.8f, 0.2f, 0.4f );
+					glColor3f( pattern_color[7].x, pattern_color[7].y, pattern_color[7].z );
 				else if( 7 <= i && i <= 10 )
-					glColor3f( 0.5f, 0.8f, 0.2f );
+					glColor3f( pattern_color[1].x, pattern_color[1].y, pattern_color[1].z );
 				else if( i == 11 || i == 12 )
-					glColor3f( 0.2f, 0.8f, 0.5f );
-				else if( 13 <= i && i <= 35 )
-					glColor3f( 0.4f, 0.2f, 0.8f );
+					glColor3f( pattern_color[0].x, pattern_color[0].y, pattern_color[0].z );
+				else if( i >= 13 && i <= 16 )
+					glColor3f( pattern_color[3].x, pattern_color[3].y, pattern_color[3].z );
 				else
-					glColor3f( 0.2f, 0.4f, 0.8f );
+					glColor3f( pattern_color[4].x, pattern_color[4].y, pattern_color[4].z );
 				break;
 			case 5: //1部位1色
 				if(i == view_segment || view_segments[i] == 1)
 					if( i == 0 )
-						glColor3f( 0.5f, 0.8f, 0.2f );
+						glColor3f( segment_color[i].x, segment_color[i].y, segment_color[i].z );
 					else if( 1 <= i && i <= 3 )
-						glColor3f( 0.8f, 0.4f, 0.2f );
+						glColor3f( segment_color[i].x, segment_color[i].y, segment_color[i].z );
 					else if( 4 <= i && i <= 6 )
-						glColor3f( 0.8f, 0.2f, 0.4f );
+						glColor3f( segment_color[i].x, segment_color[i].y, segment_color[i].z );
 					else if( 7 <= i && i <= 10 )
-						glColor3f( 0.5f, 0.8f, 0.2f );
+						glColor3f( segment_color[i].x, segment_color[i].y, segment_color[i].z );
 					else if( i == 11 || i == 12 )
-						glColor3f( 0.2f, 0.8f, 0.5f );
+						glColor3f( segment_color[i].x, segment_color[i].y, segment_color[i].z );
 					else if( 13 <= i  && i <= 35 )
-						glColor3f( 0.4f, 0.2f, 0.8f );
+						glColor3f( segment_color[i].x, segment_color[i].y, segment_color[i].z );
 					else
-						glColor3f( 0.2f, 0.4f, 0.8f );
+						glColor3f( segment_color[i].x, segment_color[i].y, segment_color[i].z );
 				else
 					glColor4f( 0.4f, 0.4f, 0.4f, 0.8f );
 				break;
 			default:
 				std::cout << "pattern isn't defined." << std::endl;
 		}
+		//switch (pattern)
+		//{
+		//	case 0: //全体3色
+		//		if( 1 <= i && i <= 6 )
+		//			glColor3f( 0.8f, 0.2f, 0.2f );
+		//		else if( i <= 12 )
+		//			glColor3f( 0.2f, 0.8f, 0.2f );
+		//		else
+		//			glColor3f( 0.2f, 0.2f, 0.8f );
+		//		break;
+		//	case 1: //頭部と胸部2色
+		//		if( i == 0 )
+		//			glColor3f( 0.5f, 0.8f, 0.2f );
+		//		else if( 7 <= i && i <= 10 )
+		//			glColor3f( 0.5f, 0.8f, 0.2f );
+		//		else if( i == 11 || i == 12 )
+		//			glColor3f( 0.2f, 0.8f, 0.5f );
+		//		else
+		//			glColor3f( 0.4f, 0.4f, 0.4f );
+		//		break;
+		//	case 2: //腕2色
+		//		if( 13 <= i && i <= 35 )
+		//			glColor3f( 0.4f, 0.2f, 0.8f );
+		//		else if( 36 <= i )
+		//			glColor3f( 0.2f, 0.4f, 0.8f );
+		//		else
+		//			glColor3f( 0.4f, 0.4f, 0.4f );
+		//		break;
+		//	case 3: //脚2色
+		//		if( 1 <= i && i <= 3 )
+		//			glColor3f( 0.8f, 0.4f, 0.2f );
+		//		else if( 4 <= i && i <= 6 )
+		//			glColor3f( 0.8f, 0.2f, 0.4f );
+		//		else
+		//			glColor3f( 0.4f, 0.4f, 0.4f );
+		//		break;
+		//	case 4: //全体6色
+		//		if( i == 0 )
+		//			glColor3f( 0.5f, 0.8f, 0.2f );
+		//		else if( 1 <= i && i <= 3 )
+		//			glColor3f( 0.8f, 0.4f, 0.2f );
+		//		else if( 4 <= i && i <= 6 )
+		//			glColor3f( 0.8f, 0.2f, 0.4f );
+		//		else if( 7 <= i && i <= 10 )
+		//			glColor3f( 0.5f, 0.8f, 0.2f );
+		//		else if( i == 11 || i == 12 )
+		//			glColor3f( 0.2f, 0.8f, 0.5f );
+		//		else if( 13 <= i && i <= 35 )
+		//			glColor3f( 0.4f, 0.2f, 0.8f );
+		//		else
+		//			glColor3f( 0.2f, 0.4f, 0.8f );
+		//		break;
+		//	case 5: //1部位1色
+		//		if(i == view_segment || view_segments[i] == 1)
+		//			if( i == 0 )
+		//				glColor3f( 0.5f, 0.8f, 0.2f );
+		//			else if( 1 <= i && i <= 3 )
+		//				glColor3f( 0.8f, 0.4f, 0.2f );
+		//			else if( 4 <= i && i <= 6 )
+		//				glColor3f( 0.8f, 0.2f, 0.4f );
+		//			else if( 7 <= i && i <= 10 )
+		//				glColor3f( 0.5f, 0.8f, 0.2f );
+		//			else if( i == 11 || i == 12 )
+		//				glColor3f( 0.2f, 0.8f, 0.5f );
+		//			else if( 13 <= i  && i <= 35 )
+		//				glColor3f( 0.4f, 0.2f, 0.8f );
+		//			else
+		//				glColor3f( 0.2f, 0.4f, 0.8f );
+		//		else
+		//			glColor4f( 0.4f, 0.4f, 0.4f, 0.8f );
+		//		break;
+		//	default:
+		//		std::cout << "pattern isn't defined." << std::endl;
+		//}
 
 
 		const Segment *  segment = posture.body->segments[i];
