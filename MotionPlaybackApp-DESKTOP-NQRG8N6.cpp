@@ -88,7 +88,7 @@ void  MotionPlaybackApp::Initialize()
 	timeline = new Timeline();
 	if(motion && motion2)
 	{
-		motion2->num_frames -= 20;
+		motion2->num_frames -= 25;
 		//腰の位置を最初に一緒にする
 		Point3f root = motion2->frames[0].root_pos - motion->frames[0].root_pos;
 		for(int i = 0; i < motion2->num_frames; i++)
@@ -1688,6 +1688,7 @@ void MotionPlaybackApp::ColorBarElementPart(Timeline* timeline, int segment_num,
 	float min_error = 100.0f;
 	float max_frame = -1.0f;
 	float name_space = 30.0f;
+	Color3f c;
 	//frame内での最大誤差値を求める
 	for(int f = 0; f < PassAll[0].size(); f++)
 	{
@@ -2116,9 +2117,9 @@ void DTWinformation::DTWinformation_init( int frames1, int frames2, const Motion
 	this->DisPassAll.resize(2, vector<int>());
 	float dis1, dis2, dis3;
 	
-	//for (int j = 0; j < frames1; j++)
-	//	for (int k = 0; k < frames2; k++)
-	//		DistanceAll[j][k] += 0.05f * abs(j - k);
+	for (int j = 0; j < frames1; j++)
+		for (int k = 0; k < frames2; k++)
+			DistanceAll[j][k] += 0.05f * abs(j - k);
 	for(int j = 0; j < frames1; j++)
 		for (int k = 0; k < frames2; k++)
 			DistanceAll[j][k] += DisCostAcummurate(j, k);
@@ -2168,9 +2169,9 @@ void DTWinformation::DTWinformation_init( int frames1, int frames2, const Motion
 	f1 = frames1 - 1, f2 = frames2 - 1;
 	this->AngPassAll.resize(2, vector<int>());
 
-	//for (int j = 0; j < frames1; j++)
-	//	for (int k = 0; k < frames2; k++)
-	//		AngleAll[j][k] += 0.05f * abs(j - k);
+	for (int j = 0; j < frames1; j++)
+		for (int k = 0; k < frames2; k++)
+			AngleAll[j][k] += 0.05f * abs(j - k);
 	for(int j = 0; j < frames1; j++)
 		for (int k = 0; k < frames2; k++)
 			AngleAll[j][k] += DisCostAcummurate(j, k);
