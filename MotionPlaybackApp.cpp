@@ -140,7 +140,7 @@ void  MotionPlaybackApp::Display()
 		
 		if(error_flag == 1)//位置誤差による再生
 		{
-			if (sabun_flag == 1)//DTWによる再生
+			if (sabun_flag == 1)//ワーピング・パスによる再生
 			{
 				//1人目の動作の可視化(色付け)
 				Pass_posture1 = motion->frames[DTWa->DisPassAll[0][DTWframe_no]];
@@ -152,9 +152,9 @@ void  MotionPlaybackApp::Display()
 				DrawPostureGray(Pass_posture2, pattern, view_segment, view_segments);
 				DrawPostureShadow(Pass_posture2, shadow_dir, shadow_color);
 			}
-			else//通常再生
+			else//ワーピング・パスによる再生から通常再生
 			{
-				if (frame_no <= mf)
+				if (frame_no <= mf)//ワーピング・パスによる再生
 				{
 					//1人目の動作の可視化(色付け)
 					Pass_posture1 = motion->frames[DTWa->DisPassAll[0][frame_no]];
@@ -166,7 +166,7 @@ void  MotionPlaybackApp::Display()
 					DrawPostureGray(Pass_posture2, pattern, view_segment, view_segments);
 					DrawPostureShadow(Pass_posture2, shadow_dir, shadow_color);
 				}
-				else
+				else//通常再生
 				{
 					//1人目の動作の可視化(色付け)
 					Pass_posture1 = motion->frames[min(motion->num_frames - 1, m1f + frame_no - mf)];
@@ -181,7 +181,7 @@ void  MotionPlaybackApp::Display()
 		}
 		else//角度誤差による再生
 		{
-			if (sabun_flag == 1)//DTWによる再生
+			if (sabun_flag == 1)//ワーピング・パスによる再生
 			{
 				//1人目の動作の可視化(色付け)
 				Pass_posture1 = motion->frames[DTWa->AngPassAll[0][DTWframe_no]];
@@ -192,7 +192,7 @@ void  MotionPlaybackApp::Display()
 				DrawPostureGray(Pass_posture2, pattern, view_segment, view_segments);
 				DrawPostureShadow(Pass_posture2, shadow_dir, shadow_color);
 			}
-			else//通常再生
+			else//ワーピング・パスによる再生から通常再生
 			{
 				if (frame_no <= mf)
 				{
@@ -205,7 +205,7 @@ void  MotionPlaybackApp::Display()
 					DrawPostureGray(Pass_posture2, pattern, view_segment, view_segments);
 					DrawPostureShadow(Pass_posture2, shadow_dir, shadow_color);
 				}
-				else
+				else//通常再生
 				{
 					//1人目の動作の可視化(色付け)
 					Pass_posture1 = motion->frames[min(motion->num_frames - 1, m1f + frame_no - mf)];
@@ -230,55 +230,55 @@ void  MotionPlaybackApp::Display()
 		//部位の集合ごとの色付け
 		if(sabun_flag == 1)
 		{
-			if(error_flag == 1)
-			{
-				for (int j = 12; j >= 11; j--)
-					timeline->SetElementColor(Track_num * DTWa->DisFrame + Track_num++, Pattern_Color(pattern, j));
-				for (int j = 10; j >= 7; j--)
-					timeline->SetElementColor(Track_num * DTWa->DisFrame + Track_num++, Pattern_Color(pattern, j));
-				timeline->SetElementColor(Track_num * DTWa->DisFrame + Track_num++, Pattern_Color(pattern, 0));
-				for (int j = 13; j <= 16; j++)
-					timeline->SetElementColor(Track_num * DTWa->DisFrame + Track_num++, Pattern_Color(pattern, j));
-				for (int j = 36; j <= 39; j++)
-					timeline->SetElementColor(Track_num * DTWa->DisFrame + Track_num++, Pattern_Color(pattern, j));
-				for (int j = 1; j <= 3; j++)
-					timeline->SetElementColor(Track_num * DTWa->DisFrame + Track_num++, Pattern_Color(pattern, j));
-				for (int j = 4; j <= 6; j++)
-					timeline->SetElementColor(Track_num * DTWa->DisFrame + Track_num++, Pattern_Color(pattern, j));
-			}
-			else
-			{
-				for (int j = 12; j >= 11; j--)
-					timeline->SetElementColor(Track_num * DTWa->AngFrame + Track_num++, Pattern_Color(pattern, j));
-				for (int j = 10; j >= 7; j--)
-					timeline->SetElementColor(Track_num * DTWa->AngFrame + Track_num++, Pattern_Color(pattern, j));
-				timeline->SetElementColor(Track_num * DTWa->AngFrame + Track_num++, Pattern_Color(pattern, 0));
-				for (int j = 13; j <= 16; j++)
-					timeline->SetElementColor(Track_num * DTWa->AngFrame + Track_num++, Pattern_Color(pattern, j));
-				for (int j = 36; j <= 39; j++)
-					timeline->SetElementColor(Track_num * DTWa->AngFrame + Track_num++, Pattern_Color(pattern, j));
-				for (int j = 1; j <= 3; j++)
-					timeline->SetElementColor(Track_num * DTWa->AngFrame + Track_num++, Pattern_Color(pattern, j));
-				for (int j = 4; j <= 6; j++)
-					timeline->SetElementColor(Track_num * DTWa->AngFrame + Track_num++, Pattern_Color(pattern, j));
-			}
+			//if(error_flag == 1)
+			//{
+			//	for (int j = 12; j >= 11; j--)
+			//		timeline->SetElementColor(Track_num * DTWa->DisFrame + Track_num++, Pattern_Color(pattern, j));
+			//	for (int j = 10; j >= 7; j--)
+			//		timeline->SetElementColor(Track_num * DTWa->DisFrame + Track_num++, Pattern_Color(pattern, j));
+			//	timeline->SetElementColor(Track_num * DTWa->DisFrame + Track_num++, Pattern_Color(pattern, 0));
+			//	for (int j = 13; j <= 16; j++)
+			//		timeline->SetElementColor(Track_num * DTWa->DisFrame + Track_num++, Pattern_Color(pattern, j));
+			//	for (int j = 36; j <= 39; j++)
+			//		timeline->SetElementColor(Track_num * DTWa->DisFrame + Track_num++, Pattern_Color(pattern, j));
+			//	for (int j = 1; j <= 3; j++)
+			//		timeline->SetElementColor(Track_num * DTWa->DisFrame + Track_num++, Pattern_Color(pattern, j));
+			//	for (int j = 4; j <= 6; j++)
+			//		timeline->SetElementColor(Track_num * DTWa->DisFrame + Track_num++, Pattern_Color(pattern, j));
+			//}
+			//else
+			//{
+			//	for (int j = 12; j >= 11; j--)
+			//		timeline->SetElementColor(Track_num * DTWa->AngFrame + Track_num++, Pattern_Color(pattern, j));
+			//	for (int j = 10; j >= 7; j--)
+			//		timeline->SetElementColor(Track_num * DTWa->AngFrame + Track_num++, Pattern_Color(pattern, j));
+			//	timeline->SetElementColor(Track_num * DTWa->AngFrame + Track_num++, Pattern_Color(pattern, 0));
+			//	for (int j = 13; j <= 16; j++)
+			//		timeline->SetElementColor(Track_num * DTWa->AngFrame + Track_num++, Pattern_Color(pattern, j));
+			//	for (int j = 36; j <= 39; j++)
+			//		timeline->SetElementColor(Track_num * DTWa->AngFrame + Track_num++, Pattern_Color(pattern, j));
+			//	for (int j = 1; j <= 3; j++)
+			//		timeline->SetElementColor(Track_num * DTWa->AngFrame + Track_num++, Pattern_Color(pattern, j));
+			//	for (int j = 4; j <= 6; j++)
+			//		timeline->SetElementColor(Track_num * DTWa->AngFrame + Track_num++, Pattern_Color(pattern, j));
+			//}
 			PatternTimeline(timeline, * motion, *motion2, DTWframe_no, DTWa);
 		}
 		else
 		{
-			for (int j = 12; j >= 11; j--)
-				timeline->SetElementColor(Track_num * frames + Track_num++, Color4f(0.8f, 0.2f, 0.2f, 1.0f));
-			for (int j = 10; j >= 7; j--)
-				timeline->SetElementColor(Track_num * frames + Track_num++, Color4f(0.8f, 0.2f, 0.2f, 1.0f));
-			timeline->SetElementColor(Track_num * frames + Track_num++, Color4f(0.8f, 0.2f, 0.2f, 1.0f));
-			for (int j = 13; j <= 16; j++)
-				timeline->SetElementColor(Track_num * frames + Track_num++, Color4f(0.2f, 0.8f, 0.2f, 1.0f));
-			for (int j = 36; j <= 39; j++)
-				timeline->SetElementColor(Track_num * frames + Track_num++, Color4f(0.2f, 0.2f, 0.8f, 1.0f));
-			for (int j = 1; j <= 3; j++)
-				timeline->SetElementColor(Track_num * frames + Track_num++, Color4f(0.2f, 0.2f, 0.8f, 1.0f));
-			for (int j = 4; j <= 6; j++)
-				timeline->SetElementColor(Track_num * frames + Track_num++, Color4f(0.2f, 0.2f, 0.8f, 1.0f));
+			//for (int j = 12; j >= 11; j--)
+			//	timeline->SetElementColor(Track_num * frames + Track_num++, Color4f(0.8f, 0.2f, 0.2f, 1.0f));
+			//for (int j = 10; j >= 7; j--)
+			//	timeline->SetElementColor(Track_num * frames + Track_num++, Color4f(0.8f, 0.2f, 0.2f, 1.0f));
+			//timeline->SetElementColor(Track_num * frames + Track_num++, Color4f(0.8f, 0.2f, 0.2f, 1.0f));
+			//for (int j = 13; j <= 16; j++)
+			//	timeline->SetElementColor(Track_num * frames + Track_num++, Color4f(0.2f, 0.8f, 0.2f, 1.0f));
+			//for (int j = 36; j <= 39; j++)
+			//	timeline->SetElementColor(Track_num * frames + Track_num++, Color4f(0.2f, 0.2f, 0.8f, 1.0f));
+			//for (int j = 1; j <= 3; j++)
+			//	timeline->SetElementColor(Track_num * frames + Track_num++, Color4f(0.2f, 0.2f, 0.8f, 1.0f));
+			//for (int j = 4; j <= 6; j++)
+			//	timeline->SetElementColor(Track_num * frames + Track_num++, Color4f(0.2f, 0.2f, 0.8f, 1.0f));
 			PatternTimeline(timeline, *motion, *motion2, frame_no, DTWa);
 		}
 
@@ -1050,7 +1050,7 @@ void MotionPlaybackApp::PatternTimeline(Timeline* timeline, Motion& motion, Moti
 					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_head_chest, DTW->DisPassAll, motion, motion2);
 				for (int j = 10; j >= 7; j--)//胸部
 					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Dis_head_chest, DTW->DisPassAll, motion, motion2);
-				ColorBarElementRepPart(timeline, 0, Track_num, DTW->Dis_head_chest, DTW->DisPassAll, motion, motion2);//腰
+				ColorBarElementRepPart(timeline, 0, Track_num++, DTW->Dis_head_chest, DTW->DisPassAll, motion, motion2);//腰
 				Track_num++;
 
 				for (int j = 13; j <= 16; j++)//右腕
@@ -1231,7 +1231,7 @@ void MotionPlaybackApp::PatternTimeline(Timeline* timeline, Motion& motion, Moti
 					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_head_chest, DTW->AngPassAll, motion);
 				for (int j = 10; j >= 7; j--)//胸部
 					ColorBarElementPart(timeline, j, Track_num++, DTW->Ang_head_chest, DTW->AngPassAll, motion);
-				ColorBarElementPart(timeline, 0, Track_num, DTW->Ang_head_chest, DTW->AngPassAll, motion);//腰
+				ColorBarElementPart(timeline, 0, Track_num++, DTW->Ang_head_chest, DTW->AngPassAll, motion);//腰
 				Track_num++;
 
 				for (int j = 13; j <= 16; j++)//右腕
@@ -1409,7 +1409,7 @@ void MotionPlaybackApp::PatternTimeline(Timeline* timeline, Motion& motion, Moti
 					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_head_chest, DTW->AngPassAll, motion, motion2);
 				for (int j = 10; j >= 7; j--)//胸部
 					ColorBarElementRepPart(timeline, j, Track_num++, DTW->Ang_head_chest, DTW->AngPassAll, motion, motion2);
-				ColorBarElementRepPart(timeline, 0, Track_num, DTW->Ang_head_chest, DTW->AngPassAll, motion, motion2);//腰
+				ColorBarElementRepPart(timeline, 0, Track_num++, DTW->Ang_head_chest, DTW->AngPassAll, motion, motion2);//腰
 				Track_num++;
 
 				for (int j = 13; j <= 16; j++)//右腕
