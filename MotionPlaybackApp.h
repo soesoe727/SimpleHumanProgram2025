@@ -165,6 +165,9 @@ class  MotionPlaybackApp : public GLUTBaseApp
 	//姿勢の色パターン
 	int pattern;
 
+	//カラーマトリックスの表示･非表示
+	bool show_color_matrix;
+
 	//Timeline
 	Timeline * timeline;
 

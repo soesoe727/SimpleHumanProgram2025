@@ -42,6 +42,7 @@ MotionPlaybackApp::MotionPlaybackApp()
 	DTWa = NULL;
 	pattern = 0;
 	timeline = NULL;
+	show_color_matrix = true;
 }
 
 
@@ -234,7 +235,7 @@ void  MotionPlaybackApp::Display()
 	}
 
 	// タイムラインを描画
-	if ( timeline )
+	if ( show_color_matrix )
 	{	
 		//部位の集合ごとの色付け
 		//if(sabun_flag == 1)//ワーピング・パスによる再生
@@ -306,7 +307,7 @@ void MotionPlaybackApp::Reshape(int w, int h)
 
 	// タイムラインの描画領域の設定（画面の下部に配置）
 	if ( timeline )
-		timeline->SetViewAreaBottom( 0, 1, 0, 26, 10, 2 );
+		timeline->SetViewAreaBottom(0, 1, 0, 26, 10, 2);
 }
 
 //
@@ -416,6 +417,15 @@ void  MotionPlaybackApp::Keyboard( unsigned char key, int mx, int my )
 		error_flag *= -1;
 		frame_no = 0;
 		DTWframe_no = 0;
+	}
+
+	// m キーでカラーマトリックスの表示切り替え
+	if (key == 'm')
+	{
+		if (show_color_matrix)
+			show_color_matrix = false;
+		else
+			show_color_matrix = true;
 	}
 }
 
