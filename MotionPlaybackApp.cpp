@@ -283,11 +283,11 @@ void  MotionPlaybackApp::Display()
 			sprintf(message3, "right_arm:%.2f, left_arm:%.2f", DTWa->right_arm, DTWa->left_arm);
 		*/
 		DrawTextInformation( 1, message1 );
-		DrawTextInformation( 2, message2 );
-		for(int i = 0; i < 5; i++)
-			DrawTextInformation( 3+i, messages[i] );
-		DrawTextInformation( 8, message3 );
-		DrawTextInformation( 9, message4 );
+		//DrawTextInformation( 2, message2 );
+		//for(int i = 0; i < 5; i++)
+		//	DrawTextInformation( 3+i, messages[i] );
+		//DrawTextInformation( 8, message3 );
+		//DrawTextInformation( 9, message4 );
 	}
 	else
 	{
@@ -1977,8 +1977,11 @@ void DTWinformation::DTWinformation_init( int frames1, int frames2, const Motion
 						(j1[j][i].z * j2[k][i].z + j1[j][i].z * j2[k][i].z + j1[j][i].z * j2[k][i].z) /
 						(sqrt(pow(j1[j][i].x, 2.0) + pow(j1[j][i].y, 2.0) + pow(j1[j][i].z, 2.0)) *
 						sqrt(pow(j2[k][i].x, 2.0) + pow(j2[k][i].y, 2.0) + pow(j2[k][i].z, 2.0)));
-					this->AnglePart[i][j][k] *= -0.5;
-					this->AnglePart[i][j][k] += 0.5f;
+					//this->AnglePart[i][j][k] *= -0.5;
+					//this->AnglePart[i][j][k] += 0.5f;
+					this->AnglePart[i][j][k] += 1.0f;
+					this->AnglePart[i][j][k] = 2.0f - this->AnglePart[i][j][k];
+					this->AnglePart[i][j][k] /= 2.0f;
 
 					this->AngleAll[j][k] += this->AnglePart[i][j][k];
 					if (i == 11 || i == 12)
@@ -2130,8 +2133,7 @@ void DTWinformation::DTWinformation_init( int frames1, int frames2, const Motion
 	std::cout << "DistancePass"<< std::endl;
 	for(int f = 0; f < this->DisFrame; f++)
 		std::cout <<  f << "[" << this->DisPassAll[0][f] << "," <<
-		this->DisPassAll[1][f] << "]->" <<
-		this->Dis_head[this->DisPassAll[0][f]][this->DisPassAll[1][f]] << std::endl;
+		this->DisPassAll[1][f] << "]" << std::endl;
 	std::cout << "motion1.num_frames:" << frames1 << std::endl <<
 		"motion2.num_frames:" << frames2 << std::endl;
 
@@ -2139,8 +2141,7 @@ void DTWinformation::DTWinformation_init( int frames1, int frames2, const Motion
 	std::cout << "AnglePass" << std::endl;
 	for (int f = 0; f < this->AngFrame; f++)
 		std::cout << f << "[" << this->AngPassAll[0][f] << "," <<
-		this->AngPassAll[1][f] << "]->" <<
-		this->AngleAll[this->AngPassAll[0][f]][this->AngPassAll[1][f]] << std::endl;
+		this->AngPassAll[1][f] << "]" << std::endl;
 	std::cout << "motion1.num_frames:" << frames1 << std::endl <<
 		"motion2.num_frames:" << frames2 << std::endl;
 
