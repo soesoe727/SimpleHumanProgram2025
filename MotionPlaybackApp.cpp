@@ -8,7 +8,7 @@
 ***  動作再生アプリケーション
 **/
 
-//test5
+//test6
 // ライブラリ・クラス定義の読み込み
 #include "SimpleHuman.h"
 #include "BVH.h"
