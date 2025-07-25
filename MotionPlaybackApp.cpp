@@ -1590,7 +1590,7 @@ void MotionPlaybackApp::InitSegmentname(int num_segments)
 //
 //部位の集合毎のカラーバーの誤差による色の変化を設定(DTWframe)
 //
-//void MotionPlaybackApp::ColorBarElementSetPart(Timeline* timeline, int segment_num, int Track_num, vector<float> Distance, vector<vector<int>> PassAll, Motion & motion)
+//void MotionPlaybackApp2::ColorBarElementSetPart(Timeline* timeline, int segment_num, int Track_num, vector<float> Distance, vector<vector<int>> PassAll, Motion & motion)
 //{
 //	float red_ratio = 0.0f;
 //	float max_dep = 0.0f;

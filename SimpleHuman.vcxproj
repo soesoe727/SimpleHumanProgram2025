@@ -155,6 +155,7 @@
     <ClCompile Include="MotionDeformationEditApp.cpp" />
     <ClCompile Include="MotionInterpolationApp.cpp" />
     <ClCompile Include="MotionPlaybackApp.cpp" />
+    <ClCompile Include="MotionPlaybackApp2.cpp" />
     <ClCompile Include="MotionTransition.cpp" />
     <ClCompile Include="MotionTransitionApp.cpp" />
     <ClCompile Include="PostureInterpolationApp.cpp" />
