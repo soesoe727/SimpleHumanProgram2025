@@ -264,7 +264,7 @@ struct DTWinformation2
 {
 	public:
 
-		vector< vector<Vector3f> > centerOfGravity;
+		vector<Point3f> centerOfGravity1, centerOfGravity2;
 		vector< vector<float> > errorCenterOfGravity; 
 		vector< vector<int> > warpingPath;
 		int errorFrame;
@@ -349,7 +349,7 @@ struct DTWinformation2
 		//DTW初期化
 		void DTWinformation_init( int frames1, int frames2, const Motion & motion1, const Motion & motion2 );	
 
-		float ErrorCulculateCenterOfGravity(vector< Vector3f > v1, vector< Vector3f > v2);
+		float ErrorCulculateCenterOfGravity(vector< Vector3f > v1, vector< Vector3f > v2, Point3f* centerOfGravity1, Point3f* centerOfGravity2);
 
 		float Cost(int frame1, int frame2);
 };
@@ -484,8 +484,26 @@ class  MotionPlaybackApp2 : public GLUTBaseApp
 	//カラーバーの誤差による色の変化を設定(DTWframe)
 	void ColorBarElementErrorCenterOfGravity(Timeline * timeline, int track_num, vector<vector<float>> error, vector<vector<int>> warpingPath, Motion & motion, float curr_frame);
 
+	//カラーバーのx軸による色の変化を設定(DTWframe)
+	void ColorBarElementCenterOfGravity_X(Timeline * timeline, int track_num, vector<Point3f> center, vector<int> warpingPath, Motion & motion, float curr_frame);
+
+	//カラーバーのy軸による色の変化を設定(DTWframe)
+	void ColorBarElementCenterOfGravity_Y(Timeline * timeline, int track_num, vector<Point3f> center, vector<int> warpingPath, Motion & motion, float curr_frame);
+
+	//カラーバーのz軸による色の変化を設定(DTWframe)
+	void ColorBarElementCenterOfGravity_Z(Timeline * timeline, int track_num, vector<Point3f> center, vector<int> warpingPath, Motion & motion, float curr_frame);
+
 	//カラーバーの誤差による色の変化を設定(再生切り替え用)
 	void ColorBarElementRepErrorCenterOfGravity(Timeline * timeline, int track_num, vector<vector<float>> error, vector<vector<int>> warpingPath, Motion & motion, Motion & motion2, float curr_frame);
+	
+	//カラーバーのx軸による色の変化を設定(再生切り替え用)
+	void ColorBarElementRepCenterOfGravity_X(Timeline * timeline, int track_num, vector<Point3f> center, vector<int> warpingPath, Motion & motion, float curr_frame);
+	
+	//カラーバーのy軸による色の変化を設定(再生切り替え用)
+	void ColorBarElementRepCenterOfGravity_Y(Timeline * timeline, int track_num, vector<Point3f> center, vector<int> warpingPath, Motion & motion, float curr_frame);
+	
+	//カラーバーのz軸による色の変化を設定(再生切り替え用)
+	void ColorBarElementRepCenterOfGravity_Z(Timeline * timeline, int track_num, vector<Point3f> center, vector<int> warpingPath, Motion & motion, float curr_frame);
 
 	//カラーバーを全て灰色に設定(DTWframe)
 	void ColorBarElementGray(Timeline * timeline, int segment_num, int Track_num, vector<vector<int>> PassAll, Motion & motion);

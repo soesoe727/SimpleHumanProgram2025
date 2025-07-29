@@ -89,11 +89,23 @@ void  MotionPlaybackApp2::Initialize()
 	timeline = new Timeline();
 	if(motion && motion2)
 	{
-		//腰の位置を最初に一緒にする
-		Point3f root = motion2->frames[0].root_pos - motion->frames[0].root_pos;
+		//腰の位置を0,z,0にして最初に一緒にする
+		Point3f root = {motion->frames[0].root_pos.x, 0.0f, motion->frames[0].root_pos.z}; 
+		for(int i = 0; i < motion->num_frames; i++)
+			motion->frames[i].root_pos -= root;
+		Point3f root2 = motion2->frames[0].root_pos - motion->frames[0].root_pos;
 		for(int i = 0; i < motion2->num_frames; i++)
-			motion2->frames[i].root_pos -= root;
+			motion2->frames[i].root_pos -= root2;
 
+		//std::cout << motion->frames[0].root_ori << std::endl;
+
+		//Matrix3f p = motion->frames[0].root_ori, q;
+		//Vector3f z_current = {motion->frames[0].root_ori.m02, motion->frames[0].root_ori.m12, motion->frames[0].root_ori.m22};
+		//float theta = -atan2(z_current.x, z_current.z);
+		//q.rotY(90);
+		//for(int i = 0; i < motion->num_frames; i++)
+		//	motion->frames[i].root_ori.mul(q, motion->frames[i].root_ori);
+		
 		//DTWの作成
 		gDTW->DTWinformation_init( motion->num_frames, motion2->num_frames, *motion, *motion2 );
 	}
@@ -128,7 +140,9 @@ void  MotionPlaybackApp2::Display()
 {
 	// 基底クラスの処理を実行
 	GLUTBaseApp::Display();
-
+	Matrix4f mat;
+	Point3f postureGravityPos1, postureGravityPos2;
+	glLineWidth( 2.0f );
 
 		// タイムラインを描画
 	if ( timeline )
@@ -153,11 +167,53 @@ void  MotionPlaybackApp2::Display()
 			Pass_posture1 = motion->frames[gDTW->warpingPath[0][DTWframe_no]];
 			DrawPosture(Pass_posture1);
 			DrawPostureShadow(Pass_posture1, shadow_dir, shadow_color);
+			
 
 			//2人目の動作の可視化(白･灰)(パス対応)
 			Pass_posture2 = motion2->frames[gDTW->warpingPath[1][DTWframe_no]];
 			DrawPosture(Pass_posture2);
 			DrawPostureShadow(Pass_posture2, shadow_dir, shadow_color);
+
+			postureGravityPos1 = gDTW->centerOfGravity1[gDTW->warpingPath[0][DTWframe_no]];
+			postureGravityPos2 = gDTW->centerOfGravity2[gDTW->warpingPath[1][DTWframe_no]];
+			glDisable( GL_DEPTH_TEST );
+			glPushMatrix();
+				glColor3f( 1.0f, 0.0f, 0.0f );
+				glTranslatef( postureGravityPos1.x, postureGravityPos1.y, postureGravityPos1.z );
+				glutSolidSphere( 0.025f, 16, 16 );
+			glPopMatrix();
+			glPushMatrix();
+			glBegin( GL_LINES );
+				glColor3f( 1.0f, 0.0f, 0.0f );
+				glVertex3f(postureGravityPos1.x, postureGravityPos1.y, postureGravityPos1.z);
+				glVertex3f(postureGravityPos1.x + 0.1f, postureGravityPos1.y, postureGravityPos1.z);
+				glColor3f( 0.0f, 1.0f, 0.0f );
+				glVertex3f( postureGravityPos1.x, postureGravityPos1.y, postureGravityPos1.z );
+				glVertex3f(postureGravityPos1.x, postureGravityPos1.y + 0.1f, postureGravityPos1.z);
+				glColor3f( 0.0f, 0.0f, 1.0f );
+				glVertex3f(postureGravityPos1.x, postureGravityPos1.y, postureGravityPos1.z);
+				glVertex3f(postureGravityPos1.x, postureGravityPos1.y, postureGravityPos1.z + 0.1f);
+			glEnd();
+			glPopMatrix();
+			glPushMatrix();
+			glColor3f( 0.0f, 1.0f, 0.0f );
+			glTranslatef( postureGravityPos2.x, postureGravityPos2.y, postureGravityPos2.z );
+			glutSolidSphere( 0.025f, 16, 16 );
+			glPopMatrix();
+			glPushMatrix();
+			glBegin( GL_LINES );
+				glColor3f( 1.0f, 1.0f, 0.0f );
+				glVertex3f(postureGravityPos2.x, postureGravityPos2.y, postureGravityPos2.z);
+				glVertex3f(postureGravityPos2.x + 0.1f, postureGravityPos2.y, postureGravityPos2.z);
+				glColor3f( 0.0f, 1.0f, 1.0f );
+				glVertex3f(postureGravityPos2.x, postureGravityPos2.y, postureGravityPos2.z);
+				glVertex3f(postureGravityPos2.x, postureGravityPos2.y + 0.1f, postureGravityPos2.z);
+				glColor3f( 1.0f, 0.0f, 1.0f );
+				glVertex3f(postureGravityPos2.x, postureGravityPos2.y, postureGravityPos2.z);
+				glVertex3f(postureGravityPos2.x, postureGravityPos2.y, postureGravityPos2.z + 0.1f);
+			glEnd();
+			glPopMatrix();
+			glEnable( GL_DEPTH_TEST );
 		}
 		else//ワーピング・パスによる再生から通常再生
 		{
@@ -172,6 +228,60 @@ void  MotionPlaybackApp2::Display()
 				Pass_posture2 = motion2->frames[gDTW->warpingPath[1][frame_no]];
 				DrawPosture(Pass_posture2);
 				DrawPostureShadow(Pass_posture2, shadow_dir, shadow_color);
+
+				glDisable( GL_DEPTH_TEST );
+				glPushMatrix();
+				glColor3f( 1.0f, 0.0f, 0.0f );
+				glTranslatef( gDTW->centerOfGravity1[gDTW->warpingPath[0][DTWframe_no]].x, gDTW->centerOfGravity1[gDTW->warpingPath[0][DTWframe_no]].y, gDTW->centerOfGravity1[gDTW->warpingPath[0][DTWframe_no]].z );
+				glutSolidSphere( 0.025f, 16, 16 );
+				glPopMatrix();
+				glPushMatrix();
+				glColor3f( 0.0f, 1.0f, 0.0f );
+				glTranslatef( gDTW->centerOfGravity2[gDTW->warpingPath[1][DTWframe_no]].x, gDTW->centerOfGravity2[gDTW->warpingPath[1][DTWframe_no]].y, gDTW->centerOfGravity2[gDTW->warpingPath[1][DTWframe_no]].z );
+				glutSolidSphere( 0.025f, 16, 16 );
+				glPopMatrix();
+				glEnable( GL_DEPTH_TEST );
+
+				postureGravityPos1 = gDTW->centerOfGravity1[gDTW->warpingPath[0][frame_no]];
+				postureGravityPos2 = gDTW->centerOfGravity2[gDTW->warpingPath[1][frame_no]];
+				glDisable( GL_DEPTH_TEST );
+				glPushMatrix();
+					glColor3f( 1.0f, 0.0f, 0.0f );
+					glTranslatef( postureGravityPos1.x, postureGravityPos1.y, postureGravityPos1.z );
+					glutSolidSphere( 0.025f, 16, 16 );
+				glPopMatrix();
+				glPushMatrix();
+				glBegin( GL_LINES );
+					glColor3f( 1.0f, 0.0f, 0.0f );
+					glVertex3f(postureGravityPos1.x, postureGravityPos1.y, postureGravityPos1.z);
+					glVertex3f(postureGravityPos1.x + 0.1f, postureGravityPos1.y, postureGravityPos1.z);
+					glColor3f( 0.0f, 1.0f, 0.0f );
+					glVertex3f( postureGravityPos1.x, postureGravityPos1.y, postureGravityPos1.z );
+					glVertex3f(postureGravityPos1.x, postureGravityPos1.y + 0.1f, postureGravityPos1.z);
+					glColor3f( 0.0f, 0.0f, 1.0f );
+					glVertex3f(postureGravityPos1.x, postureGravityPos1.y, postureGravityPos1.z);
+					glVertex3f(postureGravityPos1.x, postureGravityPos1.y, postureGravityPos1.z + 0.1f);
+				glEnd();
+				glPopMatrix();
+				glPushMatrix();
+				glColor3f( 0.0f, 1.0f, 0.0f );
+				glTranslatef( postureGravityPos2.x, postureGravityPos2.y, postureGravityPos2.z );
+				glutSolidSphere( 0.025f, 16, 16 );
+				glPopMatrix();
+				glPushMatrix();
+				glBegin( GL_LINES );
+					glColor3f( 1.0f, 1.0f, 0.0f );
+					glVertex3f(postureGravityPos2.x, postureGravityPos2.y, postureGravityPos2.z);
+					glVertex3f(postureGravityPos2.x + 0.1f, postureGravityPos2.y, postureGravityPos2.z);
+					glColor3f( 0.0f, 1.0f, 1.0f );
+					glVertex3f(postureGravityPos2.x, postureGravityPos2.y, postureGravityPos2.z);
+					glVertex3f(postureGravityPos2.x, postureGravityPos2.y + 0.1f, postureGravityPos2.z);
+					glColor3f( 1.0f, 0.0f, 1.0f );
+					glVertex3f(postureGravityPos2.x, postureGravityPos2.y, postureGravityPos2.z);
+					glVertex3f(postureGravityPos2.x, postureGravityPos2.y, postureGravityPos2.z + 0.1f);
+				glEnd();
+				glPopMatrix();
+				glEnable( GL_DEPTH_TEST );
 			}
 			else//通常再生
 			{
@@ -183,6 +293,60 @@ void  MotionPlaybackApp2::Display()
 				Pass_posture2 = motion2->frames[min(motion2->num_frames - 1, m2f + frame_no - mf)];
 				DrawPosture(Pass_posture2);
 				DrawPostureShadow(Pass_posture2, shadow_dir, shadow_color);
+
+				glDisable( GL_DEPTH_TEST );
+				glPushMatrix();
+				glColor3f( 1.0f, 0.0f, 0.0f );
+				glTranslatef( gDTW->centerOfGravity1[min(motion->num_frames - 1, m1f + frame_no - mf)].x, gDTW->centerOfGravity1[min(motion->num_frames - 1, m1f + frame_no - mf)].y, gDTW->centerOfGravity1[min(motion->num_frames - 1, m1f + frame_no - mf)].z );
+				glutSolidSphere( 0.025f, 16, 16 );
+				glPopMatrix();
+				glPushMatrix();
+				glColor3f( 0.0f, 1.0f, 0.0f );
+				glTranslatef( gDTW->centerOfGravity2[min(motion2->num_frames - 1, m2f + frame_no - mf)].x, gDTW->centerOfGravity2[min(motion2->num_frames - 1, m2f + frame_no - mf)].y, gDTW->centerOfGravity2[min(motion2->num_frames - 1, m2f + frame_no - mf)].z );
+				glutSolidSphere( 0.025f, 16, 16 );
+				glPopMatrix();
+				glEnable( GL_DEPTH_TEST );
+
+				postureGravityPos1 = gDTW->centerOfGravity1[min(motion->num_frames - 1, m1f + frame_no - mf)];
+				postureGravityPos2 = gDTW->centerOfGravity2[min(motion2->num_frames - 1, m2f + frame_no - mf)];
+				glDisable( GL_DEPTH_TEST );
+				glPushMatrix();
+					glColor3f( 1.0f, 0.0f, 0.0f );
+					glTranslatef( postureGravityPos1.x, postureGravityPos1.y, postureGravityPos1.z );
+					glutSolidSphere( 0.025f, 16, 16 );
+				glPopMatrix();
+				glPushMatrix();
+				glBegin( GL_LINES );
+					glColor3f( 1.0f, 0.0f, 0.0f );
+					glVertex3f(postureGravityPos1.x, postureGravityPos1.y, postureGravityPos1.z);
+					glVertex3f(postureGravityPos1.x + 0.1f, postureGravityPos1.y, postureGravityPos1.z);
+					glColor3f( 0.0f, 1.0f, 0.0f );
+					glVertex3f( postureGravityPos1.x, postureGravityPos1.y, postureGravityPos1.z );
+					glVertex3f(postureGravityPos1.x, postureGravityPos1.y + 0.1f, postureGravityPos1.z);
+					glColor3f( 0.0f, 0.0f, 1.0f );
+					glVertex3f(postureGravityPos1.x, postureGravityPos1.y, postureGravityPos1.z);
+					glVertex3f(postureGravityPos1.x, postureGravityPos1.y, postureGravityPos1.z + 0.1f);
+				glEnd();
+				glPopMatrix();
+				glPushMatrix();
+				glColor3f( 0.0f, 1.0f, 0.0f );
+				glTranslatef( postureGravityPos2.x, postureGravityPos2.y, postureGravityPos2.z );
+				glutSolidSphere( 0.025f, 16, 16 );
+				glPopMatrix();
+				glPushMatrix();
+				glBegin( GL_LINES );
+					glColor3f( 1.0f, 1.0f, 0.0f );
+					glVertex3f(postureGravityPos2.x, postureGravityPos2.y, postureGravityPos2.z);
+					glVertex3f(postureGravityPos2.x + 0.1f, postureGravityPos2.y, postureGravityPos2.z);
+					glColor3f( 0.0f, 1.0f, 1.0f );
+					glVertex3f(postureGravityPos2.x, postureGravityPos2.y, postureGravityPos2.z);
+					glVertex3f(postureGravityPos2.x, postureGravityPos2.y + 0.1f, postureGravityPos2.z);
+					glColor3f( 1.0f, 0.0f, 1.0f );
+					glVertex3f(postureGravityPos2.x, postureGravityPos2.y, postureGravityPos2.z);
+					glVertex3f(postureGravityPos2.x, postureGravityPos2.y, postureGravityPos2.z + 0.1f);
+				glEnd();
+				glPopMatrix();
+				glEnable( GL_DEPTH_TEST );
 			}
 		}
 		glDisable(GL_BLEND);
@@ -222,7 +386,7 @@ void MotionPlaybackApp2::Reshape(int w, int h)
 
 	// タイムラインの描画領域の設定（画面の下部に配置）
 	if ( timeline )
-		timeline->SetViewAreaBottom(0, 1, 0, 1, 10, 2);
+		timeline->SetViewAreaBottom(0, 1, 0, 10, 10, 2);
 }
 
 //
@@ -582,6 +746,7 @@ void  MotionPlaybackApp2::OpenNewBVH2()
 void MotionPlaybackApp2::PatternTimeline(Timeline* timeline, Motion& motion, Motion& motion2, float curr_frame, DTWinformation2* DTW)
 {
 	int track_num = 0;
+	float name_space = 30.0f;
 	
 	// タイムラインの時間範囲を設定
 	timeline->SetTimeRange( 0.0f, DTW->errorFrame + num_space );
@@ -591,9 +756,45 @@ void MotionPlaybackApp2::PatternTimeline(Timeline* timeline, Motion& motion, Mot
 	timeline->DeleteAllSubElements();
 
 	if (sabun_flag == 1)
+	{
+		timeline->AddElement( 0.0f, name_space, {1.0f,1.0f,1.0f,1.0f},  "Error", track_num );
 		ColorBarElementErrorCenterOfGravity(timeline, track_num++, DTW->errorCenterOfGravity, DTW->warpingPath, motion, curr_frame);
+		track_num++;
+		timeline->AddElement( 0.0f, name_space, {1.0f,0.0f,0.0f,1.0f},  "Center_X", track_num );
+		ColorBarElementCenterOfGravity_X(timeline, track_num++, DTW->centerOfGravity1, DTW->warpingPath[0], motion, curr_frame);
+		timeline->AddElement( 0.0f, name_space, {1.0f,1.0f,0.0f,1.0f},  "Center_X", track_num );
+		ColorBarElementCenterOfGravity_X(timeline, track_num++, DTW->centerOfGravity2, DTW->warpingPath[1], motion2, curr_frame);
+		track_num++;
+		timeline->AddElement( 0.0f, name_space, {0.0f,1.0f,0.0f,1.0f},  "Center_Y", track_num );
+		ColorBarElementCenterOfGravity_Y(timeline, track_num++, DTW->centerOfGravity1, DTW->warpingPath[0], motion, curr_frame);
+		timeline->AddElement( 0.0f, name_space, {0.0f,1.0f,1.0f,1.0f},  "Center_Y", track_num );
+		ColorBarElementCenterOfGravity_Y(timeline, track_num++, DTW->centerOfGravity2, DTW->warpingPath[1], motion2, curr_frame);
+		track_num++;
+		timeline->AddElement( 0.0f, name_space, {0.0f,0.0f,1.0f,1.0f},  "Center_Z", track_num );
+		ColorBarElementCenterOfGravity_Z(timeline, track_num++, DTW->centerOfGravity1, DTW->warpingPath[0], motion, curr_frame);
+		timeline->AddElement( 0.0f, name_space, {1.0f,0.0f,1.0f,1.0f},  "Center_Z", track_num );
+		ColorBarElementCenterOfGravity_Z(timeline, track_num++, DTW->centerOfGravity2, DTW->warpingPath[1], motion2, curr_frame);
+	}
 	else
+	{
+		timeline->AddElement( 0.0f, name_space, {1.0f,1.0f,1.0f,0.2f},  "Error", track_num );
 		ColorBarElementRepErrorCenterOfGravity(timeline, track_num++, DTW->errorCenterOfGravity, DTW->warpingPath, motion, motion2, curr_frame);
+		track_num++;
+		timeline->AddElement( 0.0f, name_space, {1.0f,0.0f,0.0f,1.0f},  "Center_X", track_num );
+		ColorBarElementRepCenterOfGravity_X(timeline, track_num++, DTW->centerOfGravity1, DTW->warpingPath[0], motion, curr_frame);
+		timeline->AddElement( 0.0f, name_space, {1.0f,1.0f,0.0f,1.0f},  "Center_X", track_num );
+		ColorBarElementRepCenterOfGravity_X(timeline, track_num++, DTW->centerOfGravity2, DTW->warpingPath[1], motion2, curr_frame);
+		track_num++;
+		timeline->AddElement( 0.0f, name_space, {0.0f,1.0f,0.0f,1.0f},  "Center_Y", track_num );
+		ColorBarElementRepCenterOfGravity_Y(timeline, track_num++, DTW->centerOfGravity1, DTW->warpingPath[0], motion, curr_frame);
+		timeline->AddElement( 0.0f, name_space, {0.0f,1.0f,1.0f,1.0f},  "Center_Y", track_num );
+		ColorBarElementRepCenterOfGravity_Y(timeline, track_num++, DTW->centerOfGravity2, DTW->warpingPath[1], motion2, curr_frame);
+		track_num++;
+		timeline->AddElement( 0.0f, name_space, {0.0f,0.0f,1.0f,1.0f},  "Center_Z", track_num );
+		ColorBarElementRepCenterOfGravity_Z(timeline, track_num++, DTW->centerOfGravity1, DTW->warpingPath[0], motion, curr_frame);
+		timeline->AddElement( 0.0f, name_space, {1.0f,0.0f,1.0f,1.0f},  "Center_Z", track_num );
+		ColorBarElementRepCenterOfGravity_Z(timeline, track_num++, DTW->centerOfGravity2, DTW->warpingPath[1], motion2, curr_frame);
+	}
 
 	// 動作再生時刻を表す縦線を設定
 	timeline->AddLine( curr_frame + num_space, Color4f( 1.0f, 1.0f, 1.0f, 1.0f ) );
@@ -716,8 +917,6 @@ void MotionPlaybackApp2::ColorBarElementErrorCenterOfGravity(Timeline* timeline,
 	//誤差の大きさと色付けしてフレーム毎に表示
 	for(int f = 0; f < warpingPath[0].size(); f++)
 	{
-		if(f == 0)
-			timeline->AddElement( 0.0f, name_space, {1.0f,1.0f,1.0f,1.0f},  "Error", track_num );
 		red_ratio = (error[warpingPath[0][f]][warpingPath[1][f]] - min_error) / max_error;
 		if (red_ratio == 1.0)
 			c = Color4f( 0.0f, 0.0f, 0.0f, 1.0f );
@@ -729,6 +928,132 @@ void MotionPlaybackApp2::ColorBarElementErrorCenterOfGravity(Timeline* timeline,
 			c = Color4f(0.0f, 1.0f, (0.5f - red_ratio) * 4.0f, 1.0f);
 		else
 			c = Color4f( 0.0f, red_ratio * 4.0f, 1.0f, 1.0f );
+
+		timeline->AddElement( f + name_space, f + 1.0f + name_space, c, "", track_num );
+	}
+}
+
+void MotionPlaybackApp2::ColorBarElementCenterOfGravity_X(Timeline* timeline, int track_num, vector<Point3f> center, vector<int> warpingPath, Motion& motion, float curr_frame)
+{
+	float red_ratio;
+	float max_x = center[warpingPath[0]].x;
+	float min_x = center[warpingPath[0]].x;
+	float center_x = center[warpingPath[0]].x;
+	float name_space = 30.0f;
+	Color4f c;
+
+	//frame内での最大最小値を求める
+	for(int f = 0; f < warpingPath.size(); f++)
+		if(max_x < center[warpingPath[f]].x)
+			max_x = center[warpingPath[f]].x;
+		else if (min_x > center[warpingPath[f]].x)
+			min_x = center[warpingPath[f]].x;
+
+	//大きさと色付けしてフレーム毎に表示
+	for(int f = 0; f < warpingPath.size(); f++)
+	{
+		if(center[warpingPath[f]].x >= center_x)
+		{
+			red_ratio = (center[warpingPath[f]].x - center_x) / (max_x - center_x);
+
+			if(red_ratio >= 0.5)
+				c = Color4f( 1.0f, (1.0f - red_ratio) * 2.0f, 0.0f, 1.0f );
+			else
+				c = Color4f( red_ratio * 2.0f, 1.0f, 0.0f, 1.0f );
+		}
+		else
+		{
+			red_ratio = (center[warpingPath[f]].x - min_x) / (center_x - min_x);
+
+			if(red_ratio >= 0.5)
+				c = Color4f( 0.0f, 1.0f, (1.0f - red_ratio) * 2.0f, 1.0f );
+			else
+				c = Color4f( 0.0f, red_ratio * 2.0f, 1.0f, 1.0f );
+		}
+
+		timeline->AddElement( f + name_space, f + 1.0f + name_space, c, "", track_num );
+	}
+}
+
+void MotionPlaybackApp2::ColorBarElementCenterOfGravity_Y(Timeline* timeline, int track_num, vector<Point3f> center, vector<int> warpingPath, Motion& motion, float curr_frame)
+{
+	float red_ratio;
+	float max_y = center[warpingPath[0]].y;
+	float min_y = center[warpingPath[0]].y;
+	float center_y = center[warpingPath[0]].y;
+	float name_space = 30.0f;
+	Color4f c;
+
+	//frame内での最大最小値を求める
+	for(int f = 0; f < warpingPath.size(); f++)
+		if(max_y < center[warpingPath[f]].y)
+			max_y = center[warpingPath[f]].y;
+		else if (min_y > center[warpingPath[f]].y)
+			min_y = center[warpingPath[f]].y;
+
+	//大きさと色付けしてフレーム毎に表示
+	for(int f = 0; f < warpingPath.size(); f++)
+	{
+		if(center[warpingPath[f]].y >= center_y)
+		{
+			red_ratio = (center[warpingPath[f]].y - center_y) / (max_y - center_y);
+
+			if(red_ratio >= 0.5)
+				c = Color4f( 1.0f, (1.0f - red_ratio) * 2.0f, 0.0f, 1.0f );
+			else
+				c = Color4f( red_ratio * 2.0f, 1.0f, 0.0f, 1.0f );
+		}
+		else
+		{
+			red_ratio = (center[warpingPath[f]].y - min_y) / (center_y - min_y);
+
+			if(red_ratio >= 0.5)
+				c = Color4f( 0.0f, 1.0f, (1.0f - red_ratio) * 2.0f, 1.0f );
+			else
+				c = Color4f( 0.0f, red_ratio * 2.0f, 1.0f, 1.0f );
+		}
+
+		timeline->AddElement( f + name_space, f + 1.0f + name_space, c, "", track_num );
+	}
+}
+
+void MotionPlaybackApp2::ColorBarElementCenterOfGravity_Z(Timeline* timeline, int track_num, vector<Point3f> center, vector<int> warpingPath, Motion& motion, float curr_frame)
+{
+	float red_ratio;
+	float max_z = center[warpingPath[0]].z;
+	float min_z = center[warpingPath[0]].z;
+	float center_z = center[warpingPath[0]].z;
+	float name_space = 30.0f;
+	Color4f c;
+
+	//frame内での最大最小値を求める
+	for(int f = 0; f < warpingPath.size(); f++)
+		if(max_z < center[warpingPath[f]].z)
+			max_z = center[warpingPath[f]].z;
+		else if (min_z > center[warpingPath[f]].z)
+			min_z = center[warpingPath[f]].z;
+
+	//大きさと色付けしてフレーム毎に表示
+	for(int f = 0; f < warpingPath.size(); f++)
+	{
+		if(center[warpingPath[f]].z >= center_z)
+		{
+			red_ratio = (center[warpingPath[f]].z - center_z) / (max_z - center_z);
+
+			if(red_ratio >= 0.5)
+				c = Color4f( 1.0f, (1.0f - red_ratio) * 2.0f, 0.0f, 1.0f );
+			else
+				c = Color4f( red_ratio * 2.0f, 1.0f, 0.0f, 1.0f );
+		}
+		else
+		{
+			red_ratio = (center[warpingPath[f]].z - min_z) / (center_z - min_z);
+
+			if(red_ratio >= 0.5)
+				c = Color4f( 0.0f, 1.0f, (1.0f - red_ratio) * 2.0f, 1.0f );
+			else
+				c = Color4f( 0.0f, red_ratio * 2.0f, 1.0f, 1.0f );
+		}
 
 		timeline->AddElement( f + name_space, f + 1.0f + name_space, c, "", track_num );
 	}
@@ -774,9 +1099,6 @@ void MotionPlaybackApp2::ColorBarElementRepErrorCenterOfGravity(Timeline* timeli
 	//誤差の大きさと色付けしてフレーム毎に表示
 	for(int f = 0; f < frames; f++)
 	{
-		if(f == 0)
-			timeline->AddElement( 0.0f, name_space, {1.0f,1.0f,1.0f,1.0f},  "Error", track_num );
-		
 		if (f <= mf)
 			red_ratio = (error[warpingPath[0][f]][warpingPath[1][f]] - min_error) / max_error;
 		else
@@ -792,6 +1114,237 @@ void MotionPlaybackApp2::ColorBarElementRepErrorCenterOfGravity(Timeline* timeli
 			c = Color4f(0.0f, 1.0f, (0.5f - red_ratio) * 4.0f, 1.0f);
 		else
 			c = Color4f( 0.0f, red_ratio * 4.0f, 1.0f, 1.0f );
+
+		timeline->AddElement( f + name_space, f + 1.0f + name_space, c, "", track_num );
+	}
+}
+
+void MotionPlaybackApp2::ColorBarElementRepCenterOfGravity_X(Timeline* timeline, int track_num, vector<Point3f> center, vector<int> warpingPath, Motion& motion, float curr_frame)
+{
+	float red_ratio;
+	float max_x = center[warpingPath[0]].x;
+	float min_x = center[warpingPath[0]].x;
+	float center_x = center[warpingPath[0]].x;
+	float name_space = 30.0f;
+	int kirikae;
+	Color4f c;
+
+	//frame内での最大最小値を求める
+	for(int f = 0; f <= mf; f++)
+		if(max_x < center[warpingPath[f]].x)
+			max_x = center[warpingPath[f]].x;
+		else if (min_x > center[warpingPath[f]].x)
+			min_x = center[warpingPath[f]].x;
+
+	if(warpingPath[mf] == m1f)
+		kirikae = m1f;
+	else if(warpingPath[mf] == m2f)
+		kirikae = m2f;
+
+	for(int f = mf + 1; f <= frames; f++)
+		if(max_x < center[min(motion.num_frames - 1, f - mf + kirikae)].x)
+			max_x = center[min(motion.num_frames - 1, f - mf + kirikae)].x;
+		else if (min_x > center[min(motion.num_frames - 1, f - mf + kirikae)].x)
+			min_x = center[min(motion.num_frames - 1, f - mf + kirikae)].x;
+
+	//大きさと色付けしてフレーム毎に表示
+	for(int f = 0; f <= mf; f++)
+	{
+		if(center[warpingPath[f]].x >= center_x)
+		{
+			red_ratio = (center[warpingPath[f]].x - center_x) / (max_x - center_x);
+
+			if(red_ratio >= 0.5)
+				c = Color4f( 1.0f, (1.0f - red_ratio) * 2.0f, 0.0f, 1.0f );
+			else
+				c = Color4f( red_ratio * 2.0f, 1.0f, 0.0f, 1.0f );
+		}
+		else
+		{
+			red_ratio = (center[warpingPath[f]].x - min_x) / (center_x - min_x);
+
+			if(red_ratio >= 0.5)
+				c = Color4f( 0.0f, 1.0f, (1.0f - red_ratio) * 2.0f, 1.0f );
+			else
+				c = Color4f( 0.0f, red_ratio * 2.0f, 1.0f, 1.0f );
+		}
+
+		timeline->AddElement( f + name_space, f + 1.0f + name_space, c, "", track_num );
+	}
+	for(int f = mf + 1; f < frames; f++)
+	{
+		if(center[min(motion.num_frames - 1, f - mf + kirikae)].x >= center_x)
+		{
+			red_ratio = (center[min(motion.num_frames - 1, f - mf + kirikae)].x - center_x) / (max_x - center_x);
+
+			if(red_ratio >= 0.5)
+				c = Color4f( 1.0f, (1.0f - red_ratio) * 2.0f, 0.0f, 1.0f );
+			else
+				c = Color4f( red_ratio * 2.0f, 1.0f, 0.0f, 1.0f );
+		}
+		else
+		{
+			red_ratio = (center[min(motion.num_frames - 1, f - mf + kirikae)].x - min_x) / (center_x - min_x);
+
+			if(red_ratio >= 0.5)
+				c = Color4f( 0.0f, 1.0f, (1.0f - red_ratio) * 2.0f, 1.0f );
+			else
+				c = Color4f( 0.0f, red_ratio * 2.0f, 1.0f, 1.0f );
+		}
+
+		timeline->AddElement( f + name_space, f + 1.0f + name_space, c, "", track_num );
+	}
+}
+
+void MotionPlaybackApp2::ColorBarElementRepCenterOfGravity_Y(Timeline* timeline, int track_num, vector<Point3f> center, vector<int> warpingPath, Motion& motion, float curr_frame)
+{
+	float red_ratio;
+	float max_y = center[warpingPath[0]].y;
+	float min_y = center[warpingPath[0]].y;
+	float center_y = center[warpingPath[0]].y;
+	float name_space = 30.0f;
+	int kirikae;
+	Color4f c;
+
+	//frame内での最大最小値を求める
+	for(int f = 0; f <= mf; f++)
+		if(max_y < center[warpingPath[f]].y)
+			max_y = center[warpingPath[f]].y;
+		else if (min_y > center[warpingPath[f]].y)
+			min_y = center[warpingPath[f]].y;
+
+	if(warpingPath[mf] == m1f)
+		kirikae = m1f;
+	else if(warpingPath[mf] == m2f)
+		kirikae = m2f;
+
+	for(int f = mf + 1; f <= frames; f++)
+		if(max_y < center[min(motion.num_frames - 1, f - mf + kirikae)].y)
+			max_y = center[min(motion.num_frames - 1, f - mf + kirikae)].y;
+		else if (min_y > center[min(motion.num_frames - 1, f - mf + kirikae)].y)
+			min_y = center[min(motion.num_frames - 1, f - mf + kirikae)].y;
+
+	//大きさと色付けしてフレーム毎に表示
+	for(int f = 0; f <= mf; f++)
+	{
+		if(center[warpingPath[f]].y >= center_y)
+		{
+			red_ratio = (center[warpingPath[f]].y - center_y) / (max_y - center_y);
+
+			if(red_ratio >= 0.5)
+				c = Color4f( 1.0f, (1.0f - red_ratio) * 2.0f, 0.0f, 1.0f );
+			else
+				c = Color4f( red_ratio * 2.0f, 1.0f, 0.0f, 1.0f );
+		}
+		else
+		{
+			red_ratio = (center[warpingPath[f]].y - min_y) / (center_y - min_y);
+
+			if(red_ratio >= 0.5)
+				c = Color4f( 0.0f, 1.0f, (1.0f - red_ratio) * 2.0f, 1.0f );
+			else
+				c = Color4f( 0.0f, red_ratio * 2.0f, 1.0f, 1.0f );
+		}
+
+		timeline->AddElement( f + name_space, f + 1.0f + name_space, c, "", track_num );
+	}
+	for(int f = mf + 1; f < frames; f++)
+	{
+		if(center[min(motion.num_frames - 1, f - mf + kirikae)].y >= center_y)
+		{
+			red_ratio = (center[min(motion.num_frames - 1, f - mf + kirikae)].y - center_y) / (max_y - center_y);
+
+			if(red_ratio >= 0.5)
+				c = Color4f( 1.0f, (1.0f - red_ratio) * 2.0f, 0.0f, 1.0f );
+			else
+				c = Color4f( red_ratio * 2.0f, 1.0f, 0.0f, 1.0f );
+		}
+		else
+		{
+			red_ratio = (center[min(motion.num_frames - 1, f - mf + kirikae)].y - min_y) / (center_y - min_y);
+
+			if(red_ratio >= 0.5)
+				c = Color4f( 0.0f, 1.0f, (1.0f - red_ratio) * 2.0f, 1.0f );
+			else
+				c = Color4f( 0.0f, red_ratio * 2.0f, 1.0f, 1.0f );
+		}
+
+		timeline->AddElement( f + name_space, f + 1.0f + name_space, c, "", track_num );
+	}
+}
+
+void MotionPlaybackApp2::ColorBarElementRepCenterOfGravity_Z(Timeline* timeline, int track_num, vector<Point3f> center, vector<int> warpingPath, Motion& motion, float curr_frame)
+{
+	float red_ratio;
+	float max_z = center[warpingPath[0]].z;
+	float min_z = center[warpingPath[0]].z;
+	float center_z = center[warpingPath[0]].z;
+	float name_space = 30.0f;
+	int kirikae;
+	Color4f c;
+
+	//frame内での最大最小値を求める
+	for(int f = 0; f <= mf; f++)
+		if(max_z < center[warpingPath[f]].z)
+			max_z = center[warpingPath[f]].z;
+		else if (min_z > center[warpingPath[f]].z)
+			min_z = center[warpingPath[f]].z;
+
+	if(warpingPath[mf] == m1f)
+		kirikae = m1f;
+	else if(warpingPath[mf] == m2f)
+		kirikae = m2f;
+
+	for(int f = mf + 1; f <= frames; f++)
+		if(max_z < center[min(motion.num_frames - 1, f - mf + kirikae)].z)
+			max_z = center[min(motion.num_frames - 1, f - mf + kirikae)].z;
+		else if (min_z > center[min(motion.num_frames - 1, f - mf + kirikae)].z)
+			min_z = center[min(motion.num_frames - 1, f - mf + kirikae)].z;
+
+	//大きさと色付けしてフレーム毎に表示
+	for(int f = 0; f <= mf; f++)
+	{
+		if(center[warpingPath[f]].z >= center_z)
+		{
+			red_ratio = (center[warpingPath[f]].z - center_z) / (max_z - center_z);
+
+			if(red_ratio >= 0.5)
+				c = Color4f( 1.0f, (1.0f - red_ratio) * 2.0f, 0.0f, 1.0f );
+			else
+				c = Color4f( red_ratio * 2.0f, 1.0f, 0.0f, 1.0f );
+		}
+		else
+		{
+			red_ratio = (center[warpingPath[f]].z - min_z) / (center_z - min_z);
+
+			if(red_ratio >= 0.5)
+				c = Color4f( 0.0f, 1.0f, (1.0f - red_ratio) * 2.0f, 1.0f );
+			else
+				c = Color4f( 0.0f, red_ratio * 2.0f, 1.0f, 1.0f );
+		}
+
+		timeline->AddElement( f + name_space, f + 1.0f + name_space, c, "", track_num );
+	}
+	for(int f = mf + 1; f < frames; f++)
+	{
+		if(center[min(motion.num_frames - 1, f - mf + kirikae)].z >= center_z)
+		{
+			red_ratio = (center[min(motion.num_frames - 1, f - mf + kirikae)].z - center_z) / (max_z - center_z);
+
+			if(red_ratio >= 0.5)
+				c = Color4f( 1.0f, (1.0f - red_ratio) * 2.0f, 0.0f, 1.0f );
+			else
+				c = Color4f( red_ratio * 2.0f, 1.0f, 0.0f, 1.0f );
+		}
+		else
+		{
+			red_ratio = (center[min(motion.num_frames - 1, f - mf + kirikae)].z - min_z) / (center_z - min_z);
+
+			if(red_ratio >= 0.5)
+				c = Color4f( 0.0f, 1.0f, (1.0f - red_ratio) * 2.0f, 1.0f );
+			else
+				c = Color4f( 0.0f, red_ratio * 2.0f, 1.0f, 1.0f );
+		}
 
 		timeline->AddElement( f + name_space, f + 1.0f + name_space, c, "", track_num );
 	}
@@ -831,7 +1384,8 @@ void DTWinformation2::DTWinformation_init( int frames1, int frames2, const Motio
 	//iが体節、jがフレーム1、kがフレーム2
 	int numSegments = motion1.body->num_segments;
 
-	centerOfGravity.resize(frames1,vector<Vector3f>(frames2, {0.0f, 0.0f, 0.0f}));
+	centerOfGravity1.resize(frames1, {0.0f, 0.0f, 0.0f});
+	centerOfGravity2.resize(frames2, {0.0f, 0.0f, 0.0f});
 	errorCenterOfGravity.resize(frames1,vector<float>(frames2, 0.0f));
 
 	vector< Matrix4f >  seg_frame_array1, seg_frame_array2;
@@ -867,7 +1421,10 @@ void DTWinformation2::DTWinformation_init( int frames1, int frames2, const Motio
 	//身体重心誤差の計算
 	for(int j = 0; j < frames1; j++)
 		for(int k = 0; k < frames2; k++)
-			errorCenterOfGravity[j][k] = ErrorCulculateCenterOfGravity(v1[j], v2[k]);
+			errorCenterOfGravity[j][k] = ErrorCulculateCenterOfGravity(v1[j], v2[k], &centerOfGravity1[j], &centerOfGravity2[k]);
+
+	for(int j = 0; j < frames1; j++)
+		std::cout << centerOfGravity1[j] << std::endl;
 
 	//身体重心誤差の全体に対するパスの作成
 	int f1 = frames1 - 1, f2 = frames2 - 1;
@@ -893,8 +1450,8 @@ void DTWinformation2::DTWinformation_init( int frames1, int frames2, const Motio
 		else
 		{
 			error1 = errorCenterOfGravity[f1 - 1][f2 - 1] + Cost(f1 - 1, f2 - 1);
-			error2 = errorCenterOfGravity[f1 - 1][f2]; + Cost(f1 - 1, f2);
-			error3 = errorCenterOfGravity[f1][f2 - 1]; + Cost(f1, f2 - 1);
+			error2 = errorCenterOfGravity[f1 - 1][f2] + Cost(f1 - 1, f2);
+			error3 = errorCenterOfGravity[f1][f2 - 1] + Cost(f1, f2 - 1);
 			if (error1 > error2 || error1 > error3)
 				if (error2 > error3)
 				{
@@ -927,81 +1484,80 @@ void DTWinformation2::DTWinformation_init( int frames1, int frames2, const Motio
 		"motion2.num_frames:" << frames2 << std::endl;
 }
 
-float  DTWinformation2::ErrorCulculateCenterOfGravity(vector< Vector3f > v1, vector< Vector3f > v2)
+float  DTWinformation2::ErrorCulculateCenterOfGravity(vector< Vector3f > v1, vector< Vector3f > v2, Point3f * centerOfGravity1, Point3f * centerOfGravity2)
 {
 	Vector3f head1, chest1, rightUpperArm1, rightCalf1, leftUpperArm1, leftCalf1, rightThigh1, leftThigh1, rightForeArm1, leftForeArm1,
 		head2, chest2, rightUpperArm2, rightCalf2, leftUpperArm2, leftCalf2, rightThigh2, leftThigh2, rightForeArm2, leftForeArm2;
-	Point3f centerOfGravity1, centerOfGravity2;
 	float error;
 
 	head1.interpolate(v1[11],v1[12],0.5f);
 	head1.scale(0.08f);
-		centerOfGravity1.set(head1);
+		(*centerOfGravity1).set(head1);
 	chest1.interpolate(v1[10],v1[9],0.5f);
 	chest1.interpolate(chest1,v1[8],0.5f);
 	chest1.interpolate(chest1,v1[0],0.5f);
 	chest1.scale(0.497f);
-		centerOfGravity1.add(chest1);
+		(*centerOfGravity1).add(chest1);
 	rightUpperArm1.interpolate(v1[13],v2[14],0.5f);
 	rightUpperArm1.scale(0.028f);
-		centerOfGravity1.add(rightUpperArm1);
+		(*centerOfGravity1).add(rightUpperArm1);
 	rightCalf1.interpolate(v1[2],v1[3],0.5f);
 	rightCalf1.scale(0.061f);
-		centerOfGravity1.add(rightCalf1);
+		(*centerOfGravity1).add(rightCalf1);
 	leftUpperArm1.interpolate(v1[36],v1[37],0.5f);
 	leftUpperArm1.scale(0.028f);
-		centerOfGravity1.add(leftUpperArm1);
+		(*centerOfGravity1).add(leftUpperArm1);
 	leftCalf1.interpolate(v1[5],v1[6],0.5f);
 	leftCalf1.scale(0.061f);
-		centerOfGravity1.add(leftCalf1);
+		(*centerOfGravity1).add(leftCalf1);
 	rightThigh1.scale(0.10f,v1[1]);
-		centerOfGravity1.add(rightThigh1);
+		(*centerOfGravity1).add(rightThigh1);
 	rightForeArm1.interpolate(v1[15],v1[16],0.5f);
 	rightForeArm1.scale(0.022f);
-		centerOfGravity1.add(rightForeArm1);
+		(*centerOfGravity1).add(rightForeArm1);
 	leftForeArm1.interpolate(v1[38],v1[39],0.5f);
 	leftForeArm1.scale(0.022f);
-		centerOfGravity1.add(leftForeArm1);
+		(*centerOfGravity1).add(leftForeArm1);
 	leftThigh1.scale(0.10f,v1[4]);
-		centerOfGravity1.add(leftThigh1);
+		(*centerOfGravity1).add(leftThigh1);
 
 	head2.interpolate(v2[11],v2[12],0.5f);
 	head2.scale(0.08f);
-		centerOfGravity2.set(head2);
+		(*centerOfGravity2).set(head2);
 	chest2.interpolate(v2[10],v2[9],0.5f);
-	chest2.interpolate(chest1,v2[8],0.5f);
-	chest2.interpolate(chest1,v2[0],0.5f);
+	chest2.interpolate(chest2,v2[8],0.5f);
+	chest2.interpolate(chest2,v2[0],0.5f);
 	chest2.scale(0.497f);
-		centerOfGravity2.add(chest2);
+		(*centerOfGravity2).add(chest2);
 	rightUpperArm2.interpolate(v2[13],v2[14],0.5f);
 	rightUpperArm2.scale(0.028f);
-		centerOfGravity2.add(rightUpperArm2);
+		(*centerOfGravity2).add(rightUpperArm2);
 	rightCalf2.interpolate(v2[2],v2[3],0.5f);
 	rightCalf2.scale(0.061f);
-		centerOfGravity2.add(rightCalf2);
+		(*centerOfGravity2).add(rightCalf2);
 	leftUpperArm2.interpolate(v2[36],v2[37],0.5f);
 	leftUpperArm2.scale(0.028f);
-		centerOfGravity2.add(leftUpperArm2);
+		(*centerOfGravity2).add(leftUpperArm2);
 	leftCalf2.interpolate(v2[5],v2[6],0.5f);
 	leftCalf2.scale(0.061f);
-		centerOfGravity2.add(leftCalf2);
+		(*centerOfGravity2).add(leftCalf2);
 	rightThigh2.scale(0.10f,v2[1]);
-		centerOfGravity2.add(rightThigh2);
+		(*centerOfGravity2).add(rightThigh2);
 	rightForeArm2.interpolate(v2[15],v2[16],0.5f);
 	rightForeArm2.scale(0.022f);
-		centerOfGravity2.add(rightForeArm2);
+		(*centerOfGravity2).add(rightForeArm2);
 	leftForeArm2.interpolate(v2[38],v2[39],0.5f);
 	leftForeArm2.scale(0.022f);
-		centerOfGravity2.add(leftForeArm2);
+		(*centerOfGravity2).add(leftForeArm2);
 	leftThigh2.scale(0.10f,v2[4]);
-		centerOfGravity2.add(leftThigh2);
+		(*centerOfGravity2).add(leftThigh2);
 
-	error = centerOfGravity1.distance(centerOfGravity2);
+	error = (*centerOfGravity1).distance(*centerOfGravity2);
 
 	return error;
 }
 
 float DTWinformation2::Cost(int frame1, int frame2)
 {
-	return fabs(frame1 - frame2) * 0.01f;
+	return fabs(frame1 - frame2) * 0.002f;
 }

@@ -2256,12 +2256,12 @@ float DTWinformation::AngCostAcummurate(int j, int k)
 //e1[j][i].x = asin(rot1.m12);
 //if (cos(e1[j][i].x) != 0.0f)
 //{
-//	e1[j][i].y = atan2(rot1.m02, rot1.m22);
+//	e1[j][i].z = atan2(rot1.m02, rot1.m22);
 //	e1[j][i].z = atan2(rot1.m10, rot1.m11);
 //}
 //else
 //{
-//	e1[j][i].y = atan2(-rot1.m20, rot1.m00);
+//	e1[j][i].z = atan2(-rot1.m20, rot1.m00);
 //	e1[j][i].z = 0.0f;
 //}
 
@@ -2269,11 +2269,11 @@ float DTWinformation::AngCostAcummurate(int j, int k)
 //e2[k][i].x = asin(rot2.m12);
 //if (cos(e2[k][i].x) != 0.0f)
 //{
-//	e2[k][i].y = atan2(rot2.m02, rot2.m22);
+//	e2[k][i].z = atan2(rot2.m02, rot2.m22);
 //	e2[k][i].z = atan2(rot2.m10, rot2.m11);
 //}
 //else
 //{
-//	e2[k][i].y = atan2(-rot2.m20, rot2.m00);
+//	e2[k][i].z = atan2(-rot2.m20, rot2.m00);
 //	e2[k][i].z = 0.0f;
 //}

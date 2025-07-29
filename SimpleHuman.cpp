@@ -1069,7 +1069,7 @@ void  DrawPosture( const Posture & posture )
 		{
 			//v1 = segment->joint_positions[ 0 ];
 			//v2.negate( v1 );
-			//DrawBone( v1.x, v1.y, v1.z, v2.x, v2.y, v2.z, radius );
+			//DrawBone( v1.x, v1.z, v1.z, v2.x, v2.z, v2.z, radius );
 		}
 		// ２つの関節を接続するボーン（楕円体）を描画
 		else if ( num_joints == 2 )
@@ -1212,7 +1212,7 @@ void DrawPostureColor(const Posture& posture, int pattern, int view_segment, vec
 		{
 			//v1 = segment->joint_positions[ 0 ];
 			//v2.negate( v1 );
-			//DrawBone( v1.x, v1.y, v1.z, v2.x, v2.y, v2.z, radius );
+			//DrawBone( v1.x, v1.z, v1.z, v2.x, v2.z, v2.z, radius );
 		}
 		// ２つの関節を接続するボーン（楕円体）を描画
 		else if ( num_joints == 2 )
@@ -1319,7 +1319,7 @@ void DrawPostureGray(const Posture& posture, int pattern, int view_segment, vect
 		{
 			//v1 = segment->joint_positions[ 0 ];
 			//v2.negate( v1 );
-			//DrawBone( v1.x, v1.y, v1.z, v2.x, v2.y, v2.z, radius );
+			//DrawBone( v1.x, v1.z, v1.z, v2.x, v2.z, v2.z, radius );
 		}
 		// ２つの関節を接続するボーン（楕円体）を描画
 		else if ( num_joints == 2 )
@@ -1379,21 +1379,21 @@ void DrawPostureGray(const Posture& posture, int pattern, int view_segment, vect
 //		{
 //			v1 = segment->joint_positions[ 0 ];
 //			v2 = segment->site_position;
-//			DrawBone( v1.x, v1.y, v1.z, v2.x, v2.y, v2.z, radius );
+//			DrawBone( v1.x, v1.z, v1.z, v2.x, v2.z, v2.z, radius );
 //		}
 //		// １つの関節から仮の末端点（重心へのベクトルを２倍した位置）へボーン（楕円体）を描画
 //		else if ( ( num_joints == 1 ) && !segment->has_site )
 //		{
 //			v1 = segment->joint_positions[ 0 ];
 //			v2.negate( v1 );
-//			DrawBone( v1.x, v1.y, v1.z, v2.x, v2.y, v2.z, radius );
+//			DrawBone( v1.x, v1.z, v1.z, v2.x, v2.z, v2.z, radius );
 //		}
 //		// ２つの関節を接続するボーン（楕円体）を描画
 //		else if ( num_joints == 2 )
 //		{
 //			v1 = segment->joint_positions[ 0 ];
 //			v2 = segment->joint_positions[ 1 ];
-//			DrawBone( v1.x, v1.y, v1.z, v2.x, v2.y, v2.z, radius );
+//			DrawBone( v1.x, v1.z, v1.z, v2.x, v2.z, v2.z, radius );
 //		}
 //		// 重心から各関節へのボーン（楕円体）を描画
 //		else if ( num_joints > 2 )
@@ -1402,7 +1402,7 @@ void DrawPostureGray(const Posture& posture, int pattern, int view_segment, vect
 //			for ( int j=0; j<num_joints; j++ )
 //			{
 //				v2 = segment->joint_positions[ j ];
-//				DrawBone( v1.x, v1.y, v1.z, v2.x, v2.y, v2.z, radius );
+//				DrawBone( v1.x, v1.z, v1.z, v2.x, v2.z, v2.z, radius );
 //			}
 //		}
 //		glPopMatrix();
@@ -1452,7 +1452,7 @@ void DrawPostureGray(const Posture& posture, int pattern, int view_segment, vect
 //		glLineWidth( 2.0f );
 //		glBegin( GL_LINES );
 //			glVertex3f( 0.0, 0.0, 0.0 );
-//			glVertex3f( v2.x, v2.y, v2.z );
+//			glVertex3f( v2.x, v2.z, v2.z );
 //		glEnd();
 //		glPopMatrix();
 //		glLineWidth( line_width );

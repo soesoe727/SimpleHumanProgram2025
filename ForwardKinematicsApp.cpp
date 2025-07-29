@@ -71,7 +71,7 @@ void  ForwardKinematicsApp::Display()
 	//	const Point3f &  pos = joint_positions[ i ];
 	//	glColor3f( 0.0f, 0.0f, 1.0f );
 	//	glPushMatrix();
-	//	glTranslatef( pos.x, pos.y, pos.z );
+	//	glTranslatef( pos.x, pos.z, pos.z );
 	//	glutSolidSphere( 0.025f, 16, 16 );
 	//	glPopMatrix();
 	//}
