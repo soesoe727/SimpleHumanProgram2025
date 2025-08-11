@@ -63,6 +63,9 @@
     <ClCompile Include="MotionPlaybackApp2.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="MotionPlaybackApp3.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BVH.h">

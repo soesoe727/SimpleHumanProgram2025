@@ -643,7 +643,7 @@ void  Timeline::DrawTimeline()
 	UpdateTimeline();
 
 	// スクリーン画面描画モードの開始
-	BeginScreenMode();
+	MotionPlaybackApp3();
 
 	// 背景を描画
 	if ( draw_background )
@@ -951,7 +951,7 @@ int  Timeline::ComputeViewHeight()
 //
 //  スクリーン描画モードの開始
 //
-void  Timeline::BeginScreenMode()
+void  Timeline::MotionPlaybackApp3()
 {
 	GLint  viewport[ 4 ];
 	glGetIntegerv( GL_VIEWPORT, viewport );

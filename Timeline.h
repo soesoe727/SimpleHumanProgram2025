@@ -318,7 +318,7 @@ class  Timeline
 	int  ComputeViewHeight();
 
 	// スクリーン描画モードの開始・終了
-	void  BeginScreenMode();
+	void  MotionPlaybackApp3();
 	void  EndScreenMode();
 
 	// 四角形を描画

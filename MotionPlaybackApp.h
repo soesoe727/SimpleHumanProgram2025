@@ -22,6 +22,10 @@
 struct DTWinformation;
 struct DTWinformation2;
 
+//
+//MotionPlaybackAppクラスの前方宣言
+//
+
 struct DTWinformation
 {
 	public:
@@ -113,9 +117,7 @@ struct DTWinformation
 		float AngCostAcummurate(int j, int k);
 };
 
-//
 //  動作再生アプリケーションクラス
-//
 class  MotionPlaybackApp : public GLUTBaseApp
 {
   protected:
@@ -260,6 +262,10 @@ class  MotionPlaybackApp : public GLUTBaseApp
 	
 };
 
+//
+//MotionPlaybackApp2クラスの前方宣言
+//
+
 struct DTWinformation2
 {
 	public:
@@ -354,6 +360,7 @@ struct DTWinformation2
 		float Cost(int frame1, int frame2);
 };
 
+//  動作再生アプリケーションクラス
 class  MotionPlaybackApp2 : public GLUTBaseApp
 {
   protected:
@@ -511,6 +518,75 @@ class  MotionPlaybackApp2 : public GLUTBaseApp
 	//カラーバーを全て灰色に設定(再生切り替え用)
 	void ColorBarElementRepGray(Timeline * timeline, int segment_num, int Track_num, vector<vector<int>> PassAll, Motion & motion);
 	
+};
+
+//
+//MotionPlaybackApp3クラスの前方宣言
+//
+
+//  動作再生＆プロットアプリケーションクラス
+class  MotionPlaybackApp3 : public GLUTBaseApp
+{
+  protected:
+	// 動作データ
+	Motion * motion;
+	Motion * motion2;
+
+	// 現在の姿勢
+	Posture * curr_posture;
+	Posture * curr_posture2;
+
+	// アニメーション再生中かどうかのフラグ
+	bool  on_animation;
+
+	// アニメーションの再生時間
+	float  animation_time;
+
+	// アニメーションの再生速度
+	float  animation_speed;
+	
+	// --- プロット関連の変数 ---
+	
+	// プロット対象の部位（セグメント）のインデックス
+	int plot_segment_index;
+	
+	// プロットする軸のインデックス (0:X, 1:Y, 2:Z, 3:Frame)
+	int plot_vertical_axis;
+	int plot_horizontal_axis;
+
+	// プロット用のデータ（各フレームの部位の3D位置を格納）
+	vector<Point3f> plot_data1;
+	vector<Point3f> plot_data2;
+
+  public:
+	// コンストラクタ・デストラクタ
+	MotionPlaybackApp3();
+	virtual ~MotionPlaybackApp3();
+
+  public:
+	// イベント処理
+	virtual void  Initialize();
+	virtual void  Start();
+	virtual void  Display();
+	virtual void  Keyboard( unsigned char key, int mx, int my );
+	virtual void  Animation( float delta );
+
+  protected:
+	// 補助処理
+	void  LoadBVH( const char * file_name );
+	void  LoadBVH2( const char * file_name, bool is_first_load = false );
+	void  AlignInitialPositions();
+	void  AlignInitialOrientations();
+	void  OpenNewBVH();
+	void  OpenNewBVH2();
+	void  PreparePlotData();
+	void  DrawPositionPlot();
+
+	// 2D描画用のヘルパー関数
+	void  BeginScreenMode();
+	void  EndScreenMode();
+	void  DrawPlotAxes(int x, int y, int w, int h, float h_min, float h_max, float v_min, float v_max, const char* h_label, const char* v_label);
+	void  DrawText(int x, int y, const char* text, void* font = GLUT_BITMAP_HELVETICA_12);
 };
 
 #endif // _MOTION_PLAYBACK_APP_H_
