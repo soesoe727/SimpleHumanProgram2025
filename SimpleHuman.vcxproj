@@ -151,12 +151,14 @@
     <ClCompile Include="ForwardKinematicsApp.cpp" />
     <ClCompile Include="InverseKinematicsCCDApp.cpp" />
     <ClCompile Include="KeyframeMotionPlaybackApp.cpp" />
+    <ClCompile Include="MotionApp.cpp" />
     <ClCompile Include="MotionDeformationApp.cpp" />
     <ClCompile Include="MotionDeformationEditApp.cpp" />
     <ClCompile Include="MotionInterpolationApp.cpp" />
     <ClCompile Include="MotionPlaybackApp3.cpp" />
     <ClCompile Include="MotionPlaybackApp.cpp" />
     <ClCompile Include="MotionPlaybackApp2.cpp" />
+    <ClCompile Include="MotionPlaybackApp4.cpp" />
     <ClCompile Include="MotionTransition.cpp" />
     <ClCompile Include="MotionTransitionApp.cpp" />
     <ClCompile Include="PostureInterpolationApp.cpp" />
@@ -170,6 +172,7 @@
     <ClInclude Include="ForwardKinematicsApp.h" />
     <ClInclude Include="InverseKinematicsCCDApp.h" />
     <ClInclude Include="KeyframeMotionPlaybackApp.h" />
+    <ClInclude Include="MotionApp.h" />
     <ClInclude Include="MotionDeformationApp.h" />
     <ClInclude Include="MotionDeformationEditApp.h" />
     <ClInclude Include="MotionInterpolationApp.h" />

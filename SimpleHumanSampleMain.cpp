@@ -20,6 +20,7 @@
 #include "MotionTransitionApp.h"
 #include "MotionDeformationEditApp.h"
 #include "InverseKinematicsCCDApp.h"
+#include "MotionApp.h"
 
 
 
@@ -34,7 +35,10 @@ int  main( int argc, char ** argv )
 	// 全アプリケーションを登録
 	//applications.push_back( new MotionPlaybackApp() );
 	//applications.push_back( new MotionPlaybackApp2() );
-	applications.push_back( new MotionPlaybackApp3() );
+	//applications.push_back( new MotionPlaybackApp3() );
+	//applications.push_back( new MotionPlaybackApp4() );
+	applications.push_back( new MotionApp() );
+	
 	//applications.push_back( new KeyframeMotionPlaybackApp() );
 	//applications.push_back( new ForwardKinematicsApp() );
 	//applications.push_back( new PostureInterpolationApp() );

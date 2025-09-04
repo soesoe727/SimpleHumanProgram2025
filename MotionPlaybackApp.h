@@ -580,7 +580,7 @@ class  MotionPlaybackApp3 : public GLUTBaseApp
 	void  OpenNewBVH();
 	void  OpenNewBVH2();
 	void  PreparePlotData();
-	void  DrawPositionPlot();
+	virtual void  DrawPositionPlot();
 
 	// 2D描画用のヘルパー関数
 	void  BeginScreenMode();
@@ -589,4 +589,37 @@ class  MotionPlaybackApp3 : public GLUTBaseApp
 	void  DrawText(int x, int y, const char* text, void* font = GLUT_BITMAP_HELVETICA_12);
 };
 
+//
+// MotionPlaybackApp4クラスの前方宣言
+//
+
+
+class  MotionPlaybackApp4 : public MotionPlaybackApp3
+{
+  protected:
+	// 0: 折れ線グラフ, 1: カラーマップ
+	int  view_mode;
+
+	// カラーマップ用のデータ
+	vector< vector<float> > colormap_data;
+	float cmap_min_diff;
+	float cmap_max_diff;
+
+  public:
+	// コンストラクタ
+	MotionPlaybackApp4();
+
+	// イベント処理 (オーバーライド)
+	virtual void  Display() override;
+	virtual void  Keyboard( unsigned char key, int mx, int my ) override;
+	
+  protected:
+	// 補助処理 (オーバーライド)
+	void  LoadBVH( const char * file_name );
+	void  LoadBVH2( const char * file_name, bool is_first_load = false );
+
+	// カラーマップ用の描画関数とデータ準備関数
+	void  DrawColormap();
+	void  PrepareColormapData();
+};
 #endif // _MOTION_PLAYBACK_APP_H_

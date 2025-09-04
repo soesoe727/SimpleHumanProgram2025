@@ -1541,4 +1541,68 @@ void  DrawPostureShadow( const Posture & posture, const Vector3f & light_dir, co
 		glDisable( GL_STENCIL_TEST );
 }
 
+void DrawPostureSelective(const Posture& posture, int selected_segment_index, const Color3f& highlight_color, const Color3f& base_color)
+{
+	if ( !posture.body )
+		return;
+
+	// 順運動学計算
+	vector< Matrix4f >  seg_frame_array;
+	vector< Point3f >  joi_pos_array;
+	ForwardKinematics( posture, seg_frame_array, joi_pos_array );
+
+	float  radius = 0.05f;
+	Matrix4f  mat;
+	Vector3f  v1, v2;
+
+	// 各体節の描画
+	for ( int i = 0; i < seg_frame_array.size(); i++ )
+	{
+		// 手の細かい部分は描画しない (元々のDrawPostureのロジックを維持)
+		if(i > 16 && i < 36) continue;
+		if(i > 39) break;
+
+        // 色を設定: 選択された部位はハイライト色、それ以外はベース色
+        if (i == selected_segment_index) {
+            glColor3f(highlight_color.x, highlight_color.y, highlight_color.z);
+        } else {
+            glColor3f(base_color.x, base_color.y, base_color.z);
+        }
+
+		const Segment * segment = posture.body->segments[i];
+		const int  num_joints = segment->num_joints;
+
+		// 体節の中心の位置・向きを基準とする変換行列を適用
+		glPushMatrix();
+		mat.transpose( seg_frame_array[ i ] );
+		glMultMatrixf( & mat.m00 );
+
+		// １つの関節から末端点へのボーン（楕円体）を描画
+		if ( ( num_joints == 1 ) && segment->has_site )
+		{
+			v1 = segment->joint_positions[ 0 ];
+			v2 = segment->site_position;
+			DrawBone( v1.x, v1.y, v1.z, v2.x, v2.y, v2.z, radius );
+		}
+		// ２つの関節を接続するボーン（楕円体）を描画
+		else if ( num_joints == 2 )
+		{
+			v1 = segment->joint_positions[ 0 ];
+			v2 = segment->joint_positions[ 1 ];
+			DrawBone( v1.x, v1.y, v1.z, v2.x, v2.y, v2.z, radius );
+		}
+		// 重心から各関節へのボーン（楕円体）を描画
+		else if ( num_joints > 2 )
+		{
+			v1.set( 0.0f, 0.0f, 0.0f );
+			for ( int j=0; j<num_joints; j++ )
+			{
+				v2 = segment->joint_positions[ j ];
+				DrawBone( v1.x, v1.y, v1.z, v2.x, v2.y, v2.z, radius );
+			}
+		}
+		glPopMatrix();
+	}
+}
+
 

@@ -87,13 +87,17 @@ void MotionPlaybackApp3::Display()
 	GLUTBaseApp::Display();
 
 	if (curr_posture) {
-		glColor3f(0.8f, 0.2f, 0.2f);
-		DrawPosture(*curr_posture);
+		// 選択部位を赤、その他を明るい灰色で描画
+		Color3f highlight_color1(0.8f, 0.2f, 0.2f);
+		Color3f base_color1(1.0f, 1.0f, 1.0f);
+		DrawPostureSelective(*curr_posture, plot_segment_index, highlight_color1, base_color1);
 		DrawPostureShadow(*curr_posture, shadow_dir, shadow_color);
 	}
 	if (curr_posture2) {
-		glColor3f(0.2f, 0.2f, 0.8f);
-		DrawPosture(*curr_posture2);
+		// 選択部位を青、その他を少し暗い灰色で描画
+		Color3f highlight_color2(0.2f, 0.2f, 0.8f);
+		Color3f base_color2(0.6f, 0.6f, 0.6f);
+		DrawPostureSelective(*curr_posture2, plot_segment_index, highlight_color2, base_color2);
 		DrawPostureShadow(*curr_posture2, shadow_dir, shadow_color);
 	}
 

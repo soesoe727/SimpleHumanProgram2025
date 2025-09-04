@@ -287,5 +287,8 @@ void  DrawPostureGray( const Posture & posture, int pattern, int view_segment, v
 // 姿勢の影の描画（スティックフィギュアで描画）
 void  DrawPostureShadow( const Posture & posture, const Vector3f & light_dir, const Color4f & color );
 
+// ADDED: 選択部位のみをハイライトして姿勢を描画
+void  DrawPostureSelective( const Posture & posture, int selected_segment_index, const Color3f& highlight_color, const Color3f& base_color );
+
 
 #endif // _SIMPLE_HUMAN_H_
