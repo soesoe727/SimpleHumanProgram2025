@@ -37,6 +37,18 @@ protected:
     std::vector<std::vector<float>> occupancy_grid1, occupancy_grid2, difference_grid;
     float max_occupancy_diff;
 
+    // 速度表示用の変数
+    int   ct_feature_mode; // 0: 占有率, 1: 速度
+    vector<vector<float>> speed_grid1;
+    vector<vector<float>> speed_grid2;
+    vector<vector<float>> speed_diff_grid;
+    float max_speed;
+    float max_speed_diff;
+
+    // ADDED: 速度のノーマライゼーションに関する変数
+    int   speed_norm_mode;      // 0: フレーム基準, 1: 全体基準
+    float global_max_speed;     // 全てのフレーム/部位を通した最大速度
+
 public:
     MotionApp();
     virtual ~MotionApp();
@@ -57,10 +69,13 @@ protected:
     void PreparePlotData();
     void PrepareColormapData();
     void CalculateWorldBounds();
+    void  CalculateCtScanBounds(float& h_min, float& h_max, float& v_min, float& v_max);
+    void PrepareSpeedData();
     void UpdateOccupancyGrids();
     void DrawPositionPlot();
     void DrawColormap();
     void DrawCtScanView();
+    void DrawSlicePlane();
     void BeginScreenMode();
     void EndScreenMode();
     void DrawText(int x, int y, const char* text, void* font);
