@@ -19,35 +19,51 @@ protected:
     Motion *motion, *motion2;
     Posture *curr_posture, *curr_posture2;
     bool on_animation;
-    float animation_time, animation_speed;
+    float animation_time;
+    float animation_speed;
     int view_mode;
 
-    int plot_segment_index, plot_vertical_axis, plot_horizontal_axis;
+    // --- プロット用 ---
+    int plot_segment_index;
+    int plot_vertical_axis, plot_horizontal_axis;
     std::vector<Point3f> plot_data1, plot_data2;
-    
+
+    // --- カラーマップ(時間vs部位)用 ---
     std::vector<std::vector<float>> colormap_data;
     float cmap_min_diff, cmap_max_diff;
+
+    // --- カラーマップ(空間XvsZ)用 ---
+    int   ct_h_axis, ct_v_axis;
+    bool  projection_mode;
+    int   grid_resolution;
+    float world_bounds[3][2];
+    int   ct_feature_mode;
     
-    // REVISED: CTスキャンモード用の変数を更新
-    int ct_h_axis, ct_v_axis;    // 0:X, 1:Y, 2:Z
-    bool projection_mode;       // false:スライス, true:投影
-    float slice_value;          // スライスする座標値
-    int grid_resolution;
-    float world_bounds[3][2];   // X,Y,Zそれぞれのmin/max
-    std::vector<std::vector<float>> occupancy_grid1, occupancy_grid2, difference_grid;
-    float max_occupancy_diff;
+    // --- 速度ノーマライズ用 ---
+    int   speed_norm_mode;
+    float global_max_speed;
 
-    // 速度表示用の変数
-    int   ct_feature_mode; // 0: 占有率, 1: 速度
-    vector<vector<float>> speed_grid1;
-    vector<vector<float>> speed_grid2;
-    vector<vector<float>> speed_diff_grid;
-    float max_speed;
-    float max_speed_diff;
+    // ==================================================================
+    // REVISED: 複数スライスを管理するためのデータ構造
+    // ==================================================================
+    
+    // 複数のスライス平面のY座標
+    std::vector<float> slice_values; 
 
-    // ADDED: 速度のノーマライゼーションに関する変数
-    int   speed_norm_mode;      // 0: フレーム基準, 1: 全体基準
-    float global_max_speed;     // 全てのフレーム/部位を通した最大速度
+    // 各スライスに対応するグリッドデータ (グリッドのベクトル)
+    std::vector<std::vector<std::vector<float>>> occupancy_grids1;
+    std::vector<std::vector<std::vector<float>>> occupancy_grids2;
+    std::vector<std::vector<std::vector<float>>> difference_grids;
+    std::vector<std::vector<std::vector<float>>> speed_grids1;
+    std::vector<std::vector<std::vector<float>>> speed_grids2;
+    std::vector<std::vector<std::vector<float>>> speed_diff_grids;
+
+    // 各スライスに対応する最大値 (最大値のベクトル)
+    std::vector<float> max_occupancy_diffs;
+    std::vector<float> max_speeds;
+    std::vector<float> max_speed_diffs;
+    
+    // ==================================================================
 
 public:
     MotionApp();

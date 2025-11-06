@@ -24,6 +24,7 @@
     <ProjectGuid>{87a09e46-05c8-48ee-bff2-f71e567a5d6a}</ProjectGuid>
     <RootNamespace>SimpleHuman</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <ProjectName>Program2025</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">

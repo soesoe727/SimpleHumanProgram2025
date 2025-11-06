@@ -5,9 +5,31 @@
 #include <cstdio>
 #include <cmath>
 
-static float get_axis_value(const Point3f& p, int axis_index) { if (axis_index == 0) return p.x; if (axis_index == 1) return p.y; return p.z; }
-static const char* get_axis_name(int axis_index) { if (axis_index == 0) return "X"; if (axis_index == 1) return "Y"; if (axis_index == 2) return "Z"; return "Frame"; }
-static Color3f GetHeatmapColor(float value) { Color3f color; value = max(0.0f, min(1.0f, value)); if (value < 0.5f) { color.set(0.0f, value * 2.0f, 1.0f - (value * 2.0f)); } else { color.set((value - 0.5f) * 2.0f, 1.0f - ((value - 0.5f) * 2.0f), 0.0f); } return color; }
+static float get_axis_value(const Point3f& p, int axis_index) 
+{
+	if (axis_index == 0) return p.x; 
+	if (axis_index == 1) return p.y;
+	return p.z; 
+}
+
+static const char* get_axis_name(int axis_index)
+{ if (axis_index == 0) return "X"; 
+	if (axis_index == 1) return "Y";
+	if (axis_index == 2) return "Z";
+	return "Frame"; 
+}
+
+
+static Color3f GetHeatmapColor(float value)
+{ 
+	Color3f color; 
+	value = max(0.0f, min(1.0f, value));
+	if (value < 0.5f) 
+		color.set(0.0f, value * 2.0f, 1.0f - (value * 2.0f)); 
+	else 
+		color.set((value - 0.5f) * 2.0f, 1.0f - ((value - 0.5f) * 2.0f), 0.0f); 
+	return color; 
+}
 
 MotionApp::MotionApp() {
 	app_name = "Motion Analysis App";
@@ -15,19 +37,62 @@ MotionApp::MotionApp() {
     on_animation = true; animation_time = 0.0f; animation_speed = 1.0f;
     view_mode = 0; plot_segment_index = 0; plot_vertical_axis = 1; plot_horizontal_axis = 3;
     cmap_min_diff = 0.0f; cmap_max_diff = 1.0f;
-    ct_h_axis = 0; ct_v_axis = 2; // 初期値: XZ平面（上から）
-    projection_mode = false; // 初期値: スライスモード
-    slice_value = 1.0f; // 初期スライス高さ
-    grid_resolution = 80; max_occupancy_diff = 1.0f;
+    ct_h_axis = 0; ct_v_axis = 2;
+    projection_mode = false;
+    
+    // REVISED: 2つのスライス値を設定
+    slice_values.push_back(1.0f); // スライス1
+    slice_values.push_back(0.5f); // スライス2
+    
+    grid_resolution = 80;
     ct_feature_mode = 0;
-    speed_norm_mode = 0; // 初期値はフレーム基準
+    speed_norm_mode = 0;
     global_max_speed = 1.0f;
+
+    // REVISED: 複数スライス用のデータ構造のサイズを確保
+    size_t num_slices = slice_values.size();
+    occupancy_grids1.resize(num_slices);
+    occupancy_grids2.resize(num_slices);
+    difference_grids.resize(num_slices);
+    speed_grids1.resize(num_slices);
+    speed_grids2.resize(num_slices);
+    speed_diff_grids.resize(num_slices);
+    
+    max_occupancy_diffs.resize(num_slices, 1.0f);
+    max_speeds.resize(num_slices, 1.0f);
+    max_speed_diffs.resize(num_slices, 1.0f);
 }
 
-MotionApp::~MotionApp() { if ( motion ) { if (motion->body) delete motion->body; delete motion; } if ( motion2 ) delete motion2; if ( curr_posture ) delete curr_posture; if ( curr_posture2 ) delete curr_posture2; }
-void MotionApp::Initialize() { GLUTBaseApp::Initialize(); OpenNewBVH(); OpenNewBVH2(); }
-void MotionApp::Start() { GLUTBaseApp::Start(); on_animation = true; animation_time = 0.0f; Animation(0.0f); }
+MotionApp::~MotionApp() 
+{
+	if ( motion )
+	{ 
+		if (motion->body) 
+			delete motion->body;
+		delete motion;
+	} 
+	if ( motion2 )
+		delete motion2; 
+	if ( curr_posture )
+		delete curr_posture;
+	if ( curr_posture2 )
+		delete curr_posture2;
+}
 
+void MotionApp::Initialize() 
+{
+	GLUTBaseApp::Initialize();
+	OpenNewBVH(); 
+	OpenNewBVH2();
+}
+
+void MotionApp::Start()
+{
+	GLUTBaseApp::Start();
+	on_animation = true;
+	animation_time = 0.0f;
+	Animation(0.0f);
+}
 
 void MotionApp::Keyboard(unsigned char key, int mx, int my) {
 	GLUTBaseApp::Keyboard(key, mx, my);
@@ -45,14 +110,21 @@ void MotionApp::Keyboard(unsigned char key, int mx, int my) {
 			case 'x': ct_h_axis = (ct_h_axis + 1) % 3; if (ct_h_axis == ct_v_axis) ct_h_axis = (ct_h_axis + 1) % 3; break;
 			case 'y': ct_v_axis = (ct_v_axis + 1) % 3; if (ct_v_axis == ct_h_axis) ct_v_axis = (ct_v_axis + 1) % 3; break;
 			case 'z': projection_mode = !projection_mode; break;
-			case 'w': slice_value += 0.01f; break;
-			case 's': slice_value -= 0.01f; break;
-            case 'f': // ADDED: 特徴量モードの切り替え
+			
+            // REVISED: w/s がスライス1を操作
+			case 'w': slice_values[0] += 0.01f; break;
+			case 's': slice_values[0] -= 0.01f; break;
+            
+            // ADDED: t/g がスライス2を操作
+            case 't': if (slice_values.size() > 1) slice_values[1] += 0.01f; break;
+            case 'g': if (slice_values.size() > 1) slice_values[1] -= 0.01f; break;
+
+            case 'f': // (変更なし)
                 ct_feature_mode = (ct_feature_mode + 1) % 2;
                 printf("CT-Scan Feature Mode: %s\n", (ct_feature_mode == 0) ? "Occupancy" : "Speed");
                 break;
-			case 'n': // ADDED: ノーマライゼーションモードの切り替え
-                if (ct_feature_mode == 1) { // 速度モードの時のみ有効
+			case 'n': // (変更なし)
+                if (ct_feature_mode == 1) { 
                     speed_norm_mode = (speed_norm_mode + 1) % 2;
                     printf("Speed Normalization Mode: %s\n", (speed_norm_mode == 0) ? "Per-Frame" : "Global");
                 }
@@ -78,7 +150,7 @@ void MotionApp::Display()
 	if (curr_posture) { DrawPostureSelective(*curr_posture, plot_segment_index, Color3f(0.8f,0.2f,0.2f), Color3f(0.7f,0.7f,0.7f)); DrawPostureShadow(*curr_posture, shadow_dir, shadow_color); }
 	if (curr_posture2) { DrawPostureSelective(*curr_posture2, plot_segment_index, Color3f(0.2f,0.2f,0.8f), Color3f(0.6f,0.6f,0.6f)); DrawPostureShadow(*curr_posture2, shadow_dir, shadow_color); }
 
-	// ADDED: CT-Scanの"スライスモード"時に、分析平面を3Dビューに描画する
+	//CT-Scanの"スライスモード"時に、分析平面を3Dビューに描画する
     if (view_mode == 2 && !projection_mode) {
         DrawSlicePlane();
     }
@@ -94,9 +166,15 @@ void MotionApp::Display()
         const char* feature_mode_str = (ct_feature_mode == 0) ? "Occupancy" : "Speed";
         const char* norm_mode_str = (speed_norm_mode == 0) ? "Frame" : "Global";
 
-		sprintf(title, "View:%s|H:%s V:%s|Mode:%s|Feature:%s|Norm:%s('n')|Slice:%s %.2f",
-        mode_str[view_mode], get_axis_name(ct_h_axis), get_axis_name(ct_v_axis), slice_mode_str, feature_mode_str, norm_mode_str, get_axis_name(d_axis), slice_value);
-	} else { sprintf(title, "View:%s('c')|Plotting:%s('p'/'q')|V-Axis:%s('v')|H-Axis:%s('h')", mode_str[view_mode], motion ? motion->body->segments[plot_segment_index]->name.c_str() : "N/A", get_axis_name(plot_vertical_axis), get_axis_name(plot_horizontal_axis)); }
+		// REVISED: 2つのスライスの値を表示
+		sprintf(title, "View:%s|H:%s V:%s|Mode:%s|Feature:%s|Norm:%s('n')|%s|S1:%.2f(w/s) S2:%.2f(t/g)",
+        mode_str[view_mode], get_axis_name(ct_h_axis), get_axis_name(ct_v_axis), slice_mode_str, 
+        feature_mode_str, norm_mode_str, get_axis_name(d_axis), 
+        slice_values[0], (slice_values.size() > 1 ? slice_values[1] : 0.0f) );
+	} else
+		sprintf(title, "View:%s('c')|Plotting:%s('p'/'q')|V-Axis:%s('v')|H-Axis:%s('h')", 
+			mode_str[view_mode], motion ? motion->body->segments[plot_segment_index]->name.c_str() : "N/A",
+			get_axis_name(plot_vertical_axis), get_axis_name(plot_horizontal_axis)); 
 	
 	DrawTextInformation(0, title);
 	if (motion) { char msg[64]; sprintf(msg, "Time:%.2f(%d)", animation_time, (int)(animation_time / motion->interval)); DrawTextInformation(1, msg); }
@@ -117,10 +195,23 @@ void MotionApp::LoadBVH(const char* file_name) {
 	Start();
 }
 
-void MotionApp::LoadBVH2(const char* file_name) { if (!motion) return; Motion* m2 = LoadAndCoustructBVHMotion(file_name, motion->body); if (!m2) return; if (motion2) delete motion2; if (curr_posture2) delete curr_posture2; motion2 = m2; curr_posture2 = new Posture(motion2->body); AlignInitialPositions(); AlignInitialOrientations(); PrepareAllData(); Start(); }
+void MotionApp::LoadBVH2(const char* file_name)
+{ 
+	if (!motion) return;
+	Motion* m2 = LoadAndCoustructBVHMotion(file_name, motion->body);
+	if (!m2) return;
+	if (motion2) delete motion2; 
+	if (curr_posture2) delete curr_posture2;
+	motion2 = m2;
+	curr_posture2 = new Posture(motion2->body); 
+	AlignInitialPositions(); 
+	AlignInitialOrientations(); 
+	PrepareAllData();
+	Start();
+}
 
 //
-// ADDED: ２つのモーションの初期位置を合わせる
+// ２つのモーションの初期位置を合わせる
 //
 void MotionApp::AlignInitialPositions() {
 	if (!motion || !motion2 || motion->num_frames == 0 || motion2->num_frames == 0) return;
@@ -318,7 +409,7 @@ void MotionApp::DrawPositionPlot()
 	glColor3f(0.8f, 0.2f, 0.2f); draw_line_strip(h1, v1);
 	glColor3f(0.2f, 0.2f, 0.8f); draw_line_strip(h2, v2);
 
-	// REVISED: ハイライト機能の分離と改善
+	// ハイライト機能の分離と改善
 	int frame_idx = static_cast<int>(animation_time / motion->interval);
 	
 	if (plot_horizontal_axis == 3) { // 横軸がフレームの場合は黄色の縦線
@@ -352,6 +443,7 @@ void MotionApp::DrawPositionPlot()
 }
 
 // 2つのモーションが占める空間全体の境界を計算
+
 void MotionApp::CalculateWorldBounds() {
 	if (!motion || !motion2) return;
 
@@ -367,16 +459,10 @@ void MotionApp::CalculateWorldBounds() {
 			ForwardKinematics(m->frames[f], seg_frames);
 			for (int s = 0; s < m->body->num_segments; ++s) {
 				Point3f p(seg_frames[s].m03, seg_frames[s].m13, seg_frames[s].m23);
-				
-				// X axis
 				if (p.x < world_bounds[0][0]) world_bounds[0][0] = p.x;
 				if (p.x > world_bounds[0][1]) world_bounds[0][1] = p.x;
-				
-				// Y axis
 				if (p.y < world_bounds[1][0]) world_bounds[1][0] = p.y;
 				if (p.y > world_bounds[1][1]) world_bounds[1][1] = p.y;
-
-				// Z axis
 				if (p.z < world_bounds[2][0]) world_bounds[2][0] = p.z;
 				if (p.z > world_bounds[2][1]) world_bounds[2][1] = p.z;
 			}
@@ -386,9 +472,10 @@ void MotionApp::CalculateWorldBounds() {
 	update_bounds(motion);
 	update_bounds(motion2);
 
-	// 各軸に少し余白を持たせる
+	// 各軸に持たせる余白を10%から5%に減らす
 	for (int i = 0; i < 3; ++i) {
 		float range = world_bounds[i][1] - world_bounds[i][0];
+		// ここの値を調整することで、ズーム具合を変更できる
 		world_bounds[i][0] -= range * 0.1f;
 		world_bounds[i][1] += range * 0.1f;
 	}
@@ -505,7 +592,7 @@ void MotionApp::PrepareColormapData()
 }
 
 //
-// カラーマップを描画 (完成版)
+// カラーマップを描画
 //
 void MotionApp::DrawColormap()
 {
@@ -564,7 +651,7 @@ void MotionApp::DrawColormap()
 	EndScreenMode();
 }
 
-// ADDED: 全体基準の最大速度を事前に計算する
+// 全体基準の最大速度を事前に計算する
 void MotionApp::PrepareSpeedData() {
     if (!motion || !motion2) return;
 
@@ -624,244 +711,313 @@ void MotionApp::PrepareSpeedData() {
     printf("Done. Global max speed (filtered) = %.2f\n", global_max_speed);
 }
 
-// REVISED: 空間占有率の計算ロジック
-// 既存の UpdateOccupancyGrids 関数を、以下の内容に丸ごと置き換えてください。
-
+// 空間占有率の計算ロジック
 void MotionApp::UpdateOccupancyGrids() {
 	if (!motion || !motion2) return;
-
-	// グリッド初期化 (変更なし)
-	occupancy_grid1.assign(grid_resolution, vector<float>(grid_resolution, 0.0f));
-	occupancy_grid2.assign(grid_resolution, vector<float>(grid_resolution, 0.0f));
-	difference_grid.assign(grid_resolution, vector<float>(grid_resolution, 0.0f));
-    speed_grid1.assign(grid_resolution, vector<float>(grid_resolution, 0.0f));
-    speed_grid2.assign(grid_resolution, vector<float>(grid_resolution, 0.0f));
-    speed_diff_grid.assign(grid_resolution, vector<float>(grid_resolution, 0.0f));
-	max_occupancy_diff = 0.0f;
-    max_speed = 0.0f;
-    max_speed_diff = 0.0f;
 	
 	int current_frame = (int)(animation_time / motion->interval);
-	if (current_frame <= 0 || current_frame >= min(motion->num_frames, motion2->num_frames)) return;
+	if (current_frame <= 0 || current_frame >= max(motion->num_frames, motion2->num_frames)) return;
 
 	int d_axis = 3 - ct_h_axis - ct_v_axis;
 	float h_world_range = world_bounds[ct_h_axis][1] - world_bounds[ct_h_axis][0];
 	float v_world_range = world_bounds[ct_v_axis][1] - world_bounds[ct_v_axis][0];
 
-	auto process_motion = [&](const Motion* m, vector<vector<float>>& occ_grid, vector<vector<float>>& spd_grid) {
-		vector<Point3f> joint_pos, joint_pos_prev;
-		vector<Matrix4f> seg_frames, seg_frames_prev;
-		ForwardKinematics(m->frames[current_frame], seg_frames, joint_pos);
-		ForwardKinematics(m->frames[current_frame - 1], seg_frames_prev, joint_pos_prev);
-		float bone_radius = 0.08f;
+	// REVISED: すべてのスライス平面について計算をループ
+    for (int i = 0; i < slice_values.size(); ++i)
+    {
+        float current_slice_val = slice_values[i];
 
-		for (int s = 0; s < m->body->num_segments; ++s) {
-			
-			std::string seg_name = m->body->segments[s]->name;
-			if (seg_name.find("Hand") != std::string::npos && seg_name != "RightHand" && seg_name != "LeftHand") {
-				continue;
-			}
+        // --- グリッドと最大値をスライスごとに初期化 ---
+        occupancy_grids1[i].assign(grid_resolution, vector<float>(grid_resolution, 0.0f));
+        occupancy_grids2[i].assign(grid_resolution, vector<float>(grid_resolution, 0.0f));
+        difference_grids[i].assign(grid_resolution, vector<float>(grid_resolution, 0.0f));
+        speed_grids1[i].assign(grid_resolution, vector<float>(grid_resolution, 0.0f));
+        speed_grids2[i].assign(grid_resolution, vector<float>(grid_resolution, 0.0f));
+        speed_diff_grids[i].assign(grid_resolution, vector<float>(grid_resolution, 0.0f));
+        float max_occ_diff_local = 0.0f;
+        float max_speed_local = 0.0f;
+        float max_speed_diff_local = 0.0f;
 
-			const Segment* seg = m->body->segments[s];
-			Point3f p1, p2, p1_prev, p2_prev;
+        // --- 計算の本体 (process_motion ラムダ) ---
+        auto process_motion = [&](const Motion* m, vector<vector<float>>& occ_grid, vector<vector<float>>& spd_grid) {
+            // ... (このラムダ関数の内部は、slice_value -> current_slice_val に変更した以外は、以前のバージョンと全く同じです) ...
+            vector<Point3f> joint_pos, joint_pos_prev;
+            vector<Matrix4f> seg_frames, seg_frames_prev;
+            ForwardKinematics(m->frames[min(current_frame, m->num_frames - 1)], seg_frames, joint_pos);
+            ForwardKinematics(m->frames[min(current_frame, m->num_frames - 1) - 1], seg_frames_prev, joint_pos_prev);
+            float bone_radius = 0.08f;
+            for (int s = 0; s < m->body->num_segments; ++s) {
+                std::string seg_name = m->body->segments[s]->name;
+                if (seg_name.find("Hand") != std::string::npos && seg_name != "RightHand" && seg_name != "LeftHand") continue;
+                const Segment* seg = m->body->segments[s];
+                Point3f p1, p2, p1_prev, p2_prev;
+                if (seg->num_joints == 1) {
+					p1 = joint_pos[seg->joints[0]->index];
+					p1_prev = joint_pos_prev[seg->joints[0]->index];
+					Matrix3f R_curr(seg_frames[s].m00, seg_frames[s].m01, seg_frames[s].m02, seg_frames[s].m10, seg_frames[s].m11, seg_frames[s].m12, seg_frames[s].m20, seg_frames[s].m21, seg_frames[s].m22);
+					Point3f offset_vec = seg->site_position; 
+					R_curr.transform(&offset_vec);
+					p2 = p1 + offset_vec;
+					Matrix3f R_prev(seg_frames_prev[s].m00, seg_frames_prev[s].m01, seg_frames_prev[s].m02, seg_frames_prev[s].m10, seg_frames_prev[s].m11, seg_frames_prev[s].m12, seg_frames_prev[s].m20, seg_frames_prev[s].m21, seg_frames_prev[s].m22);
+					Point3f offset_vec_prev = seg->site_position;
+					R_prev.transform(&offset_vec_prev);
+					p2_prev = p1_prev + offset_vec_prev;
+				} else if (seg->num_joints >= 2) {
+					p1 = joint_pos[seg->joints[0]->index];
+					p2 = joint_pos[seg->joints[1]->index];
+					p1_prev = joint_pos_prev[seg->joints[0]->index];
+					p2_prev = joint_pos_prev[seg->joints[1]->index];
+				} else
+					continue;
 
-			if (seg->num_joints == 1) {
-				p1 = joint_pos[seg->joints[0]->index];
-				p1_prev = joint_pos_prev[seg->joints[0]->index];
-				Matrix3f R_curr(seg_frames[s].m00, seg_frames[s].m01, seg_frames[s].m02, seg_frames[s].m10, seg_frames[s].m11, seg_frames[s].m12, seg_frames[s].m20, seg_frames[s].m21, seg_frames[s].m22);
-				Point3f offset_vec = seg->site_position; 
-				R_curr.transform(&offset_vec);
-				p2 = p1 + offset_vec;
-				Matrix3f R_prev(seg_frames_prev[s].m00, seg_frames_prev[s].m01, seg_frames_prev[s].m02, seg_frames_prev[s].m10, seg_frames_prev[s].m11, seg_frames_prev[s].m12, seg_frames_prev[s].m20, seg_frames_prev[s].m21, seg_frames_prev[s].m22);
-				Point3f offset_vec_prev = seg->site_position;
-				R_prev.transform(&offset_vec_prev);
-				p2_prev = p1_prev + offset_vec_prev;
-			} else if (seg->num_joints >= 2) {
-				p1 = joint_pos[seg->joints[0]->index];
-				p2 = joint_pos[seg->joints[1]->index];
-				p1_prev = joint_pos_prev[seg->joints[0]->index];
-				p2_prev = joint_pos_prev[seg->joints[1]->index];
-			} else {
-				continue;
-			}
-
-			if (!projection_mode) {
-				if (min(get_axis_value(p1, d_axis), get_axis_value(p2, d_axis)) > slice_value + bone_radius || max(get_axis_value(p1, d_axis), get_axis_value(p2, d_axis)) < slice_value - bone_radius) continue;
-			}
-			
-            Vector3f vel1 = p1 - p1_prev;
-            Vector3f vel2 = p2 - p2_prev;
-            float speed = ((vel1.length() + vel2.length()) / 2.0f) / m->interval;
-
-			float h_min = min(get_axis_value(p1, ct_h_axis), get_axis_value(p2, ct_h_axis)) - bone_radius;
-			float h_max = max(get_axis_value(p1, ct_h_axis), get_axis_value(p2, ct_h_axis)) + bone_radius;
-			float v_min = min(get_axis_value(p1, ct_v_axis), get_axis_value(p2, ct_v_axis)) - bone_radius;
-			float v_max = max(get_axis_value(p1, ct_v_axis), get_axis_value(p2, ct_v_axis)) + bone_radius;
-			int h_start = (int)(((h_min - world_bounds[ct_h_axis][0]) / h_world_range) * grid_resolution);
-			int h_end   = (int)(((h_max - world_bounds[ct_h_axis][0]) / h_world_range) * grid_resolution);
-			int v_start = (int)(((v_min - world_bounds[ct_v_axis][0]) / v_world_range) * grid_resolution);
-			int v_end   = (int)(((v_max - world_bounds[ct_v_axis][0]) / v_world_range) * grid_resolution);
-			h_start = max(0, h_start); h_end = min(grid_resolution - 1, h_end);
-			v_start = max(0, v_start); v_end = min(grid_resolution - 1, v_end);
-
-			for (int v_idx = v_start; v_idx <= v_end; ++v_idx) {
-				for (int h_idx = h_start; h_idx <= h_end; ++h_idx) {
-					float world_h = world_bounds[ct_h_axis][0] + (h_idx + 0.5f) * (h_world_range / grid_resolution);
-					float world_v = world_bounds[ct_v_axis][0] + (v_idx + 0.5f) * (v_world_range / grid_resolution);
-					
-					// ==================================================================
-					// REVISED: 選択された軸で正しく距離を計算するロジック
-					// ==================================================================
-					float p1_h = get_axis_value(p1, ct_h_axis); float p1_v = get_axis_value(p1, ct_v_axis);
-					float p2_h = get_axis_value(p2, ct_h_axis); float p2_v = get_axis_value(p2, ct_v_axis);
-
-					float dx = p2_h - p1_h, dv = p2_v - p1_v;
-					float len_sq = dx*dx + dv*dv;
-					if (len_sq < 1e-6) continue;
-
-					float t = ((world_h - p1_h) * dx + (world_v - p1_v) * dv) / len_sq;
-					t = max(0.0f, min(1.0f, t));
-
-					float closest_h = p1_h + t * dx;
-					float closest_v = p1_v + t * dv;
-					
-					float dist_sq_2D = pow(closest_h - world_h, 2) + pow(closest_v - world_v, 2);
-					float dist_sq = dist_sq_2D;
-
-					if (!projection_mode) {
-						Point3f closest_p_3D = p1 + (p2 - p1) * t;
-						float dist_sq_depth = pow(get_axis_value(closest_p_3D, d_axis) - slice_value, 2);
-						dist_sq += dist_sq_depth;
+				if (!projection_mode)
+					if (min(get_axis_value(p1, d_axis), get_axis_value(p2, d_axis)) > current_slice_val + bone_radius || max(get_axis_value(p1, d_axis), get_axis_value(p2, d_axis)) < current_slice_val - bone_radius) continue;
+				Vector3f vel1 = p1 - p1_prev; Vector3f vel2 = p2 - p2_prev;
+				float speed = ((vel1.length() + vel2.length()) / 2.0f) / m->interval;
+				float h_min = min(get_axis_value(p1, ct_h_axis), get_axis_value(p2, ct_h_axis)) - bone_radius;
+				float h_max = max(get_axis_value(p1, ct_h_axis), get_axis_value(p2, ct_h_axis)) + bone_radius;
+				float v_min = min(get_axis_value(p1, ct_v_axis), get_axis_value(p2, ct_v_axis)) - bone_radius;
+				float v_max = max(get_axis_value(p1, ct_v_axis), get_axis_value(p2, ct_v_axis)) + bone_radius;
+				int h_start = (int)(((h_min - world_bounds[ct_h_axis][0]) / h_world_range) * grid_resolution);
+				int h_end   = (int)(((h_max - world_bounds[ct_h_axis][0]) / h_world_range) * grid_resolution);
+				int v_start = (int)(((v_min - world_bounds[ct_v_axis][0]) / v_world_range) * grid_resolution);
+				int v_end   = (int)(((v_max - world_bounds[ct_v_axis][0]) / v_world_range) * grid_resolution);
+				h_start = max(0, h_start); h_end = min(grid_resolution - 1, h_end);
+				v_start = max(0, v_start); v_end = min(grid_resolution - 1, v_end);
+				for (int v_idx = v_start; v_idx <= v_end; ++v_idx) {
+					for (int h_idx = h_start; h_idx <= h_end; ++h_idx) {
+						float world_h = world_bounds[ct_h_axis][0] + (h_idx + 0.5f) * (h_world_range / grid_resolution);
+						float world_v = world_bounds[ct_v_axis][0] + (v_idx + 0.5f) * (v_world_range / grid_resolution);
+						float p1_h = get_axis_value(p1, ct_h_axis); float p1_v = get_axis_value(p1, ct_v_axis);
+						float p2_h = get_axis_value(p2, ct_h_axis); float p2_v = get_axis_value(p2, ct_v_axis);
+						float dx = p2_h - p1_h, dv = p2_v - p1_v;
+						float len_sq = dx*dx + dv*dv;
+						if (len_sq < 1e-6) continue;
+						float t = ((world_h - p1_h) * dx + (world_v - p1_v) * dv) / len_sq;
+						t = max(0.0f, min(1.0f, t));
+						float closest_h = p1_h + t * dx; float closest_v = p1_v + t * dv;
+						float dist_sq = pow(closest_h - world_h, 2) + pow(closest_v - world_v, 2);
+						if (!projection_mode) {
+							Point3f closest_p_3D = p1 + (p2 - p1) * t;
+							float dist_sq_depth = pow(get_axis_value(closest_p_3D, d_axis) - current_slice_val, 2);
+							dist_sq += dist_sq_depth;
+						}
+						if (dist_sq < bone_radius*bone_radius) {
+							float presence = exp(-dist_sq / (2.0f * (bone_radius/2.0f)*(bone_radius/2.0f)));
+							occ_grid[v_idx][h_idx] += presence;
+							spd_grid[v_idx][h_idx] = max(spd_grid[v_idx][h_idx], speed);
+						}
 					}
-					// ==================================================================
+				}
+			}
+		};// --- process_motion ラムダの終わり ---
+
+		process_motion(motion, occupancy_grids1[i], speed_grids1[i]);
+		process_motion(motion2, occupancy_grids2[i], speed_grids2[i]);
+
+		// --- 差分と最大値を計算 ---
+        for (int v = 0; v < grid_resolution; ++v) {
+            for (int h = 0; h < grid_resolution; ++h) {
+                float diff = abs(occupancy_grids1[i][v][h] - occupancy_grids2[i][v][h]);
+                difference_grids[i][v][h] = diff;
+                if (diff > max_occ_diff_local) max_occ_diff_local = diff;
+                if (speed_grids1[i][v][h] > max_speed_local) max_speed_local = speed_grids1[i][v][h];
+                if (speed_grids2[i][v][h] > max_speed_local) max_speed_local = speed_grids2[i][v][h];
+                float speed_diff = abs(speed_grids1[i][v][h] - speed_grids2[i][v][h]);
+                speed_diff_grids[i][v][h] = speed_diff;
+                if (speed_diff > max_speed_diff_local) max_speed_diff_local = speed_diff;
+            }
+        }
+
+		// --- 計算結果をグローバルなベクトルに格納 ---
+        max_occupancy_diffs[i] = (max_occ_diff_local < 1e-5f) ? 1.0f : max_occ_diff_local;
+        max_speeds[i] = (max_speed_local < 1e-5f) ? 1.0f : max_speed_local;
+        max_speed_diffs[i] = (max_speed_diff_local < 1e-5f) ? 1.0f : max_speed_diff_local;
+    }
+}
+
+// CTスキャン風カラーマップ描画
+void MotionApp::DrawCtScanView() {
+	if (occupancy_grids1.empty() || occupancy_grids1[0].empty()) return;
+
+	BeginScreenMode();
+
+	// 1. レイアウト計算 (2行3列)
+	int margin = 50, gap = 15;
+    int num_cols = 3;
+    int num_rows = slice_values.size();
+
+    // 利用可能な全幅と全高
+    int total_w = win_width - 2 * margin - (num_cols - 1) * gap;
+    int total_h = win_height - 2 * margin - (num_rows - 1) * gap;
+
+    int map_w = total_w / num_cols;
+    int map_h = total_h / num_rows;
+
+    // 正方形に補正
+    map_w = min(map_w, map_h);
+    map_h = map_w;
+
+    // 描画開始位置 (左上)
+    int start_x = margin;
+    int start_y = win_height - margin - (num_rows * map_h + (num_rows - 1) * gap);
+
+	// 2. 描画範囲の計算 (変更なし)
+	float final_h_min, final_h_max, final_v_min, final_v_max;
+	CalculateCtScanBounds(final_h_min, final_h_max, final_v_min, final_v_max);
+	float final_h_range = final_h_max - final_h_min;
+	float final_v_range = final_v_max - final_v_min;
+	float raw_h_min = world_bounds[ct_h_axis][0], raw_h_max = world_bounds[ct_h_axis][1];
+	float raw_v_min = world_bounds[ct_v_axis][0], raw_v_max = world_bounds[ct_v_axis][1];
+	float raw_h_range = raw_h_max - raw_h_min;
+	float raw_v_range = raw_v_max - raw_v_min;
+	
+	// 3. 描画ヘルパー関数
+	auto draw_single_map = [&](int x_pos, int y_pos, int w, int h, const vector<vector<float>>& source_grid, float max_val, const char* title) {
+		
+		bool invert_y = (ct_v_axis == 1);
+		float v_min_label = invert_y ? final_v_max : final_v_min;
+		float v_max_label = invert_y ? final_v_min : final_v_max;
+		DrawPlotAxes(x_pos, y_pos, w, h, final_h_min, final_h_max, v_min_label, v_max_label, get_axis_name(ct_h_axis), get_axis_name(ct_v_axis));
+
+		// ==================================================================
+		// NEW: 描画直前にデータをリサンプリングして、スケールを補正する
+		// ==================================================================
+		vector<vector<float>> resampled_grid(grid_resolution, vector<float>(grid_resolution, 0.0f));
+		if (raw_h_range > 1e-5f && raw_v_range > 1e-5f) {
+			for (int v_new = 0; v_new < grid_resolution; ++v_new) {
+				for (int h_new = 0; h_new < grid_resolution; ++h_new) {
+					// 正方形の描画範囲に対応するワールド座標を計算
+					float world_h = final_h_min + (h_new + 0.5f) * (final_h_range / grid_resolution);
+					float world_v = final_v_min + (v_new + 0.5f) * (final_v_range / grid_resolution);
 					
-					if (dist_sq < bone_radius*bone_radius) {
-						float presence = exp(-dist_sq / (2.0f * (bone_radius/2.0f)*(bone_radius/2.0f)));
-						occ_grid[v_idx][h_idx] += presence;
-						spd_grid[v_idx][h_idx] = max(spd_grid[v_idx][h_idx], speed);
+					// そのワールド座標が、元のデータ範囲（長方形）の内側にあるかチェック
+					if (world_h >= raw_h_min && world_h <= raw_h_max && world_v >= raw_v_min && world_v <= raw_v_max) {
+						// 内側にあれば、元のグリッドから値を取得して新しいグリッドにコピー
+						int h_old = (int)(((world_h - raw_h_min) / raw_h_range) * grid_resolution);
+						int v_old = (int)(((world_v - raw_v_min) / raw_v_range) * grid_resolution);
+						resampled_grid[v_new][h_new] = source_grid[v_old][h_old];
 					}
 				}
 			}
 		}
-	};
-	
-	process_motion(motion, occupancy_grid1, speed_grid1);
-	process_motion(motion2, occupancy_grid2, speed_grid2);
 
-	for (int v = 0; v < grid_resolution; ++v) {
-		for (int h = 0; h < grid_resolution; ++h) {
-			float diff = abs(occupancy_grid1[v][h] - occupancy_grid2[v][h]);
-			difference_grid[v][h] = diff;
-			if (diff > max_occupancy_diff) max_occupancy_diff = diff;
-            if (speed_grid1[v][h] > max_speed) max_speed = speed_grid1[v][h];
-            if (speed_grid2[v][h] > max_speed) max_speed = speed_grid2[v][h];
-            float speed_diff = abs(speed_grid1[v][h] - speed_grid2[v][h]);
-            speed_diff_grid[v][h] = speed_diff;
-            if (speed_diff > max_speed_diff) max_speed_diff = speed_diff;
-		}
-	}
-	if (max_occupancy_diff < 1e-5f) max_occupancy_diff = 1.0f;
-    if (max_speed < 1e-5f) max_speed = 1.0f;
-    if (max_speed_diff < 1e-5f) max_speed_diff = 1.0f;
-}
-
-// REVISED: CTスキャン風カラーマップ描画
-void MotionApp::DrawCtScanView() {
-	if (occupancy_grid1.empty() || speed_grid1.empty()) return;
-	BeginScreenMode();
-	
-	// レイアウト計算
-	int margin = 50, gap = 15;
-	int map_w = (win_width - 2 * margin - 2 * gap) / 3;
-	if (map_w < 100) map_w = 100;
-	int map_h = map_w;
-	int area_y = win_height - margin - map_h;
-	if (area_y < margin) { map_h = win_height - 2 * margin; if (map_h < 100) map_h = 100; map_w = map_h; area_y = margin; }
-	int map1_x = margin, map2_x = margin + map_w + gap, map3_x = margin + 2 * (map_w + gap);
-
-	// REVISED: 新しい補助関数で、統一された正方形の範囲を取得
-	float final_h_min, final_h_max, final_v_min, final_v_max;
-	CalculateCtScanBounds(final_h_min, final_h_max, final_v_min, final_v_max);
-
-	auto draw_single_map = [&](int x_pos, const vector<vector<float>>& grid, float max_val, const char* title) {
-		bool invert_y = (ct_v_axis == 1);
-		float v_min_label = invert_y ? world_bounds[ct_v_axis][1] : world_bounds[ct_v_axis][0];
-		float v_max_label = invert_y ? world_bounds[ct_v_axis][0] : world_bounds[ct_v_axis][1];
-		DrawPlotAxes(x_pos, area_y, map_w, map_h, world_bounds[ct_h_axis][0], world_bounds[ct_h_axis][1], v_min_label, v_max_label, get_axis_name(ct_h_axis), get_axis_name(ct_v_axis));
-		float cell_w = (float)map_w / grid_resolution; float cell_h = (float)map_h / grid_resolution;
+		// ==================================================================
+		// STABLE: シンプルで安定した描画ループ
+		// ==================================================================
 		glBegin(GL_QUADS);
 		for (int v_idx = 0; v_idx < grid_resolution; ++v_idx) {
 			for (int h_idx = 0; h_idx < grid_resolution; ++h_idx) {
 				int read_v_idx = invert_y ? (grid_resolution - 1 - v_idx) : v_idx;
-				float value = grid[read_v_idx][h_idx] / max_val;
-				if (value > 0.01) {
-					Color3f color = GetHeatmapColor(value); glColor3f(color.x, color.y, color.z);
-					float sx0 = x_pos + h_idx * cell_w; float sy0 = area_y + v_idx * cell_h;
-					glVertex2f(sx0, sy0); glVertex2f(sx0, sy0 + cell_h); glVertex2f(sx0 + cell_w, sy0 + cell_h); glVertex2f(sx0 + cell_w, sy0);
-				}
+				float value = resampled_grid[read_v_idx][h_idx] / max_val; // 補正後のグリッドを使用
+				if (value <= 0.01) continue;
+
+				Color3f color = GetHeatmapColor(value);
+				glColor3f(color.x, color.y, color.z);
+
+				float cell_w = (float)w / grid_resolution;
+				float cell_h = (float)h / grid_resolution;
+				float sx0 = x_pos + h_idx * cell_w;
+				float sy0 = y_pos + v_idx * cell_h;
+				
+				glVertex2f(sx0, sy0);
+				glVertex2f(sx0, sy0 + cell_h);
+				glVertex2f(sx0 + cell_w, sy0 + cell_h);
+				glVertex2f(sx0 + cell_w, sy0);
 			}
 		}
 		glEnd();
-		glColor3f(0.0f, 0.0f, 0.0f); DrawText(x_pos + 5, area_y - 5, title, GLUT_BITMAP_HELVETICA_10);
+
+		glColor3f(0.0f, 0.0f, 0.0f);
+		DrawText(x_pos + 5, y_pos - 5, title, GLUT_BITMAP_HELVETICA_10);
 	};
 
-	if (ct_feature_mode == 0) { // 占有率モード
-		draw_single_map(map1_x, occupancy_grid1, max_occupancy_diff, "Motion 1 Occupancy");
-		draw_single_map(map2_x, occupancy_grid2, max_occupancy_diff, "Motion 2 Occupancy");
-		draw_single_map(map3_x, difference_grid, max_occupancy_diff, "Difference");
-	} else { // 速度モード
-		// REVISED: ノーマライゼーションモードに応じて最大値を切り替え
-        float norm_speed = (speed_norm_mode == 0) ? max_speed : global_max_speed;
-        float norm_speed_diff = (speed_norm_mode == 0) ? max_speed_diff : global_max_speed;
+	// 4. REVISED: 6つのマップを2行3列で描画
+    for (int i = 0; i < slice_values.size(); ++i) // i が行 (スライス)
+    {
+        int y_pos = start_y + i * (map_h + gap);
+        int x_pos_1 = start_x;
+        int x_pos_2 = start_x + (map_w + gap);
+        int x_pos_3 = start_x + 2 * (map_w + gap);
 
-		draw_single_map(map1_x, speed_grid1, norm_speed, "Motion 1 Speed");
-		draw_single_map(map2_x, speed_grid2, norm_speed, "Motion 2 Speed");
-		draw_single_map(map3_x, speed_diff_grid, norm_speed_diff, "Speed Difference");
-	}
+        char title1[64], title2[64], title3[64];
+        sprintf(title1, "S%d Motion 1", i+1);
+        sprintf(title2, "S%d Motion 2", i+1);
+        sprintf(title3, "S%d Difference", i+1);
 
-	// ビューポートを全体に戻す
-	glViewport(0, 0, win_width, win_height);
+        if (ct_feature_mode == 0) {
+            draw_single_map(x_pos_1, y_pos, map_w, map_h, occupancy_grids1[i], max_occupancy_diffs[i], title1);
+            draw_single_map(x_pos_2, y_pos, map_w, map_h, occupancy_grids2[i], max_occupancy_diffs[i], title2);
+            draw_single_map(x_pos_3, y_pos, map_w, map_h, difference_grids[i], max_occupancy_diffs[i], title3);
+        } else {
+            float norm_speed = (speed_norm_mode == 0) ? max_speeds[i] : global_max_speed;
+            float norm_speed_diff = (speed_norm_mode == 0) ? max_speed_diffs[i] : global_max_speed;
+            draw_single_map(x_pos_1, y_pos, map_w, map_h, speed_grids1[i], norm_speed, title1);
+            draw_single_map(x_pos_2, y_pos, map_w, map_h, speed_grids2[i], norm_speed, title2);
+            draw_single_map(x_pos_3, y_pos, map_w, map_h, speed_diff_grids[i], norm_speed_diff, title3);
+        }
+    }
 
 	EndScreenMode();
 }
 
-// REPLACE the existing DrawSlicePlane function
+// スライス平面の描画
 void MotionApp::DrawSlicePlane()
 {
     int d_axis = 3 - ct_h_axis - ct_v_axis;
 
-    // REVISED: 新しい補助関数で、統一された正方形の範囲を取得
     float h_min, h_max, v_min, v_max;
     CalculateCtScanBounds(h_min, h_max, v_min, v_max);
 
-    Point3f corners[4];
-    if (d_axis == 0) { // Slicing along X
-        corners[0].set(slice_value, v_min, h_min); corners[1].set(slice_value, v_max, h_min);
-        corners[2].set(slice_value, v_max, h_max); corners[3].set(slice_value, v_min, h_max);
-    } else if (d_axis == 1) { // Slicing along Y
-        corners[0].set(h_min, slice_value, v_min); corners[1].set(h_max, slice_value, v_min);
-        corners[2].set(h_max, slice_value, v_max); corners[3].set(h_min, slice_value, v_max);
-    } else { // Slicing along Z
-        corners[0].set(h_min, v_min, slice_value); corners[1].set(h_max, v_min, slice_value);
-        corners[2].set(h_max, v_max, slice_value); corners[3].set(h_min, v_max, slice_value);
-    }
-    
-    // --- Drawing (no changes) ---
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glColor4f(1.0f, 1.0f, 0.8f, 0.25f);
-    glBegin(GL_QUADS);
-    for (int i = 0; i < 4; ++i) glVertex3f(corners[i].x, corners[i].y, corners[i].z);
-    glEnd();
-    glLineWidth(1.5f);
-    glColor4f(1.0f, 1.0f, 0.8f, 0.6f);
-    glBegin(GL_LINE_LOOP);
-    for (int i = 0; i < 4; ++i) glVertex3f(corners[i].x, corners[i].y, corners[i].z);
-    glEnd();
+
+    // REVISED: すべてのスライス平面をループで描画
+    for (int i = 0; i < slice_values.size(); ++i)
+    {
+        float current_slice_val = slice_values[i];
+        Point3f corners[4];
+
+        if (d_axis == 0) { // Slicing along X
+            corners[0].set(current_slice_val, v_min, h_min); corners[1].set(current_slice_val, v_max, h_min);
+            corners[2].set(current_slice_val, v_max, h_max); corners[3].set(current_slice_val, v_min, h_max);
+        } else if (d_axis == 1) { // Slicing along Y
+            corners[0].set(h_min, current_slice_val, v_min); corners[1].set(h_max, current_slice_val, v_min);
+            corners[2].set(h_max, current_slice_val, v_max); corners[3].set(h_min, current_slice_val, v_max);
+        } else { // Slicing along Z
+            corners[0].set(h_min, v_min, current_slice_val); corners[1].set(h_max, v_min, current_slice_val);
+            corners[2].set(h_max, v_max, current_slice_val); corners[3].set(h_min, v_max, current_slice_val);
+        }
+        
+        // REVISED: i (0 or 1) に基づいて色と太さを決定
+        if (i == 0) {
+            glColor4f(1.0f, 1.0f, 0.8f, 0.25f); // Slice 1 Face (Yellow)
+            glLineWidth(1.5f);
+        } else {
+            glColor4f(0.7f, 0.7f, 1.0f, 0.15f); // Slice 2 Face (Blue)
+            glLineWidth(1.0f);
+        }
+
+        // 面の描画
+        glBegin(GL_QUADS);
+        for (int j = 0; j < 4; ++j) glVertex3f(corners[j].x, corners[j].y, corners[j].z);
+        glEnd();
+        
+        // 枠線の描画
+        if (i == 0) {
+            glColor4f(1.0f, 1.0f, 0.8f, 0.6f); // Slice 1 Border
+        } else {
+            glColor4f(0.7f, 0.7f, 1.0f, 0.4f); // Slice 2 Border
+        }
+        glBegin(GL_LINE_LOOP);
+        for (int j = 0; j < 4; ++j) glVertex3f(corners[j].x, corners[j].y, corners[j].z);
+        glEnd();
+    }
+    
     glDisable(GL_BLEND);
 }
 
-// ADD THIS NEW FUNCTION
+//
 void MotionApp::CalculateCtScanBounds(float& h_min, float& h_max, float& v_min, float& v_max)
 {
 	// 選択された2軸の元の範囲を取得

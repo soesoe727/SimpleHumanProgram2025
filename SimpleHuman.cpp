@@ -1044,10 +1044,10 @@ void  DrawPosture( const Posture & posture )
 	// 各体節の描画
 	for ( int i = 0; i < seg_frame_array.size(); i++ )
 	{
-		while(i > 16 && i < 36)
+		/*while(i > 16 && i < 36)
 			i++;
 		if(i > 39)
-			break;
+			break;*/
 
 		const Segment *  segment = posture.body->segments[i];
 		const int  num_joints = segment->num_joints;
