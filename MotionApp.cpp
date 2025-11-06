@@ -848,8 +848,8 @@ void MotionApp::DrawCtScanView() {
     int num_rows = slice_values.size();
 
     // óòópâ¬î\Ç»ëSïùÇ∆ëSçÇ
-    int total_w = win_width - 2 * margin - (num_cols - 1) * gap;
-    int total_h = win_height - 2 * margin - (num_rows - 1) * gap;
+    int total_w = win_width - 5 * margin - (num_cols - 1) * gap;
+    int total_h = win_height - 5 * margin - (num_rows - 1) * gap;
 
     int map_w = total_w / num_cols;
     int map_h = total_h / num_rows;
@@ -1001,16 +1001,17 @@ void MotionApp::DrawSlicePlane()
         // ñ ÇÃï`âÊ
         glBegin(GL_QUADS);
         for (int j = 0; j < 4; ++j) glVertex3f(corners[j].x, corners[j].y, corners[j].z);
+		for (int j = 3; j >=0; --j) glVertex3f(corners[j].x, corners[j].y, corners[j].z);
         glEnd();
         
         // ògê¸ÇÃï`âÊ
+		glBegin(GL_LINE_LOOP);
         if (i == 0) {
-            glColor4f(1.0f, 1.0f, 0.8f, 0.6f); // Slice 1 Border
+            glColor4f(1.0f, 1.0f, 0.8f, 0.7f); // Slice 1 Border
         } else {
-            glColor4f(0.7f, 0.7f, 1.0f, 0.4f); // Slice 2 Border
+            glColor4f(0.7f, 0.7f, 1.0f, 0.7f); // Slice 2 Border
         }
-        glBegin(GL_LINE_LOOP);
-        for (int j = 0; j < 4; ++j) glVertex3f(corners[j].x, corners[j].y, corners[j].z);
+		for (int j = 0; j < 4; ++j) glVertex3f(corners[j].x, corners[j].y, corners[j].z);
         glEnd();
     }
     
