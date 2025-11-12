@@ -5,6 +5,18 @@
 #include <cstdio>
 #include <cmath>
 
+// ADDED: インスタンスを保持する static ポインタ
+static MotionApp* g_app_instance = NULL;
+
+// ADDED: 'Special'関数を呼び出すための静的ラッパー
+static void SpecialKeyWrapper(int key, int x, int y)
+{
+    // static ポインタ経由で、インスタンスの Special 関数を呼び出す
+    if (g_app_instance) {
+        g_app_instance->Special(key, x, y);
+    }
+}
+
 static float get_axis_value(const Point3f& p, int axis_index) 
 {
 	if (axis_index == 0) return p.x; 
@@ -32,6 +44,7 @@ static Color3f GetHeatmapColor(float value)
 }
 
 MotionApp::MotionApp() {
+	g_app_instance = this;
 	app_name = "Motion Analysis App";
     motion = NULL; motion2 = NULL; curr_posture = NULL; curr_posture2 = NULL;
     on_animation = true; animation_time = 0.0f; animation_speed = 1.0f;
@@ -51,6 +64,11 @@ MotionApp::MotionApp() {
 
 	show_slice_planes = true;
 	show_ct_maps = true;
+
+	// ADDED: ズーム＆パン変数の初期化
+    ct_scan_zoom = 1.0f;
+    ct_scan_center.set(0.0f, 0.0f);
+    ct_scan_manual_mode = false;
 
     // REVISED: 複数スライス用のデータ構造のサイズを確保
     size_t num_slices = slice_values.size();
@@ -85,6 +103,7 @@ MotionApp::~MotionApp()
 void MotionApp::Initialize() 
 {
 	GLUTBaseApp::Initialize();
+	glutSpecialFunc(SpecialKeyWrapper);
 	OpenNewBVH(); 
 	OpenNewBVH2();
 }
@@ -139,8 +158,66 @@ void MotionApp::Keyboard(unsigned char key, int mx, int my) {
 			case 'm': // ADDED: 'm' で2D CTマップの表示/非表示を切り替え
                 show_ct_maps = !show_ct_maps;
                 break;
+			// ADDED: ズームとリセットのキー
+            case 'i': // ズームイン
+                ct_scan_zoom *= 0.9f;
+                ct_scan_manual_mode = true;
+                break;
+            case 'o': // ズームアウト
+                ct_scan_zoom *= 1.1f;
+                ct_scan_manual_mode = true;
+                break;
+            case 'r': // リセット
+                ResetCtScanView();
+                break;
 		}
 	}
+}
+
+void MotionApp::Special(int key, int mx, int my)
+{
+	GLUTBaseApp::KeyboardSpecial(key, mx, my);
+    // CTスキャンビュー以外では何もしない
+    if (view_mode != 2) return;
+    
+
+	// 現在の表示範囲に基づいて、パンの移動量を決定 (表示範囲の5%ずつ移動)
+    float h_min, h_max, v_min, v_max;
+    CalculateCtScanBounds(h_min, h_max, v_min, v_max);
+    float pan_speed_h = (h_max - h_min) * 0.02f;
+    float pan_speed_v = (v_max - v_min) * 0.02f;
+
+
+    switch(key)
+    {
+        case GLUT_KEY_LEFT:
+            ct_scan_center.x -= pan_speed_h;
+            ct_scan_manual_mode = true;
+            break;
+        case GLUT_KEY_RIGHT:
+            ct_scan_center.x += pan_speed_h;
+            ct_scan_manual_mode = true;
+            break;
+        case GLUT_KEY_DOWN:
+            ct_scan_center.y -= pan_speed_v;
+            ct_scan_manual_mode = true;
+            break;
+        case GLUT_KEY_UP:
+            ct_scan_center.y += pan_speed_v;
+            ct_scan_manual_mode = true;
+            break;
+		default :
+			std::cout << "clicked key" << std::endl;
+			break;
+    }
+}
+
+void MotionApp::ResetCtScanView()
+{
+    ct_scan_zoom = 1.0f;
+    ct_scan_center.set(0.0f, 0.0f);
+    ct_scan_manual_mode = false;
+    printf("CT-Scan view reset to default.\n");
 }
 
 void MotionApp::Animation(float delta)
@@ -185,8 +262,7 @@ void MotionApp::Display()
 		const char* planes_on_str = (show_slice_planes) ? "ON" : "OFF";
 		const char* maps_on_str = (show_ct_maps) ? "ON" : "OFF";
 
-		// REVISED: 2Dマップの表示状態('m')をタイトルに追加
-		sprintf(title, "View:%s|H:%s V:%s|Mode:%s|Feature:%s|Norm:%s|Planes:%s('b')|Maps:%s('m')|%s|S1:%.2f S2:%.2f",
+		sprintf(title, "View:%s|H:%s V:%s|Mode:%s|Feature:%s|Norm:%s|Planes:%s('b')|Maps:%s('m')|Pan:Arrows Zoom:i/o Reset:r|%s|S1:%.2f S2:%.2f",
             mode_str[view_mode], get_axis_name(ct_h_axis), get_axis_name(ct_v_axis), slice_mode_str, 
             feature_mode_str, norm_mode_str, planes_on_str, maps_on_str, get_axis_name(d_axis), 
             slice_values[0], (slice_values.size() > 1 ? slice_values[1] : 0.0f) );
@@ -1036,25 +1112,40 @@ void MotionApp::DrawSlicePlane()
     glDisable(GL_BLEND);
 }
 
-//
+// REPLACE the existing CalculateCtScanBounds function
 void MotionApp::CalculateCtScanBounds(float& h_min, float& h_max, float& v_min, float& v_max)
 {
-	// 選択された2軸の元の範囲を取得
+	// 1. 選択された2軸の元の範囲を取得
 	float h_min_raw = world_bounds[ct_h_axis][0];
 	float h_max_raw = world_bounds[ct_h_axis][1];
 	float v_min_raw = world_bounds[ct_v_axis][0];
 	float v_max_raw = world_bounds[ct_v_axis][1];
 
-	// 2軸の範囲の広い方を基準に、正方形の描画範囲を計算
-	float h_range = h_max_raw - h_min_raw;
-	float v_range = v_max_raw - v_min_raw;
-	float max_range = max(h_range, v_range);
+	// 2. 2軸のデフォルトの範囲と中心を計算
+	float h_range_raw = h_max_raw - h_min_raw;
+	float v_range_raw = v_max_raw - v_min_raw;
+	float max_range_raw = max(h_range_raw, v_range_raw);
 
-	float h_center = (h_min_raw + h_max_raw) / 2.0f;
-	float v_center = (v_min_raw + v_max_raw) / 2.0f;
+	float h_center_default = (h_min_raw + h_max_raw) / 2.0f;
+	float v_center_default = (v_min_raw + v_max_raw) / 2.0f;
+    
+    // 3. 手動モードが有効かチェック
+    if (ct_scan_manual_mode) {
+        // 手動モードの場合：デフォルトの中心 + 手動オフセット を中心とする
+        float final_center_h = h_center_default + ct_scan_center.x;
+        float final_center_v = v_center_default + ct_scan_center.y;
+        // デフォルトの範囲 x ズーム倍率 を新しい範囲とする
+        float final_range = max_range_raw * ct_scan_zoom;
 
-	h_min = h_center - max_range / 2.0f;
-	h_max = h_center + max_range / 2.0f;
-	v_min = v_center - max_range / 2.0f;
-	v_max = v_center + max_range / 2.0f;
+        h_min = final_center_h - final_range / 2.0f;
+        h_max = final_center_h + final_range / 2.0f;
+        v_min = final_center_v - final_range / 2.0f;
+        v_max = final_center_v + final_range / 2.0f;
+    } else {
+        // 自動モードの場合：従来通りの計算
+        h_min = h_center_default - max_range_raw / 2.0f;
+        h_max = h_center_default + max_range_raw / 2.0f;
+        v_min = v_center_default - max_range_raw / 2.0f;
+        v_max = v_center_default + max_range_raw / 2.0f;
+    }
 }

@@ -65,6 +65,11 @@ protected:
 
     bool show_slice_planes;
     bool show_ct_maps;
+
+    // ADDED: ズーム＆パン機能用の変数
+    float ct_scan_zoom;         // ズーム倍率 (1.0がデフォルト)
+    Point2f ct_scan_center;     // 中心のオフセット (H軸, V軸)
+    bool ct_scan_manual_mode;  // 手動操作中かどうかのフラグ
     
     // ==================================================================
 
@@ -75,6 +80,7 @@ public:
     virtual void Start() override;
     virtual void Display() override;
     virtual void Keyboard(unsigned char key, int mx, int my) override;
+    void Special(int key, int mx, int my); // ADD THIS LINE
     virtual void Animation(float delta) override;
     
 protected:
@@ -89,6 +95,7 @@ protected:
     void PrepareColormapData();
     void CalculateWorldBounds();
     void CalculateCtScanBounds(float& h_min, float& h_max, float& v_min, float& v_max);
+    void ResetCtScanView(); // ADD THIS LINE
     void PrepareSpeedData();
     void UpdateOccupancyGrids();
     void DrawPositionPlot();
