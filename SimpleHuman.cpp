@@ -1559,8 +1559,7 @@ void DrawPostureSelective(const Posture& posture, int selected_segment_index, co
 	for ( int i = 0; i < seg_frame_array.size(); i++ )
 	{
 		// 手の細かい部分は描画しない (元々のDrawPostureのロジックを維持)
-		if(i > 16 && i < 36) continue;
-		if(i > 39) break;
+		
 
         // 色を設定: 選択された部位はハイライト色、それ以外はベース色
         if (i == selected_segment_index) {

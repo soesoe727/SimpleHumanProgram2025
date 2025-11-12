@@ -62,6 +62,9 @@ protected:
     std::vector<float> max_occupancy_diffs;
     std::vector<float> max_speeds;
     std::vector<float> max_speed_diffs;
+
+    bool show_slice_planes;
+    bool show_ct_maps;
     
     // ==================================================================
 
@@ -85,7 +88,7 @@ protected:
     void PreparePlotData();
     void PrepareColormapData();
     void CalculateWorldBounds();
-    void  CalculateCtScanBounds(float& h_min, float& h_max, float& v_min, float& v_max);
+    void CalculateCtScanBounds(float& h_min, float& h_max, float& v_min, float& v_max);
     void PrepareSpeedData();
     void UpdateOccupancyGrids();
     void DrawPositionPlot();

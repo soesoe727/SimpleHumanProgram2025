@@ -35,7 +35,7 @@ MotionApp::MotionApp() {
 	app_name = "Motion Analysis App";
     motion = NULL; motion2 = NULL; curr_posture = NULL; curr_posture2 = NULL;
     on_animation = true; animation_time = 0.0f; animation_speed = 1.0f;
-    view_mode = 0; plot_segment_index = 0; plot_vertical_axis = 1; plot_horizontal_axis = 3;
+    view_mode = 2; plot_segment_index = 0; plot_vertical_axis = 1; plot_horizontal_axis = 3;
     cmap_min_diff = 0.0f; cmap_max_diff = 1.0f;
     ct_h_axis = 0; ct_v_axis = 2;
     projection_mode = false;
@@ -48,6 +48,9 @@ MotionApp::MotionApp() {
     ct_feature_mode = 0;
     speed_norm_mode = 0;
     global_max_speed = 1.0f;
+
+	show_slice_planes = true;
+	show_ct_maps = true;
 
     // REVISED: 複数スライス用のデータ構造のサイズを確保
     size_t num_slices = slice_values.size();
@@ -104,6 +107,7 @@ void MotionApp::Keyboard(unsigned char key, int mx, int my) {
 		case 'h': plot_horizontal_axis = (plot_horizontal_axis + 1) % 4; break;
 		case 'p': if (motion) { plot_segment_index = (plot_segment_index + 1) % motion->body->num_segments; PreparePlotData(); } break;
         case 'q': if (motion) { plot_segment_index = (plot_segment_index - 1 + motion->body->num_segments) % motion->body->num_segments; PreparePlotData(); } break;
+		case 'l': {OpenNewBVH(); OpenNewBVH2();} break;
 	}
 	if (view_mode == 2) {
 		switch(key) {
@@ -129,6 +133,12 @@ void MotionApp::Keyboard(unsigned char key, int mx, int my) {
                     printf("Speed Normalization Mode: %s\n", (speed_norm_mode == 0) ? "Per-Frame" : "Global");
                 }
                 break;
+			case 'b': // ADDED: 'b' でスライス平面の表示/非表示を切り替え
+                show_slice_planes = !show_slice_planes;
+                break;
+			case 'm': // ADDED: 'm' で2D CTマップの表示/非表示を切り替え
+                show_ct_maps = !show_ct_maps;
+                break;
 		}
 	}
 }
@@ -150,14 +160,21 @@ void MotionApp::Display()
 	if (curr_posture) { DrawPostureSelective(*curr_posture, plot_segment_index, Color3f(0.8f,0.2f,0.2f), Color3f(0.7f,0.7f,0.7f)); DrawPostureShadow(*curr_posture, shadow_dir, shadow_color); }
 	if (curr_posture2) { DrawPostureSelective(*curr_posture2, plot_segment_index, Color3f(0.2f,0.2f,0.8f), Color3f(0.6f,0.6f,0.6f)); DrawPostureShadow(*curr_posture2, shadow_dir, shadow_color); }
 
-	//CT-Scanの"スライスモード"時に、分析平面を3Dビューに描画する
-    if (view_mode == 2 && !projection_mode) {
+
+	// REVISED: 'show_slice_planes' が true の時のみ平面を描画
+    if (view_mode == 2 && !projection_mode && show_slice_planes) {
         DrawSlicePlane();
     }
 
 	if (view_mode == 0) DrawPositionPlot();
 	else if (view_mode == 1) DrawColormap();
-	else if (view_mode == 2) { UpdateOccupancyGrids(); DrawCtScanView(); }
+	else if (view_mode == 2) { 
+        // REVISED: 'show_ct_maps' が true の時のみ計算と描画を実行
+        if (show_ct_maps) {
+            UpdateOccupancyGrids(); 
+            DrawCtScanView(); 
+        }
+	}
 
 	char title[256]; const char* mode_str[] = {"Plot", "Colormap", "CT-Scan"};
 	if (view_mode == 2) {
@@ -165,12 +182,14 @@ void MotionApp::Display()
 		const char* slice_mode_str = projection_mode ? "Projection" : "Slice";
         const char* feature_mode_str = (ct_feature_mode == 0) ? "Occupancy" : "Speed";
         const char* norm_mode_str = (speed_norm_mode == 0) ? "Frame" : "Global";
+		const char* planes_on_str = (show_slice_planes) ? "ON" : "OFF";
+		const char* maps_on_str = (show_ct_maps) ? "ON" : "OFF";
 
-		// REVISED: 2つのスライスの値を表示
-		sprintf(title, "View:%s|H:%s V:%s|Mode:%s|Feature:%s|Norm:%s('n')|%s|S1:%.2f(w/s) S2:%.2f(t/g)",
-        mode_str[view_mode], get_axis_name(ct_h_axis), get_axis_name(ct_v_axis), slice_mode_str, 
-        feature_mode_str, norm_mode_str, get_axis_name(d_axis), 
-        slice_values[0], (slice_values.size() > 1 ? slice_values[1] : 0.0f) );
+		// REVISED: 2Dマップの表示状態('m')をタイトルに追加
+		sprintf(title, "View:%s|H:%s V:%s|Mode:%s|Feature:%s|Norm:%s|Planes:%s('b')|Maps:%s('m')|%s|S1:%.2f S2:%.2f",
+            mode_str[view_mode], get_axis_name(ct_h_axis), get_axis_name(ct_v_axis), slice_mode_str, 
+            feature_mode_str, norm_mode_str, planes_on_str, maps_on_str, get_axis_name(d_axis), 
+            slice_values[0], (slice_values.size() > 1 ? slice_values[1] : 0.0f) );
 	} else
 		sprintf(title, "View:%s('c')|Plotting:%s('p'/'q')|V-Axis:%s('v')|H-Axis:%s('h')", 
 			mode_str[view_mode], motion ? motion->body->segments[plot_segment_index]->name.c_str() : "N/A",
@@ -191,21 +210,18 @@ void MotionApp::LoadBVH(const char* file_name) {
 	if (curr_posture) delete curr_posture;
 	motion = new_motion;
 	curr_posture = new Posture(motion->body);
-	if (motion2) { AlignInitialPositions(); AlignInitialOrientations(); }
 	Start();
 }
 
 void MotionApp::LoadBVH2(const char* file_name)
 { 
 	if (!motion) return;
-	Motion* m2 = LoadAndCoustructBVHMotion(file_name, motion->body);
+	Motion* m2 = LoadAndCoustructBVHMotion(file_name);
 	if (!m2) return;
 	if (motion2) delete motion2; 
 	if (curr_posture2) delete curr_posture2;
 	motion2 = m2;
 	curr_posture2 = new Posture(motion2->body); 
-	AlignInitialPositions(); 
-	AlignInitialOrientations(); 
 	PrepareAllData();
 	Start();
 }
@@ -215,17 +231,21 @@ void MotionApp::LoadBVH2(const char* file_name)
 //
 void MotionApp::AlignInitialPositions() {
 	if (!motion || !motion2 || motion->num_frames == 0 || motion2->num_frames == 0) return;
+	std::cout << motion->frames[0].root_pos << std::endl;
+	std::cout << motion2->frames[0].root_pos << std::endl;
+	
 	Point3f offset1(motion->frames[0].root_pos.x, 0.0f, motion->frames[0].root_pos.z);
 	for (int i = 0; i < motion->num_frames; i++) { motion->frames[i].root_pos -= offset1; }
-	Point3f offset2 = motion2->frames[0].root_pos - motion->frames[0].root_pos;
+	Point3f offset2(motion2->frames[0].root_pos.x, 0.0f, motion2->frames[0].root_pos.z);
 	for (int i = 0; i < motion2->num_frames; i++) { motion2->frames[i].root_pos -= offset2; }
+
+	std::cout << motion->frames[0].root_pos << std::endl;
+	std::cout << motion2->frames[0].root_pos << std::endl;
 	printf("Initial positions aligned.\n");
-	PreparePlotData();
-	PrepareColormapData();
 }
 
 //
-// ADDED: ２つのモーションの初期の向きを合わせる
+//２つのモーションの初期の向きを合わせる
 //
 void MotionApp::AlignInitialOrientations() {
 	if (!motion || !motion2 || motion->num_frames == 0 || motion2->num_frames == 0) return;
@@ -244,8 +264,6 @@ void MotionApp::AlignInitialOrientations() {
 		motion2->frames[i].root_ori.mul(rot2, motion2->frames[i].root_ori);
 	}
 	printf("Initial orientations aligned to face +Z axis.\n");
-	PreparePlotData();
-	PrepareColormapData();
 }
 
 void MotionApp::OpenNewBVH()
