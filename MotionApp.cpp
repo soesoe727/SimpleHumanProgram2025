@@ -176,17 +176,14 @@ void MotionApp::Keyboard(unsigned char key, int mx, int my) {
 
 void MotionApp::Special(int key, int mx, int my)
 {
-	GLUTBaseApp::KeyboardSpecial(key, mx, my);
     // CTスキャンビュー以外では何もしない
     if (view_mode != 2) return;
-    
 
 	// 現在の表示範囲に基づいて、パンの移動量を決定 (表示範囲の5%ずつ移動)
     float h_min, h_max, v_min, v_max;
     CalculateCtScanBounds(h_min, h_max, v_min, v_max);
     float pan_speed_h = (h_max - h_min) * 0.02f;
     float pan_speed_v = (v_max - v_min) * 0.02f;
-
 
     switch(key)
     {
