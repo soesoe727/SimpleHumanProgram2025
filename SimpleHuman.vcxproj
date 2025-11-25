@@ -166,6 +166,7 @@
     <ClCompile Include="SimpleHuman.cpp" />
     <ClCompile Include="SimpleHumanGLUT.cpp" />
     <ClCompile Include="SimpleHumanSampleMain.cpp" />
+    <ClCompile Include="SpatialAnalysis.cpp" />
     <ClCompile Include="Timeline.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -183,6 +184,7 @@
     <ClInclude Include="PostureInterpolationApp.h" />
     <ClInclude Include="SimpleHuman.h" />
     <ClInclude Include="SimpleHumanGLUT.h" />
+    <ClInclude Include="SpatialAnalysis.h" />
     <ClInclude Include="Timeline.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

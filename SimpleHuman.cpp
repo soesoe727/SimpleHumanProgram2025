@@ -167,6 +167,20 @@ Posture::~Posture()
 
 
 //
+//  Postureクラスの順運動学計算（メンバ関数版）
+//
+void Posture::ForwardKinematics( vector< Matrix4f > & seg_frame_array ) const
+{
+	::ForwardKinematics( *this, seg_frame_array );
+}
+
+void Posture::ForwardKinematics( vector< Matrix4f > & seg_frame_array, vector< Point3f > & joi_pos_array ) const
+{
+	::ForwardKinematics( *this, seg_frame_array, joi_pos_array );
+}
+
+
+//
 //  人体モデルの動作を表すクラス
 //
 
@@ -428,7 +442,7 @@ void  InitPosture( Posture & posture, const Skeleton * body )
 
 	// 適当な腰の高さを計算・設定
 	//（最も低い関節の y座標が 0になるように腰の高さを設定）
-	//（本来は、一度計算した高さを記録しておくようにすれば、毎回計算する必要はない）
+// （本来は、一度計算した高さを記録しておくようにすれば、毎回計算する必要はない）
 	vector< Matrix4f >  seg_frame_array;
 	ForwardKinematics( posture, seg_frame_array );
 	float  root_height = 0.0f;
@@ -1456,6 +1470,7 @@ void DrawPostureGray(const Posture& posture, int pattern, int view_segment, vect
 //		glEnd();
 //		glPopMatrix();
 //		glLineWidth( line_width );
+//
 //		/*
 //		for ( int i=0; i<segment_frames.size(); i++ )
 //		{

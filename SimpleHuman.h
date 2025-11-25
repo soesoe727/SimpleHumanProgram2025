@@ -127,6 +127,10 @@ class  Posture
 
 	// 初期化
 	void  Init( const Skeleton * b );
+
+	// 順運動学計算（メンバ関数版）
+	void  ForwardKinematics( vector< Matrix4f > & seg_frame_array ) const;
+	void  ForwardKinematics( vector< Matrix4f > & seg_frame_array, vector< Point3f > & joi_pos_array ) const;
 };
 
 
