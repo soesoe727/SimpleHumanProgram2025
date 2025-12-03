@@ -18,15 +18,42 @@ struct SpatialPoint2f {
 struct VoxelGrid {
     int resolution;
     std::vector<float> data; 
+    
+    // NEW: 基準姿勢情報（腰の位置・回転）
+    Point3f reference_root_pos;
+    Matrix3f reference_root_ori;
+    bool has_reference;
+    
+    VoxelGrid() : resolution(0), has_reference(false) {
+        reference_root_pos.set(0, 0, 0);
+        reference_root_ori.setIdentity();
+    }
+    
     void Resize(int res);
     void Clear();
     float& At(int x, int y, int z);
     float Get(int x, int y, int z) const;
+    
+    // NEW: 基準姿勢の設定・取得
+    void SetReference(const Point3f& root_pos, const Matrix3f& root_ori) {
+        reference_root_pos = root_pos;
+        reference_root_ori = root_ori;
+        has_reference = true;
+    }
+    
+    void GetReference(Point3f& root_pos, Matrix3f& root_ori) const {
+        root_pos = reference_root_pos;
+        root_ori = reference_root_ori;
+    }
+    
+    // ファイル保存・読み込み
+    bool SaveToFile(const char* filename) const;
+    bool LoadFromFile(const char* filename);
 };
 
 // NEW: 部位ごとのボクセルグリッドコレクション
 struct SegmentVoxelData {
-    std::vector<VoxelGrid> segment_grids;  // 各セグメントのグリッド
+    std::vector<VoxelGrid> segment_grids;
     int num_segments;
     
     SegmentVoxelData() : num_segments(0) {}
@@ -52,6 +79,10 @@ struct SegmentVoxelData {
         static VoxelGrid dummy;
         return dummy;
     }
+    
+    // NEW: ファイル保存・読み込み
+    bool SaveToFile(const char* filename) const;
+    bool LoadFromFile(const char* filename);
 };
 
 class SpatialAnalyzer {
@@ -111,18 +142,23 @@ public:
     // ボクセル計算
     void UpdateVoxels(Motion* m1, Motion* m2, float current_time);
     
-    // NEW: 動作全体の累積ボクセル計算
+    // 累積ボクセル計算
     void AccumulateVoxelsAllFrames(Motion* m1, Motion* m2);
     void ClearAccumulatedVoxels();
 
-    // NEW: 部位ごとのボクセル計算
+    // 部位ごとのボクセル計算
     void VoxelizeMotionBySegment(Motion* m, float time, SegmentVoxelData& seg_data);
     void AccumulateVoxelsBySegmentAllFrames(Motion* m1, Motion* m2);
+    
+    // NEW: ボクセルキャッシュ（ファイル保存・読み込み）
+    bool SaveVoxelCache(const char* motion1_name, const char* motion2_name);
+    bool LoadVoxelCache(const char* motion1_name, const char* motion2_name);
+    std::string GenerateCacheFilename(const char* motion1_name, const char* motion2_name) const;
 
     // 描画関連
     void DrawSlicePlanes();
     void DrawCTMaps(int win_width, int win_height);
-    void DrawVoxels3D();  // NEW: 3Dボクセル描画
+    void DrawVoxels3D();
 
     // 操作関連
     void ResetView();

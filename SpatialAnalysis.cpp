@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <iostream>
+#include <fstream>  // NEW: ファイルI/O用
 
 using namespace std;
 
@@ -49,11 +50,162 @@ float VoxelGrid::Get(int x, int y, int z) const {
     return data[z * resolution * resolution + y * resolution + x];
 }
 
+// NEW: ファイルへ保存（基準姿勢情報も含む）
+bool VoxelGrid::SaveToFile(const char* filename) const {
+    ofstream ofs(filename, ios::binary);
+    if (!ofs) return false;
+    
+    // バージョン情報を書き込み
+    int version = 2;  // バージョン2：基準姿勢情報を含む
+    ofs.write(reinterpret_cast<const char*>(&version), sizeof(int));
+    
+    // 解像度を書き込み
+    ofs.write(reinterpret_cast<const char*>(&resolution), sizeof(int));
+    
+    // データサイズを書き込み
+    int data_size = data.size();
+    ofs.write(reinterpret_cast<const char*>(&data_size), sizeof(int));
+    
+    // データを書き込み
+    ofs.write(reinterpret_cast<const char*>(data.data()), data_size * sizeof(float));
+    
+    // NEW: 基準姿勢情報を書き込み
+    ofs.write(reinterpret_cast<const char*>(&has_reference), sizeof(bool));
+    if (has_reference) {
+        ofs.write(reinterpret_cast<const char*>(&reference_root_pos.x), sizeof(float));
+        ofs.write(reinterpret_cast<const char*>(&reference_root_pos.y), sizeof(float));
+        ofs.write(reinterpret_cast<const char*>(&reference_root_pos.z), sizeof(float));
+        
+        // 回転行列を保存
+        for (int i = 0; i < 3; ++i) {
+            for (int j = 0; j < 3; ++j) {
+                float val = 0.0f;
+                if (i == 0 && j == 0) val = reference_root_ori.m00;
+                else if (i == 0 && j == 1) val = reference_root_ori.m01;
+                else if (i == 0 && j == 2) val = reference_root_ori.m02;
+                else if (i == 1 && j == 0) val = reference_root_ori.m10;
+                else if (i == 1 && j == 1) val = reference_root_ori.m11;
+                else if (i == 1 && j == 2) val = reference_root_ori.m12;
+                else if (i == 2 && j == 0) val = reference_root_ori.m20;
+                else if (i == 2 && j == 1) val = reference_root_ori.m21;
+                else if (i == 2 && j == 2) val = reference_root_ori.m22;
+                ofs.write(reinterpret_cast<const char*>(&val), sizeof(float));
+            }
+        }
+    }
+    
+    return ofs.good();
+}
+
+// NEW: ファイルから読み込み（バージョン対応）
+bool VoxelGrid::LoadFromFile(const char* filename) {
+    ifstream ifs(filename, ios::binary);
+    if (!ifs) return false;
+    
+    // バージョン情報を読み込み
+    int version;
+    ifs.read(reinterpret_cast<char*>(&version), sizeof(int));
+    
+    // 解像度を読み込み
+    int res;
+    ifs.read(reinterpret_cast<char*>(&res), sizeof(int));
+    
+    // データサイズを読み込み
+    int data_size;
+    ifs.read(reinterpret_cast<char*>(&data_size), sizeof(int));
+    
+    // リサイズして読み込み
+    Resize(res);
+    ifs.read(reinterpret_cast<char*>(data.data()), data_size * sizeof(float));
+    
+    // バージョン2以降は基準姿勢情報を読み込み
+    if (version >= 2) {
+        ifs.read(reinterpret_cast<char*>(&has_reference), sizeof(bool));
+        if (has_reference) {
+            ifs.read(reinterpret_cast<char*>(&reference_root_pos.x), sizeof(float));
+            ifs.read(reinterpret_cast<char*>(&reference_root_pos.y), sizeof(float));
+            ifs.read(reinterpret_cast<char*>(&reference_root_pos.z), sizeof(float));
+            
+            // 回転行列を読み込み
+            float m[9];
+            for (int i = 0; i < 9; ++i) {
+                ifs.read(reinterpret_cast<char*>(&m[i]), sizeof(float));
+            }
+            reference_root_ori.set(m[0], m[1], m[2], 
+                                  m[3], m[4], m[5], 
+                                  m[6], m[7], m[8]);
+        }
+    } else {
+        // 旧バージョンは基準姿勢なし
+        has_reference = false;
+    }
+    
+    return ifs.good();
+}
+
+// NEW: SegmentVoxelDataのファイル保存
+bool SegmentVoxelData::SaveToFile(const char* filename) const {
+    ofstream ofs(filename, ios::binary);
+    if (!ofs) return false;
+    
+    // セグメント数を書き込み
+    ofs.write(reinterpret_cast<const char*>(&num_segments), sizeof(int));
+    
+    // 各セグメントのグリッドを書き込み
+    for (int i = 0; i < num_segments; ++i) {
+        const VoxelGrid& grid = segment_grids[i];
+        
+        // 解像度
+        ofs.write(reinterpret_cast<const char*>(&grid.resolution), sizeof(int));
+        
+        // データサイズ
+        int data_size = grid.data.size();
+        ofs.write(reinterpret_cast<const char*>(&data_size), sizeof(int));
+        
+        // データ
+        ofs.write(reinterpret_cast<const char*>(grid.data.data()), data_size * sizeof(float));
+    }
+    
+    return ofs.good();
+}
+
+// NEW: SegmentVoxelDataのファイル読み込み
+bool SegmentVoxelData::LoadFromFile(const char* filename) {
+    ifstream ifs(filename, ios::binary);
+    if (!ifs) return false;
+    
+    // セグメント数を読み込み
+    int num_seg;
+    ifs.read(reinterpret_cast<char*>(&num_seg), sizeof(int));
+    
+    num_segments = num_seg;
+    segment_grids.resize(num_seg);
+    
+    // 各セグメントのグリッドを読み込み
+    for (int i = 0; i < num_segments; ++i) {
+        VoxelGrid& grid = segment_grids[i];
+        
+        // 解像度
+        int res;
+        ifs.read(reinterpret_cast<char*>(&res), sizeof(int));
+        
+        // データサイズ
+        int data_size;
+        ifs.read(reinterpret_cast<char*>(&data_size), sizeof(int));
+        
+        // リサイズして読み込み
+        grid.Resize(res);
+        ifs.read(reinterpret_cast<char*>(grid.data.data()), data_size * sizeof(float));
+    }
+    
+    return ifs.good();
+}
+
 // --- SpatialAnalyzer Implementation ---
 
 SpatialAnalyzer::SpatialAnalyzer() {
     grid_resolution = 64; 
-    h_axis = 0; v_axis = 2; 
+    h_axis = 0; v_axis = 1;  // 初期はXY平面
     ResizeGrids(grid_resolution);
     
     zoom = 1.0f;
@@ -148,7 +300,13 @@ void SpatialAnalyzer::VoxelizeMotion(Motion* m, float time, VoxelGrid& occ, Voxe
     // 各セグメント（ボーン）について計算
     for (int s = 0; s < m->body->num_segments; ++s) {
         string seg_name = m->body->segments[s]->name;
-        if (seg_name.find("Hand") != string::npos && seg_name != "RightHand" && seg_name != "LeftHand") continue;
+        
+        // NEW: 指のセグメントをスキップ（高速化）
+        if (seg_name.find("Finger") != string::npos ||
+            seg_name.find("Thumb") != string::npos ||
+            (seg_name.find("Hand") != string::npos && seg_name != "RightHand" && seg_name != "LeftHand")) {
+            continue;
+        }
 
         const Segment* seg = m->body->segments[s];
         Point3f p1, p2, p1_prev, p2_prev;
@@ -364,7 +522,7 @@ void SpatialAnalyzer::DrawCTMaps(int win_width, int win_height) {
         
         char t1[64], t2[64], t3[64];
         
-        // NEW: 部位別表示モードの場合はタイトルを変更
+        // 部位別表示モードの場合はタイトルを変更
         if (show_segment_mode && selected_segment_index >= 0) {
             sprintf(t1, "S%d M1 (Seg:%d)", i+1, selected_segment_index);
             sprintf(t2, "S%d M2 (Seg:%d)", i+1, selected_segment_index);
@@ -380,14 +538,14 @@ void SpatialAnalyzer::DrawCTMaps(int win_width, int win_height) {
         VoxelGrid* grid_diff = nullptr;
         float max_value = 1.0f;
 
-        // NEW: 部位別表示モード
+        // NEW: ボクセルデータを直接使用するように修正
         if (show_segment_mode && selected_segment_index >= 0 && 
             selected_segment_index < segment_voxels1.num_segments) {
-            // 特定の部位のみ表示
+            // 部位別表示モード: 部位ごとの累積ボクセルを使用
             grid1 = &segment_voxels1.GetSegmentGrid(selected_segment_index);
             grid2 = &segment_voxels2.GetSegmentGrid(selected_segment_index);
             
-            // 差分を計算（一時的に）
+            // 差分を計算
             static VoxelGrid temp_diff;
             temp_diff.Resize(grid_resolution);
             temp_diff.Clear();
@@ -401,27 +559,33 @@ void SpatialAnalyzer::DrawCTMaps(int win_width, int win_height) {
             if (max_value < 1e-5f) max_value = 1.0f;
             grid_diff = &temp_diff;
             
-        } else if (norm_mode == 0) {
-            // 現在フレームのみ（全体）
-            if (feature_mode == 0) {
-                grid1 = &voxels1_occ;
-                grid2 = &voxels2_occ;
-                grid_diff = &voxels_diff;
-                max_value = max_occ_val;
-            } else {
-                grid1 = &voxels1_spd;
-                grid2 = &voxels2_spd;
-                grid_diff = &voxels_spd_diff;
-                max_value = global_max_spd;
-            }
         } else {
-            // 動作全体の累積データ（全体）
-            grid1 = &voxels1_accumulated;
-            grid2 = &voxels2_accumulated;
-            grid_diff = &voxels_accumulated_diff;
-            max_value = max_accumulated_val;
+            // 全体表示モード: norm_modeで累積/現在フレームを切り替え
+            if (norm_mode == 0) {
+                // 現在フレームのボクセルデータ
+                if (feature_mode == 0) {
+                    // 占有率
+                    grid1 = &voxels1_occ;
+                    grid2 = &voxels2_occ;
+                    grid_diff = &voxels_diff;
+                    max_value = max_occ_val;
+                } else {
+                    // 速度
+                    grid1 = &voxels1_spd;
+                    grid2 = &voxels2_spd;
+                    grid_diff = &voxels_spd_diff;
+                    max_value = global_max_spd;
+                }
+            } else {
+                // 累積ボクセルデータ
+                grid1 = &voxels1_accumulated;
+                grid2 = &voxels2_accumulated;
+                grid_diff = &voxels_accumulated_diff;
+                max_value = max_accumulated_val;
+            }
         }
 
+        // ボクセルデータをそのまま2Dマップに投影して描画
         DrawSingleMap(start_x, y_pos, map_w, map_h, *grid1, max_value, t1, slice_val, h_min, h_max, v_min, v_max);
         DrawSingleMap(start_x + map_w + gap, y_pos, map_w, map_h, *grid2, max_value, t2, slice_val, h_min, h_max, v_min, v_max);
         DrawSingleMap(start_x + 2*(map_w + gap), y_pos, map_w, map_h, *grid_diff, max_value, t3, slice_val, h_min, h_max, v_min, v_max);
@@ -455,50 +619,64 @@ void SpatialAnalyzer::DrawSingleMap(int x_pos, int y_pos, int w, int h, VoxelGri
     float world_range[3];
     for(int i=0; i<3; ++i) world_range[i] = world_bounds[i][1] - world_bounds[i][0];
     
-    // スライス位置のZインデックス
+    // スライス位置に対応する深さ軸のインデックスを計算
     int z_idx = (int)(((slice_val - world_bounds[d_axis][0]) / world_range[d_axis]) * grid_resolution);
     if (z_idx < 0 || z_idx >= grid_resolution) return;
 
     glBegin(GL_QUADS);
     
-    // 描画解像度（荒くして高速化）
+    // 2D平面での描画解像度（高速化のため粗く設定）
     int draw_res = 64; 
     float cell_w = (float)w / draw_res;
     float cell_h = (float)h / draw_res;
     
     float h_range_view = h_max - h_min;
     float v_range_view = v_max - v_min;
+    
+    // NEW: Y軸が垂直軸の場合は上下を反転（実際のワールド座標の下が画面の下になるように）
+    bool flip_v = (v_axis == 1);
 
+    // 2D平面の各ピクセルに対してボクセル値を取得して描画
     for (int iy = 0; iy < draw_res; ++iy) {
         for (int ix = 0; ix < draw_res; ++ix) {
-            // スクリーン上のセル中心 -> ワールド座標
+            // スクリーン座標 -> ワールド座標への変換
             float wx = h_min + (ix + 0.5f) * (h_range_view / draw_res);
             float wy = v_min + (iy + 0.5f) * (v_range_view / draw_res);
             
-            // ワールド座標 -> グリッドインデックス
+            // ワールド座標 -> ボクセルグリッドインデックスへの変換
             int gx = (int)(((wx - world_bounds[h_axis][0]) / world_range[h_axis]) * grid_resolution);
             int gy = (int)(((wy - world_bounds[v_axis][0]) / world_range[v_axis]) * grid_resolution);
             
-            float val = 0;
-            // 軸マッピング
+            // 3D軸マッピング (h_axis, v_axis, d_axis -> x, y, z)
             int idx[3];
-            idx[h_axis] = gx; idx[v_axis] = gy; idx[d_axis] = z_idx;
-            val = grid.Get(idx[0], idx[1], idx[2]);
+            idx[h_axis] = gx;
+            idx[v_axis] = gy;
+            idx[d_axis] = z_idx;
+            
+            // ボクセルグリッドから値を直接取得（これがメインの密度データ）
+            float val = grid.Get(idx[0], idx[1], idx[2]);
 
+            // 閾値以上の値を持つボクセルのみ描画
             if (val > 0.01f) {
+                // 値を正規化してヒートマップカラーに変換
                 Color3f c = sa_get_heatmap_color(val / max_val);
                 glColor3f(c.x, c.y, c.z);
                 
-                // Y軸の反転などは座標系によるが、ここでは標準的な描画
+                // スクリーン座標での四角形を描画
                 float sx = x_pos + ix * cell_w;
-                float sy = y_pos + iy * cell_h;
-                glVertex2f(sx, sy); glVertex2f(sx, sy+cell_h);
-                glVertex2f(sx+cell_w, sy+cell_h); glVertex2f(sx+cell_w, sy);
+                // NEW: Y軸が垂直の場合は上下反転
+                float sy = flip_v ? (y_pos + (draw_res - 1 - iy) * cell_h) : (y_pos + iy * cell_h);
+                
+                glVertex2f(sx, sy);
+                glVertex2f(sx, sy+cell_h);
+                glVertex2f(sx+cell_w, sy+cell_h);
+                glVertex2f(sx+cell_w, sy);
             }
         }
     }
     glEnd();
     
+    // タイトルを描画
     glColor3f(0,0,0);
     glRasterPos2i(x_pos, y_pos - 5);
     for (const char* c = title; *c != '\0'; c++) glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, *c);
@@ -615,6 +793,14 @@ void SpatialAnalyzer::AccumulateVoxelsAllFrames(Motion* m1, Motion* m2) {
     // 累積グリッドをクリア
     ClearAccumulatedVoxels();
     
+    // NEW: 基準姿勢を保存（初期フレームの腰の位置・回転）
+    if (m1->num_frames > 0) {
+        voxels1_accumulated.SetReference(m1->frames[0].root_pos, m1->frames[0].root_ori);
+    }
+    if (m2->num_frames > 0) {
+        voxels2_accumulated.SetReference(m2->frames[0].root_pos, m2->frames[0].root_ori);
+    }
+    
     // 両方のモーションの全フレームを処理
     int max_frames = max(m1->num_frames, m2->num_frames);
     
@@ -666,6 +852,12 @@ void SpatialAnalyzer::AccumulateVoxelsAllFrames(Motion* m1, Motion* m2) {
     
     if (max_accumulated_val < 1e-5f) max_accumulated_val = 1.0f;
     
+    // NEW: 差分グリッドにも基準姿勢を設定（モーション1の基準を使用）
+    if (voxels1_accumulated.has_reference) {
+        voxels_accumulated_diff.SetReference(voxels1_accumulated.reference_root_pos, 
+                                             voxels1_accumulated.reference_root_ori);
+    }
+    
     std::cout << "Accumulation complete. Max accumulated value: " << max_accumulated_val << std::endl;
 }
 
@@ -696,7 +888,13 @@ void SpatialAnalyzer::VoxelizeMotionBySegment(Motion* m, float time, SegmentVoxe
     // 各セグメント（ボーン）について個別に計算
     for (int s = 0; s < m->body->num_segments; ++s) {
         string seg_name = m->body->segments[s]->name;
-        if (seg_name.find("Hand") != string::npos && seg_name != "RightHand" && seg_name != "LeftHand") continue;
+        
+        // NEW: 指のセグメントをスキップ（高速化）
+        if (seg_name.find("Finger") != string::npos ||
+            seg_name.find("Thumb") != string::npos ||
+            (seg_name.find("Hand") != string::npos && seg_name != "RightHand" && seg_name != "LeftHand")) {
+            continue;
+        }
 
         const Segment* seg = m->body->segments[s];
         Point3f p1, p2, p1_prev, p2_prev;
@@ -830,4 +1028,112 @@ void SpatialAnalyzer::AccumulateVoxelsBySegmentAllFrames(Motion* m1, Motion* m2)
     }
     
     std::cout << "Segment-wise accumulation complete." << std::endl;
+}
+
+// NEW: キャッシュファイル名を生成
+std::string SpatialAnalyzer::GenerateCacheFilename(const char* motion1_name, const char* motion2_name) const {
+    std::string filename = "voxel_cache_";
+    filename += motion1_name;
+    filename += "_";
+    filename += motion2_name;
+    filename += ".vxl";
+    return filename;
+}
+
+// NEW: ボクセルキャッシュを保存
+bool SpatialAnalyzer::SaveVoxelCache(const char* motion1_name, const char* motion2_name) {
+    std::string base_filename = GenerateCacheFilename(motion1_name, motion2_name);
+    
+    std::cout << "Saving voxel cache to " << base_filename << "..." << std::endl;
+    
+    // 累積ボクセルデータを保存
+    std::string accumulated1_file = base_filename + "_acc1.bin";
+    std::string accumulated2_file = base_filename + "_acc2.bin";
+    std::string accumulated_diff_file = base_filename + "_acc_diff.bin";
+    
+    if (!voxels1_accumulated.SaveToFile(accumulated1_file.c_str())) return false;
+    if (!voxels2_accumulated.SaveToFile(accumulated2_file.c_str())) return false;
+    if (!voxels_accumulated_diff.SaveToFile(accumulated_diff_file.c_str())) return false;
+    
+    // 部位ごとのボクセルデータを保存
+    std::string segment1_file = base_filename + "_seg1.bin";
+    std::string segment2_file = base_filename + "_seg2.bin";
+    
+    if (!segment_voxels1.SaveToFile(segment1_file.c_str())) return false;
+    if (!segment_voxels2.SaveToFile(segment2_file.c_str())) return false;
+    
+    // メタデータを保存
+    std::string meta_file = base_filename + "_meta.txt";
+    ofstream meta_ofs(meta_file);
+    if (!meta_ofs) return false;
+    
+    meta_ofs << grid_resolution << std::endl;
+    meta_ofs << max_accumulated_val << std::endl;
+    for (int i = 0; i < 3; ++i) {
+        meta_ofs << world_bounds[i][0] << " " << world_bounds[i][1] << std::endl;
+    }
+    meta_ofs.close();
+    
+    std::cout << "Voxel cache saved successfully!" << std::endl;
+    return true;
+}
+
+// NEW: ボクセルキャッシュを読み込み
+bool SpatialAnalyzer::LoadVoxelCache(const char* motion1_name, const char* motion2_name) {
+    std::string base_filename = GenerateCacheFilename(motion1_name, motion2_name);
+    
+    std::cout << "Loading voxel cache from " << base_filename << "..." << std::endl;
+    
+    // メタデータを読み込み
+    std::string meta_file = base_filename + "_meta.txt";
+    ifstream meta_ifs(meta_file);
+    if (!meta_ifs) {
+        std::cout << "Cache file not found: " << meta_file << std::endl;
+        return false;
+    }
+    
+    int res;
+    meta_ifs >> res;
+    meta_ifs >> max_accumulated_val;
+    for (int i = 0; i < 3; ++i) {
+        meta_ifs >> world_bounds[i][0] >> world_bounds[i][1];
+    }
+    meta_ifs.close();
+    
+    // グリッドをリサイズ
+    ResizeGrids(res);
+    
+    // 累積ボクセルデータを読み込み
+    std::string accumulated1_file = base_filename + "_acc1.bin";
+    std::string accumulated2_file = base_filename + "_acc2.bin";
+    std::string accumulated_diff_file = base_filename + "_acc_diff.bin";
+    
+    if (!voxels1_accumulated.LoadFromFile(accumulated1_file.c_str())) {
+        std::cout << "Failed to load: " << accumulated1_file << std::endl;
+        return false;
+    }
+    if (!voxels2_accumulated.LoadFromFile(accumulated2_file.c_str())) {
+        std::cout << "Failed to load: " << accumulated2_file << std::endl;
+        return false;
+    }
+    if (!voxels_accumulated_diff.LoadFromFile(accumulated_diff_file.c_str())) {
+        std::cout << "Failed to load: " << accumulated_diff_file << std::endl;
+        return false;
+    }
+    
+    // 部位ごとのボクセルデータを読み込み
+    std::string segment1_file = base_filename + "_seg1.bin";
+    std::string segment2_file = base_filename + "_seg2.bin";
+    
+    if (!segment_voxels1.LoadFromFile(segment1_file.c_str())) {
+        std::cout << "Failed to load: " << segment1_file << std::endl;
+        return false;
+    }
+    if (!segment_voxels2.LoadFromFile(segment2_file.c_str())) {
+        std::cout << "Failed to load: " << segment2_file << std::endl;
+        return false;
+    }
+    
+    std::cout << "Voxel cache loaded successfully!" << std::endl;
+    return true;
 }
