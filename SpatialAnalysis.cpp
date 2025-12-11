@@ -47,7 +47,7 @@ float& VoxelGrid::At(int x, int y, int z) {
 
 float VoxelGrid::Get(int x, int y, int z) const {
     if (x < 0 || x >= resolution || y < 0 || y >= resolution || z < 0 || z >= resolution) return 0.0f;
-    return data[z * resolution * resolution + y * resolution + x];
+    return data[static_cast<std::vector<float, std::allocator<float>>::size_type>(z) * resolution * resolution + y * resolution + x];
 }
 
 // NEW: ファイルへ保存（基準姿勢情報も含む）
@@ -288,10 +288,11 @@ void SpatialAnalyzer::VoxelizeMotion(Motion* m, float time, VoxelGrid& occ, Voxe
     m->GetPosture(time, curr_pose);
     m->GetPosture(prev_time, prev_pose);
 
-    // 順運動学計算
+    // 順運動学計算（関節位置も取得）
     vector<Matrix4f> curr_frames, prev_frames;
-    curr_pose.ForwardKinematics(curr_frames);
-    prev_pose.ForwardKinematics(prev_frames);
+    vector<Point3f> curr_joint_pos, prev_joint_pos;
+    curr_pose.ForwardKinematics(curr_frames, curr_joint_pos);
+    prev_pose.ForwardKinematics(prev_frames, prev_joint_pos);
 
     float bone_radius = 0.08f;
     float world_range[3];
@@ -311,50 +312,51 @@ void SpatialAnalyzer::VoxelizeMotion(Motion* m, float time, VoxelGrid& occ, Voxe
         const Segment* seg = m->body->segments[s];
         Point3f p1, p2, p1_prev, p2_prev;
         
-        // 座標取得ロジック
+        // セグメントの接続関節数に応じて位置を取得
         if (seg->num_joints == 1) {
-            // 末端
-            int j_idx = seg->joints[0]->index;
+            // 末端セグメント：セグメントの原点から末端位置（site）まで
             p1 = Point3f(curr_frames[s].m03, curr_frames[s].m13, curr_frames[s].m23);
             p1_prev = Point3f(prev_frames[s].m03, prev_frames[s].m13, prev_frames[s].m23);
             
-            // オフセット計算 (回転を考慮)
-            Matrix3f R_curr(curr_frames[s].m00, curr_frames[s].m01, curr_frames[s].m02, 
-                            curr_frames[s].m10, curr_frames[s].m11, curr_frames[s].m12, 
-                            curr_frames[s].m20, curr_frames[s].m21, curr_frames[s].m22);
-            Point3f offset = seg->site_position; // ※ここがエラーならメンバ変数名を確認
-            R_curr.transform(&offset);
-            p2 = p1 + offset;
+            if (seg->has_site) {
+                // site_positionをワールド座標に変換
+                Matrix3f R_curr(curr_frames[s].m00, curr_frames[s].m01, curr_frames[s].m02, 
+                                curr_frames[s].m10, curr_frames[s].m11, curr_frames[s].m12, 
+                                curr_frames[s].m20, curr_frames[s].m21, curr_frames[s].m22);
+                Point3f offset = seg->site_position;
+                R_curr.transform(&offset);
+                p2 = p1 + offset;
 
-            Matrix3f R_prev(prev_frames[s].m00, prev_frames[s].m01, prev_frames[s].m02, 
-                            prev_frames[s].m10, prev_frames[s].m11, prev_frames[s].m12, 
-                            prev_frames[s].m20, prev_frames[s].m21, prev_frames[s].m22);
-            Point3f offset_prev = seg->site_position;
-            R_prev.transform(&offset_prev);
-            p2_prev = p1_prev + offset_prev;
+                Matrix3f R_prev(prev_frames[s].m00, prev_frames[s].m01, prev_frames[s].m02, 
+                                prev_frames[s].m10, prev_frames[s].m11, prev_frames[s].m12, 
+                                prev_frames[s].m20, prev_frames[s].m21, prev_frames[s].m22);
+                Point3f offset_prev = seg->site_position;
+                R_prev.transform(&offset_prev);
+                p2_prev = p1_prev + offset_prev;
+            } else {
+                // siteがない場合はスキップ
+                continue;
+            }
 
         } else if (seg->num_joints >= 2) {
-            // 通常ボーン (親関節と子関節の間)
-            // segments[s]に対応する関節と、その子の位置
-            // ここでは簡易的に、現在のセグメントの原点(p1)と、その子のセグメントの原点(p2)を結ぶと仮定
-            // 本来は seg->joints[0] と seg->joints[1] のindexを使う
-            int idx1 = seg->joints[0]->index;
-            int idx2 = seg->joints[1]->index;
+            // 通常のボーン：親関節から子関節へ
+            // seg->joints[0] がルート側、seg->joints[1] が末端側
+            Joint* root_joint = seg->joints[0];
+            Joint* end_joint = seg->joints[1];
             
-            // Note: curr_framesの並び順がsegments順と一致している前提
-            // もしForwardKinematicsの実装がjoints順なら修正が必要
-            // ここではjointsのindexを使って取得を試みるが、Matrix配列がsegments対応なら注意
-            // 安全策としてセグメントのローカル座標から計算
-            p1 = Point3f(curr_frames[idx1].m03, curr_frames[idx1].m13, curr_frames[idx1].m23);
-            p2 = Point3f(curr_frames[idx2].m03, curr_frames[idx2].m13, curr_frames[idx2].m23);
+            // 関節位置を取得
+            p1 = curr_joint_pos[root_joint->index];
+            p2 = curr_joint_pos[end_joint->index];
             
-            p1_prev = Point3f(prev_frames[idx1].m03, prev_frames[idx1].m13, prev_frames[idx1].m23);
-            p2_prev = Point3f(prev_frames[idx2].m03, prev_frames[idx2].m13, prev_frames[idx2].m23);
+            p1_prev = prev_joint_pos[root_joint->index];
+            p2_prev = prev_joint_pos[end_joint->index];
         } else {
             continue;
         }
 
-        Vector3f vel1 = p1 - p1_prev; Vector3f vel2 = p2 - p2_prev;
+        // 速度計算
+        Vector3f vel1 = p1 - p1_prev;
+        Vector3f vel2 = p2 - p2_prev;
         float speed = ((vel1.length() + vel2.length()) / 2.0f) / dt;
 
         // ボクセルへの書き込み (AABB最適化付き)
@@ -876,10 +878,11 @@ void SpatialAnalyzer::VoxelizeMotionBySegment(Motion* m, float time, SegmentVoxe
     m->GetPosture(time, curr_pose);
     m->GetPosture(prev_time, prev_pose);
 
-    // 順運動学計算
+    // 順運動学計算（関節位置も取得）
     vector<Matrix4f> curr_frames, prev_frames;
-    curr_pose.ForwardKinematics(curr_frames);
-    prev_pose.ForwardKinematics(prev_frames);
+    vector<Point3f> curr_joint_pos, prev_joint_pos;
+    curr_pose.ForwardKinematics(curr_frames, curr_joint_pos);
+    prev_pose.ForwardKinematics(prev_frames, prev_joint_pos);
 
     float bone_radius = 0.08f;
     float world_range[3];
@@ -899,35 +902,44 @@ void SpatialAnalyzer::VoxelizeMotionBySegment(Motion* m, float time, SegmentVoxe
         const Segment* seg = m->body->segments[s];
         Point3f p1, p2, p1_prev, p2_prev;
         
-        // 座標取得ロジック（既存のVoxelizeMotionと同じ）
+        // セグメントの接続関節数に応じて位置を取得
         if (seg->num_joints == 1) {
-            int j_idx = seg->joints[0]->index;
+            // 末端セグメント：セグメントの原点から末端位置（site）まで
             p1 = Point3f(curr_frames[s].m03, curr_frames[s].m13, curr_frames[s].m23);
             p1_prev = Point3f(prev_frames[s].m03, prev_frames[s].m13, prev_frames[s].m23);
             
-            Matrix3f R_curr(curr_frames[s].m00, curr_frames[s].m01, curr_frames[s].m02, 
-                            curr_frames[s].m10, curr_frames[s].m11, curr_frames[s].m12, 
-                            curr_frames[s].m20, curr_frames[s].m21, curr_frames[s].m22);
-            Point3f offset = seg->site_position;
-            R_curr.transform(&offset);
-            p2 = p1 + offset;
+            if (seg->has_site) {
+                // site_positionをワールド座標に変換
+                Matrix3f R_curr(curr_frames[s].m00, curr_frames[s].m01, curr_frames[s].m02, 
+                                curr_frames[s].m10, curr_frames[s].m11, curr_frames[s].m12, 
+                                curr_frames[s].m20, curr_frames[s].m21, curr_frames[s].m22);
+                Point3f offset = seg->site_position;
+                R_curr.transform(&offset);
+                p2 = p1 + offset;
 
-            Matrix3f R_prev(prev_frames[s].m00, prev_frames[s].m01, prev_frames[s].m02, 
-                            prev_frames[s].m10, prev_frames[s].m11, prev_frames[s].m12, 
-                            prev_frames[s].m20, prev_frames[s].m21, prev_frames[s].m22);
-            Point3f offset_prev = seg->site_position;
-            R_prev.transform(&offset_prev);
-            p2_prev = p1_prev + offset_prev;
+                Matrix3f R_prev(prev_frames[s].m00, prev_frames[s].m01, prev_frames[s].m02, 
+                                prev_frames[s].m10, prev_frames[s].m11, prev_frames[s].m12, 
+                                prev_frames[s].m20, prev_frames[s].m21, prev_frames[s].m22);
+                Point3f offset_prev = seg->site_position;
+                R_prev.transform(&offset_prev);
+                p2_prev = p1_prev + offset_prev;
+            } else {
+                // siteがない場合はスキップ
+                continue;
+            }
 
         } else if (seg->num_joints >= 2) {
-            int idx1 = seg->joints[0]->index;
-            int idx2 = seg->joints[1]->index;
+            // 通常のボーン：親関節から子関節へ
+            // seg->joints[0] がルート側、seg->joints[1] が末端側
+            Joint* root_joint = seg->joints[0];
+            Joint* end_joint = seg->joints[1];
             
-            p1 = Point3f(curr_frames[idx1].m03, curr_frames[idx1].m13, curr_frames[idx1].m23);
-            p2 = Point3f(curr_frames[idx2].m03, curr_frames[idx2].m13, curr_frames[idx2].m23);
+            // 関節位置を取得
+            p1 = curr_joint_pos[root_joint->index];
+            p2 = curr_joint_pos[end_joint->index];
             
-            p1_prev = Point3f(prev_frames[idx1].m03, prev_frames[idx1].m13, prev_frames[idx1].m23);
-            p2_prev = Point3f(prev_frames[idx2].m03, prev_frames[idx2].m13, prev_frames[idx2].m23);
+            p1_prev = prev_joint_pos[root_joint->index];
+            p2_prev = prev_joint_pos[end_joint->index];
         } else {
             continue;
         }

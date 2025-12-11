@@ -201,11 +201,15 @@ void MotionApp::Display()
 	
     // 1. 3Dƒ‚ƒfƒ‹‚Ì•`‰æ
 	if (curr_posture) { 
-        DrawPosture(*curr_posture); 
+        glColor3f(1.0f, 0.0f, 0.0f); 
+        DrawPosture(*curr_posture);
+        glColor3f(0.0f, 0.0f, 0.0f);
         DrawPostureShadow(*curr_posture, shadow_dir, shadow_color); 
     }
 	if (curr_posture2) { 
+		glColor3f(0.0f, 0.0f, 1.0f);
         DrawPosture(*curr_posture2); 
+		glColor3f(0.0f, 0.0f, 0.0f);
         DrawPostureShadow(*curr_posture2, shadow_dir, shadow_color); 
     }
 
