@@ -131,22 +131,29 @@ void MotionApp::Keyboard(unsigned char key, int mx, int my) {
         
         // 部位別表示モード
         case 'e': 
-            analyzer.show_segment_mode = !analyzer.show_segment_mode; 
+            analyzer.show_segment_mode = !analyzer.show_segment_mode;
+            // ADDED: 部位別表示モードをオンにする時、最初の有効な部位を選択
+            if (analyzer.show_segment_mode && motion) {
+                // 現在の選択が無効な場合、最初の有効な部位を探す
+                if (!HasVoxelData(analyzer.selected_segment_index)) {
+                    analyzer.selected_segment_index = 0;
+                    // 0が無効なら次の有効な部位を探す
+                    if (!HasVoxelData(analyzer.selected_segment_index)) {
+                        analyzer.selected_segment_index = GetNextValidSegment(analyzer.selected_segment_index, 1);
+                    }
+                }
+            }
             break;
         case '[': 
             if (motion && analyzer.show_segment_mode) {
-                analyzer.selected_segment_index--;
-                if (analyzer.selected_segment_index < 0) {
-                    analyzer.selected_segment_index = motion->body->num_segments - 1;
-                }
+                // MODIFIED: 前のボクセル情報を持つ部位へ移動
+                analyzer.selected_segment_index = GetNextValidSegment(analyzer.selected_segment_index, -1);
             }
             break;
         case ']': 
             if (motion && analyzer.show_segment_mode) {
-                analyzer.selected_segment_index++;
-                if (analyzer.selected_segment_index >= motion->body->num_segments) {
-                    analyzer.selected_segment_index = 0;
-                }
+                // MODIFIED: 次のボクセル情報を持つ部位へ移動
+                analyzer.selected_segment_index = GetNextValidSegment(analyzer.selected_segment_index, 1);
             }
             break;
         case '\\':  // リセット（全体表示に戻す）
@@ -200,15 +207,35 @@ void MotionApp::Display()
 	GLUTBaseApp::Display();
 	
     // 1. 3Dモデルの描画
-	if (curr_posture) { 
-        glColor3f(1.0f, 0.0f, 0.0f); 
-        DrawPosture(*curr_posture);
+	if (curr_posture) {
+        // MODIFIED: 部位別表示モードの場合は選択的描画
+        if (analyzer.show_segment_mode && analyzer.selected_segment_index >= 0) {
+            // 選択部位のみ赤色、他は灰色
+            Color3f highlight_color(1.0f, 0.0f, 0.0f);  // 赤
+            Color3f base_color(0.7f, 0.7f, 0.7f);       // 灰色
+            DrawPostureSelective(*curr_posture, analyzer.selected_segment_index, 
+                                 highlight_color, base_color);
+        } else {
+            // 通常表示：全体を赤色
+            glColor3f(1.0f, 0.0f, 0.0f); 
+            DrawPosture(*curr_posture);
+        }
         glColor3f(0.0f, 0.0f, 0.0f);
         DrawPostureShadow(*curr_posture, shadow_dir, shadow_color); 
     }
-	if (curr_posture2) { 
-		glColor3f(0.0f, 0.0f, 1.0f);
-        DrawPosture(*curr_posture2); 
+	if (curr_posture2) {
+        // MODIFIED: 部位別表示モードの場合は選択的描画
+        if (analyzer.show_segment_mode && analyzer.selected_segment_index >= 0) {
+            // 選択部位のみ青色、他は灰色
+            Color3f highlight_color(0.0f, 0.0f, 1.0f);  // 青
+            Color3f base_color(0.7f, 0.7f, 0.7f);       // 灰色
+            DrawPostureSelective(*curr_posture2, analyzer.selected_segment_index, 
+                                 highlight_color, base_color);
+        } else {
+            // 通常表示：全体を青色
+            glColor3f(0.0f, 0.0f, 1.0f);
+            DrawPosture(*curr_posture2);
+        }
 		glColor3f(0.0f, 0.0f, 0.0f);
         DrawPostureShadow(*curr_posture2, shadow_dir, shadow_color); 
     }
@@ -428,4 +455,45 @@ void MotionApp::DrawText(int x, int y, const char *text, void *font)
     glRasterPos2i(x, y);
     for (const char* c = text; *c != '\0'; c++) 
         glutBitmapCharacter(font, *c);
+}
+
+// ADDED: ボクセル情報を持つ部位かチェック（指などの細部を除外）
+bool MotionApp::HasVoxelData(int segment_index)
+{
+    // 手の細かい部位（指）は17-35の範囲で、ボクセル情報を計算していない
+    // それ以外の部位（0-16, 36-39）はボクセル情報を持つ
+    if (segment_index < 0) return false;
+    if (segment_index <= 16) return true;   // Pelvis, legs, spine, chest, head, right arm
+    if (segment_index >= 17 && segment_index <= 35) return false;  // Fingers (skipped)
+    if (segment_index >= 36 && segment_index <= 39) return true;   // Left arm
+    return false;
+}
+
+// ADDED: 次の有効な部位を取得（ボクセル情報を持つ部位のみ）
+int MotionApp::GetNextValidSegment(int current_segment, int direction)
+{
+    if (!motion || !motion->body) return -1;
+    
+    int num_segments = motion->body->num_segments;
+    int next_segment = current_segment;
+    
+    // 最大40回ループして次の有効な部位を探す（無限ループ防止）
+    for (int i = 0; i < 40; i++) {
+        next_segment += direction;
+        
+        // 範囲外になったらラップアラウンド
+        if (next_segment < 0) {
+            next_segment = num_segments - 1;
+        } else if (next_segment >= num_segments) {
+            next_segment = 0;
+        }
+        
+        // 有効な部位が見つかったら返す
+        if (HasVoxelData(next_segment)) {
+            return next_segment;
+        }
+    }
+    
+    // 有効な部位が見つからなかった場合は現在の部位を返す
+    return current_segment;
 }

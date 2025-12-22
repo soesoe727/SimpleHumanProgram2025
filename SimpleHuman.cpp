@@ -612,7 +612,6 @@ Motion *  LoadAndCoustructBVHMotion( const char * bvh_file_name, const Skeleton 
 	return  motion;
 }
 
-
 //
 //  BVH動作の関節回転を計算（オイラー角表現から回転行列表現に変換）
 //
@@ -639,7 +638,6 @@ void  ComputeBVHJointRotation( int num_channels, const BVH::Channel * const * ch
 		rot.mul( rot, axis_rot );
 	}
 }
-
 
 //
 //  BVH動作から姿勢を取得
@@ -716,7 +714,6 @@ void  GetBVHPosture( const BVH * bvh, int frame_no, Posture & posture )
 	}
 }
 
-
 //
 //  BVH動作の読み込み時の位置のスケールを取得
 //
@@ -725,7 +722,6 @@ float  GetBVHScale()
 	return  bvh_scale;
 }
 
-
 //
 //  BVH動作の読み込み時の位置のスケールを設定
 //
@@ -733,7 +729,6 @@ void  SetBVHScale( float scale )
 {
 	bvh_scale = scale;
 }
-
 
 //
 //  骨格モデルから体節を名前で探索
@@ -750,7 +745,6 @@ int  FindSegment( const Skeleton * body, const char * segment_name )
 	return  -1;
 }
 
-
 //
 //  骨格モデルから関節を名前で探索
 //
@@ -765,7 +759,6 @@ int  FindJoint( const Skeleton * body, const char * joint_name )
 	}
 	return  -1;
 }
-
 
 //
 //  順運動学計算のための反復計算（ルート体節から末端体節に向かって繰り返し再帰呼び出し）
@@ -835,7 +828,6 @@ void  ForwardKinematicsIteration(
 	}
 }
 
-
 //
 //  順運動学計算
 //
@@ -852,7 +844,6 @@ void  ForwardKinematics( const Posture & posture, vector< Matrix4f > & seg_frame
 	ForwardKinematicsIteration( posture.body->segments[ 0 ], NULL, posture, &seg_frame_array.front(), &joi_pos_array.front() );
 }
 
-
 //
 //  順運動学計算
 //
@@ -867,6 +858,8 @@ void  ForwardKinematics( const Posture & posture, vector< Matrix4f > & seg_frame
 	// Forward Kinematics 計算のための反復計算（ルート体節から末端体節に向かって繰り返し計算）
 	ForwardKinematicsIteration( posture.body->segments[ 0 ], NULL, posture, &seg_frame_array.front() );
 }
+
+
 
 
 //
@@ -985,6 +978,7 @@ void  DrawBone( float x0, float y0, float z0, float x1, float y1, float z1, floa
 
 	// 以下、回転を表す行列を計算
 
+
 	// ｚ軸を単位ベクトルに正規化
 	double  length;
 	length = sqrt( dir_x*dir_x + dir_y*dir_y + dir_z*dir_z );
@@ -1058,10 +1052,10 @@ void  DrawPosture( const Posture & posture )
 	// 各体節の描画
 	for ( int i = 0; i < seg_frame_array.size(); i++ )
 	{
-		/*while(i > 16 && i < 36)
-			i++;
-		if(i > 39)
-			break;*/
+		// MODIFIED: 指の細かい部分は描画しない（ボクセル計算対象外の部位を除外）
+		if (i >= 17 && i <= 35) {
+			continue;  // 指の部位をスキップ
+		}
 
 		const Segment *  segment = posture.body->segments[i];
 		const int  num_joints = segment->num_joints;
@@ -1081,9 +1075,9 @@ void  DrawPosture( const Posture & posture )
 		// １つの関節から仮の末端点（重心へのベクトルを２倍した位置）へボーン（楕円体）を描画
 		else if ( ( num_joints == 1 ) && !segment->has_site )
 		{
-			//v1 = segment->joint_positions[ 0 ];
-			//v2.negate( v1 );
-			//DrawBone( v1.x, v1.z, v1.z, v2.x, v2.z, v2.z, radius );
+			v1 = segment->joint_positions[ 0 ];
+			v2.negate( v1 );
+			DrawBone( v1.x, v1.z, v1.z, v2.x, v2.z, v2.z, radius );
 		}
 		// ２つの関節を接続するボーン（楕円体）を描画
 		else if ( num_joints == 2 )
@@ -1107,393 +1101,6 @@ void  DrawPosture( const Posture & posture )
 		glPopMatrix();
 	}
 }
-
-//
-//  姿勢の描画（スティックフィギュアで描画）
-//
-void DrawPostureColor(const Posture& posture, int pattern, int view_segment, vector<int> view_segments, Color4f * segment_color, Color4f * pattern_color )
-{
-	if ( !posture.body )
-		return;
-
-	// 順運動学計算
-	vector< Matrix4f >  seg_frame_array;
-	vector< Point3f >  joi_pos_array;
-	ForwardKinematics( posture, seg_frame_array, joi_pos_array );
-
-	float  radius = 0.05f;
-	Matrix4f  mat;
-	Vector3f  v1, v2;
-
-	// 各体節の描画
-	for ( int i = 0; i < seg_frame_array.size(); i++ )
-	{
-		while(i > 16 && i < 36)
-			i++;
-		if(i > 39)
-			break;
-		switch (pattern)
-		{
-			case 0: //全体3色
-				if( 1 <= i && i <= 6 )
-					glColor3f( pattern_color[8].x, pattern_color[8].y, pattern_color[8].z );
-				else if( i <= 12 )
-					glColor3f( pattern_color[2].x, pattern_color[2].y, pattern_color[2].z );
-				else
-					glColor3f( pattern_color[5].x, pattern_color[5].y, pattern_color[5].z );
-				break;
-			case 1: //頭部と胸部2色
-				if( i == 0 )
-					glColor3f( pattern_color[1].x, pattern_color[1].y, pattern_color[1].z );
-				else if( 7 <= i && i <= 10 )
-					glColor3f( pattern_color[1].x, pattern_color[1].y, pattern_color[1].z );
-				else if( i == 11 || i == 12 )
-					glColor3f( pattern_color[0].x, pattern_color[0].y, pattern_color[0].z );
-				else
-					glColor3f( 0.4f, 0.4f, 0.4f );
-				break;
-			case 2: //腕2色
-				if( 13 <= i )
-					glColor3f( pattern_color[3].x, pattern_color[3].y, pattern_color[3].z );
-				else if( 36 <= i )
-					glColor3f( pattern_color[4].x, pattern_color[4].y, pattern_color[4].z );
-				else
-					glColor3f( 0.4f, 0.4f, 0.4f );
-				break;
-			case 3: //脚2色
-				if( 1 <= i && i <= 3 )
-					glColor3f( pattern_color[6].x, pattern_color[6].y, pattern_color[6].z );
-				else if( 4 <= i && i <= 6 )
-					glColor3f( pattern_color[7].x, pattern_color[7].y, pattern_color[7].z );
-				else
-					glColor3f( 0.4f, 0.4f, 0.4f );
-				break;
-			case 4: //全体6色
-				if( i == 0 )
-					glColor3f( pattern_color[1].x, pattern_color[1].y, pattern_color[1].z );
-				else if( 1 <= i && i <= 3 )
-					glColor3f( pattern_color[6].x, pattern_color[6].y, pattern_color[6].z );
-				else if( 4 <= i && i <= 6 )
-					glColor3f( pattern_color[7].x, pattern_color[7].y, pattern_color[7].z );
-				else if( 7 <= i && i <= 10 )
-					glColor3f( pattern_color[1].x, pattern_color[1].y, pattern_color[1].z );
-				else if( i == 11 || i == 12 )
-					glColor3f( pattern_color[0].x, pattern_color[0].y, pattern_color[0].z );
-				else if( i >= 13 && i <= 16 )
-					glColor3f( pattern_color[3].x, pattern_color[3].y, pattern_color[3].z );
-				else
-					glColor3f( pattern_color[4].x, pattern_color[4].y, pattern_color[4].z );
-				break;
-			case 5: //1部位1色
-				if(i == view_segment || view_segments[i] == 1)
-					if( i == 0 )
-						glColor3f( segment_color[i].x, segment_color[i].y, segment_color[i].z );
-					else if( 1 <= i && i <= 3 )
-						glColor3f( segment_color[i].x, segment_color[i].y, segment_color[i].z );
-					else if( 4 <= i && i <= 6 )
-						glColor3f( segment_color[i].x, segment_color[i].y, segment_color[i].z );
-					else if( 7 <= i && i <= 10 )
-						glColor3f( segment_color[i].x, segment_color[i].y, segment_color[i].z );
-					else if( i == 11 || i == 12 )
-						glColor3f( segment_color[i].x, segment_color[i].y, segment_color[i].z );
-					else if( 13 <= i  && i <= 35 )
-						glColor3f( segment_color[i].x, segment_color[i].y, segment_color[i].z );
-					else
-						glColor3f( segment_color[i].x, segment_color[i].y, segment_color[i].z );
-				else
-					glColor4f( 0.4f, 0.4f, 0.4f, 0.8f );
-				break;
-			default:
-				std::cout << "pattern isn't defined." << std::endl;
-		}
-
-		const Segment *  segment = posture.body->segments[i];
-		const int  num_joints = segment->num_joints;
-
-		// 体節の中心の位置・向きを基準とする変換行列を適用
-		glPushMatrix();
-		mat.transpose( seg_frame_array[ i ] );
-		glMultMatrixf( & mat.m00 );
-		// １つの関節から末端点へのボーン（楕円体）を描画
-		if ( ( num_joints == 1 ) && segment->has_site )
-		{
-			v1 = segment->joint_positions[ 0 ];
-			v2 = segment->site_position;
-			DrawBone( v1.x, v1.y, v1.z, v2.x, v2.y, v2.z, radius );
-		}
-		// １つの関節から仮の末端点（重心へのベクトルを２倍した位置）へボーン（楕円体）を描画
-		else if ( ( num_joints == 1 ) && !segment->has_site )
-		{
-			//v1 = segment->joint_positions[ 0 ];
-			//v2.negate( v1 );
-			//DrawBone( v1.x, v1.z, v1.z, v2.x, v2.z, v2.z, radius );
-		}
-		// ２つの関節を接続するボーン（楕円体）を描画
-		else if ( num_joints == 2 )
-		{
-			v1 = segment->joint_positions[ 0 ];
-			v2 = segment->joint_positions[ 1 ];
-			DrawBone( v1.x, v1.y, v1.z, v2.x, v2.y, v2.z, radius );
-		}
-		// 重心から各関節へのボーン（楕円体）を描画
-		else if ( num_joints > 2 )
-		{
-			v1.set( 0.0f, 0.0f, 0.0f );
-			for ( int j=0; j<num_joints; j++ )
-			{
-				v2 = segment->joint_positions[ j ];
-				DrawBone( v1.x, v1.y, v1.z, v2.x, v2.y, v2.z, radius );
-			}
-		}
-
-		glPopMatrix();
-	}
-}
-
-void DrawPostureGray(const Posture& posture, int pattern, int view_segment, vector<int> view_segments )
-{
-	if ( !posture.body )
-		return;
-
-	// 順運動学計算
-	vector< Matrix4f >  seg_frame_array;
-	vector< Point3f >  joi_pos_array;
-	ForwardKinematics( posture, seg_frame_array, joi_pos_array );
-
-	float  radius = 0.05f;
-	Matrix4f  mat;
-	Vector3f  v1, v2;
-
-	
-
-	// 各体節の描画
-	for ( int i = 0; i < seg_frame_array.size(); i++ )
-	{
-		while(i > 16 && i < 36)
-			i++;
-		if(i > 39)
-			break;
-
-		switch (pattern)
-		{
-			case 0: //全体白色
-				glColor3f(1.0f, 1.0f, 1.0f);
-				break;
-			case 1: //頭部と胸部白色
-				if( i == 0 )
-					glColor3f(1.0f, 1.0f, 1.0f);
-				else if( 7 <= i && i <= 12 )
-					glColor3f(1.0f, 1.0f, 1.0f);
-				else
-					glColor3f( 0.4f, 0.4f, 0.4f );
-				break;
-			case 2: //腕白色
-				if(13 <= i)
-					glColor3f(1.0f, 1.0f, 1.0f);
-				else
-					glColor3f( 0.4f, 0.4f, 0.4f );
-				break;
-			case 3: //脚白色
-				if( 1 <= i && i <= 6 )
-					glColor3f(1.0f, 1.0f, 1.0f);
-				else
-					glColor3f( 0.4f, 0.4f, 0.4f );
-				break;
-			case 4: //全体白色
-				glColor3f(1.0f, 1.0f, 1.0f);
-				break;
-			case 5: //1部位1色
-				if( i == view_segment || view_segments[i] == 1 )
-					glColor3f( 1.0f, 1.0f, 1.0f );
-				else
-					glColor4f( 1.0f, 1.0f, 1.0f, 0.8f );
-				break;
-			default:
-				std::cout << "pattern isn't defined." << std::endl;
-		}
-		
-
-		const Segment *  segment = posture.body->segments[i];
-		const int  num_joints = segment->num_joints;
-
-		
-		// 体節の中心の位置・向きを基準とする変換行列を適用
-		glPushMatrix();
-		mat.transpose( seg_frame_array[ i ] );
-		glMultMatrixf( & mat.m00 );
-		// １つの関節から末端点へのボーン（楕円体）を描画
-		if ( ( num_joints == 1 ) && segment->has_site )
-		{
-			v1 = segment->joint_positions[ 0 ];
-			v2 = segment->site_position;
-			DrawBone( v1.x, v1.y, v1.z, v2.x, v2.y, v2.z, radius );
-		}
-		// １つの関節から仮の末端点（重心へのベクトルを２倍した位置）へボーン（楕円体）を描画
-		else if ( ( num_joints == 1 ) && !segment->has_site )
-		{
-			//v1 = segment->joint_positions[ 0 ];
-			//v2.negate( v1 );
-			//DrawBone( v1.x, v1.z, v1.z, v2.x, v2.z, v2.z, radius );
-		}
-		// ２つの関節を接続するボーン（楕円体）を描画
-		else if ( num_joints == 2 )
-		{
-			v1 = segment->joint_positions[ 0 ];
-			v2 = segment->joint_positions[ 1 ];
-			DrawBone( v1.x, v1.y, v1.z, v2.x, v2.y, v2.z, radius );
-		}
-		// 重心から各関節へのボーン（楕円体）を描画
-		else if ( num_joints > 2 )
-		{
-			v1.set( 0.0f, 0.0f, 0.0f );
-			for ( int j=0; j<num_joints; j++ )
-			{
-				v2 = segment->joint_positions[ j ];
-				DrawBone( v1.x, v1.y, v1.z, v2.x, v2.y, v2.z, radius );
-			}
-		}
-
-		glPopMatrix();
-	}
-}
-
-//void DrawPart(const Motion * motion, const int part_num)
-//{
-//	if ( !motion->body )
-//		return;
-//
-//	Posture * posture = NULL;
-//
-//	for(int i = 0; i < motion->num_frames; i++)
-//	{
-//		posture = new Posture(motion->frames[i]);
-//		if( !posture->body )
-//			return;
-//
-//		// 順運動学計算
-//		vector< Matrix4f >  seg_frame_array;
-//		vector< Point3f >  joi_pos_array;
-//		ForwardKinematics(* posture, seg_frame_array, joi_pos_array );
-//
-//		float  radius = 0.05f;
-//		Matrix4f  mat;
-//		Vector3f  v1, v2;
-//
-//		const Segment *  segment = posture->body->segments[part_num];
-//		const int  num_joints = segment->num_joints;
-//
-//		// 体節の中心の位置・向きを基準とする変換行列を適用
-//		glPushMatrix();
-//		mat.transpose( seg_frame_array[ part_num ] );
-//		glMultMatrixf( & mat.m00 );
-//
-//			
-//		// １つの関節から末端点へのボーン（楕円体）を描画
-//		if ( ( num_joints == 1 ) && segment->has_site )
-//		{
-//			v1 = segment->joint_positions[ 0 ];
-//			v2 = segment->site_position;
-//			DrawBone( v1.x, v1.z, v1.z, v2.x, v2.z, v2.z, radius );
-//		}
-//		// １つの関節から仮の末端点（重心へのベクトルを２倍した位置）へボーン（楕円体）を描画
-//		else if ( ( num_joints == 1 ) && !segment->has_site )
-//		{
-//			v1 = segment->joint_positions[ 0 ];
-//			v2.negate( v1 );
-//			DrawBone( v1.x, v1.z, v1.z, v2.x, v2.z, v2.z, radius );
-//		}
-//		// ２つの関節を接続するボーン（楕円体）を描画
-//		else if ( num_joints == 2 )
-//		{
-//			v1 = segment->joint_positions[ 0 ];
-//			v2 = segment->joint_positions[ 1 ];
-//			DrawBone( v1.x, v1.z, v1.z, v2.x, v2.z, v2.z, radius );
-//		}
-//		// 重心から各関節へのボーン（楕円体）を描画
-//		else if ( num_joints > 2 )
-//		{
-//			v1.set( 0.0f, 0.0f, 0.0f );
-//			for ( int j=0; j<num_joints; j++ )
-//			{
-//				v2 = segment->joint_positions[ j ];
-//				DrawBone( v1.x, v1.z, v1.z, v2.x, v2.z, v2.z, radius );
-//			}
-//		}
-//		glPopMatrix();
-//	}
-//}
-
-//void DrawTrace(const Motion* motion, const int part_num)
-//{
-//	if ( !motion->body )
-//		return;
-//
-//	Posture * curr_posture = NULL;
-//	Posture * next_posture = NULL;
-//	for(int i = 0; i < motion->num_frames - 1; i++)
-//	{
-//		curr_posture = new Posture(motion->frames[i]);
-//		if( !curr_posture->body )
-//			return;
-//		next_posture = new Posture(motion->frames[i+1]);
-//		if( !next_posture->body )
-//			return;
-//
-//		// 順運動学計算
-//		vector< Matrix4f >  seg_frame_array, seg_frame_array2;
-//		vector< Point3f >  joi_pos_array, joi_pos_array2;
-//		ForwardKinematics(* curr_posture, seg_frame_array, joi_pos_array );
-//		ForwardKinematics(* next_posture, seg_frame_array2, joi_pos_array2 );
-//		Matrix4f  mat1, mat2;
-//		Vector3f  v1, v2;
-//
-//		const Segment *  segment = curr_posture->body->segments[part_num];
-//		const Segment *  segment2 = next_posture->body->segments[part_num];
-//		const int  num_joints = segment->num_joints;
-//		// 体節の中心の位置・向きを基準とする変換行列を適用
-//		glPushMatrix();
-//		mat1.transpose( seg_frame_array[ part_num ] );
-//		mat2.transpose( seg_frame_array2[ part_num ] );
-//		//glMultMatrixf( & mat1.m00 );
-//		glMultMatrixf( & mat1.m00 );
-//
-//		float  line_width;
-//		v1 = segment->joint_positions[ 0 ];
-//		v2 = segment2->joint_positions[ 0 ];
-//		//std::cout << v1 << "," << v2 << endl;
-//
-//		glGetFloatv( GL_LINE_WIDTH, &line_width );
-//		glLineWidth( 2.0f );
-//		glBegin( GL_LINES );
-//			glVertex3f( 0.0, 0.0, 0.0 );
-//			glVertex3f( v2.x, v2.z, v2.z );
-//		glEnd();
-//		glPopMatrix();
-//		glLineWidth( line_width );
-//
-//		/*
-//		for ( int i=0; i<segment_frames.size(); i++ )
-//		{
-//			glPushMatrix();
-//			frame.transpose( segment_frames[ i ] );
-//			glMultMatrixf( & frame.m00 );
-//			glBegin( GL_LINES );
-//				glColor3f( 1.0f, 0.0f, 0.0f );
-//				glVertex3f( 0.0f, 0.0f, 0.0f );
-//				glVertex3f( axis_length, 0.0f, 0.0f );
-//				glColor3f( 0.0f, 1.0f, 0.0f );
-//				glVertex3f( 0.0f, 0.0f, 0.0f );
-//				glVertex3f( 0.0f, axis_length, 0.0f );
-//				glColor3f( 0.0f, 0.0f, 1.0f );
-//				glVertex3f( 0.0f, 0.0f, 0.0f );
-//				glVertex3f( 0.0f, 0.0f, axis_length );
-//			glEnd();
-//			glPopMatrix();
-//		}
-//		*/
-//	}
-//}
-
 
 
 //
@@ -1538,7 +1145,7 @@ void  DrawPostureShadow( const Posture & posture, const Vector3f & light_dir, co
 	// 地面への投影行列をかける
 	glMultMatrixf( mat );
 
-	// 姿勢の描画（スティックフィギュアで描画）
+	// 姿勢の描画（スティックフィギュアで描画、DrawPostureは指をスキップ）
 	glColor4f( color.x, color.y, color.z, color.w );
 	DrawPosture( posture );
 

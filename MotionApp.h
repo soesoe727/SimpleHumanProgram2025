@@ -42,6 +42,14 @@ protected:
     void UpdateVoxelDataWrapper();
     void CalculateWorldBounds(); 
 
+    // ADDED: ボクセル情報を持つ部位かチェック（指などの細部を除外）
+    bool HasVoxelData(int segment_index);
+    // ADDED: 次の有効な部位を取得
+    int GetNextValidSegment(int current_segment, int direction);
+    // ADDED: 体節名から指かどうかを判定
+    bool IsFingerSegment(const char* segment_name);
+    bool IsFingerSegment(const std::string& segment_name);
+
     // ユーティリティ
     void DrawText(int x, int y, const char* text, void* font);
 };

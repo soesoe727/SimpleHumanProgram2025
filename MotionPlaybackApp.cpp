@@ -157,12 +157,12 @@ void  MotionPlaybackApp::Display()
 			{
 				//1人目の動作の可視化(色付け)
 				Pass_posture1 = motion->frames[DTWa->DisPassAll[0][DTWframe_no]];
-				DrawPostureColor(Pass_posture1, pattern, view_segment, view_segments, DTWa->Seg_Color, DTWa->Pa_Color);
+				//DrawPostureColor(Pass_posture1, pattern, view_segment, view_segments, DTWa->Seg_Color, DTWa->Pa_Color);
 				DrawPostureShadow(Pass_posture1, shadow_dir, shadow_color);
 
 				//2人目の動作の可視化(白･灰)(パス対応)
 				Pass_posture2 = motion2->frames[DTWa->DisPassAll[1][DTWframe_no]];
-				DrawPostureGray(Pass_posture2, pattern, view_segment, view_segments);
+				//DrawPostureGray(Pass_posture2, pattern, view_segment, view_segments);
 				DrawPostureShadow(Pass_posture2, shadow_dir, shadow_color);
 			}
 			else//ワーピング・パスによる再生から通常再生
@@ -171,23 +171,23 @@ void  MotionPlaybackApp::Display()
 				{
 					//1人目の動作の可視化(色付け)
 					Pass_posture1 = motion->frames[DTWa->DisPassAll[0][frame_no]];
-					DrawPostureColor(Pass_posture1, pattern, view_segment, view_segments, DTWa->Seg_Color, DTWa->Pa_Color);
+					//DrawPostureColor(Pass_posture1, pattern, view_segment, view_segments, DTWa->Seg_Color, DTWa->Pa_Color);
 					DrawPostureShadow(Pass_posture1, shadow_dir, shadow_color);
 
 					//2人目の動作の可視化(白･灰)(パス対応)
 					Pass_posture2 = motion2->frames[DTWa->DisPassAll[1][frame_no]];
-					DrawPostureGray(Pass_posture2, pattern, view_segment, view_segments);
+					//DrawPostureGray(Pass_posture2, pattern, view_segment, view_segments);
 					DrawPostureShadow(Pass_posture2, shadow_dir, shadow_color);
 				}
 				else//通常再生
 				{
 					//1人目の動作の可視化(色付け)
 					Pass_posture1 = motion->frames[min(motion->num_frames - 1, m1f + frame_no - mf)];
-					DrawPostureColor(Pass_posture1, pattern, view_segment, view_segments, DTWa->Seg_Color, DTWa->Pa_Color);
+					//DrawPostureColor(Pass_posture1, pattern, view_segment, view_segments, DTWa->Seg_Color, DTWa->Pa_Color);
 					DrawPostureShadow(Pass_posture1, shadow_dir, shadow_color);
 					//2人目の動作の可視化(白･灰)(パス対応)
 					Pass_posture2 = motion2->frames[min(motion2->num_frames - 1, m2f + frame_no - mf)];
-					DrawPostureGray(Pass_posture2, pattern, view_segment, view_segments);
+					//DrawPostureGray(Pass_posture2, pattern, view_segment, view_segments);
 					DrawPostureShadow(Pass_posture2, shadow_dir, shadow_color);
 				}
 			}
@@ -198,11 +198,11 @@ void  MotionPlaybackApp::Display()
 			{
 				//1人目の動作の可視化(色付け)
 				Pass_posture1 = motion->frames[DTWa->AngPassAll[0][DTWframe_no]];
-				DrawPostureColor(Pass_posture1, pattern, view_segment, view_segments, DTWa->Seg_Color, DTWa->Pa_Color);
+				//DrawPostureColor(Pass_posture1, pattern, view_segment, view_segments, DTWa->Seg_Color, DTWa->Pa_Color);
 				DrawPostureShadow(Pass_posture1, shadow_dir, shadow_color);
 				//2人目の動作の可視化(白･灰)(パス対応)
 				Pass_posture2 = motion2->frames[DTWa->AngPassAll[1][DTWframe_no]];
-				DrawPostureGray(Pass_posture2, pattern, view_segment, view_segments);
+				//DrawPostureGray(Pass_posture2, pattern, view_segment, view_segments);
 				DrawPostureShadow(Pass_posture2, shadow_dir, shadow_color);
 			}
 			else//ワーピング・パスによる再生から通常再生
@@ -211,22 +211,22 @@ void  MotionPlaybackApp::Display()
 				{
 					//1人目の動作の可視化(色付け)
 					Pass_posture1 = motion->frames[DTWa->AngPassAll[0][frame_no]];
-					DrawPostureColor(Pass_posture1, pattern, view_segment, view_segments, DTWa->Seg_Color, DTWa->Pa_Color);
+					//DrawPostureColor(Pass_posture1, pattern, view_segment, view_segments, DTWa->Seg_Color, DTWa->Pa_Color);
 					DrawPostureShadow(Pass_posture1, shadow_dir, shadow_color);
 					//2人目の動作の可視化(白･灰)(パス対応)
 					Pass_posture2 = motion2->frames[DTWa->AngPassAll[1][frame_no]];
-					DrawPostureGray(Pass_posture2, pattern, view_segment, view_segments);
+					//DrawPostureGray(Pass_posture2, pattern, view_segment, view_segments);
 					DrawPostureShadow(Pass_posture2, shadow_dir, shadow_color);
 				}
 				else//通常再生
 				{
 					//1人目の動作の可視化(色付け)
 					Pass_posture1 = motion->frames[min(motion->num_frames - 1, m1f + frame_no - mf)];
-					DrawPostureColor(Pass_posture1, pattern, view_segment, view_segments, DTWa->Seg_Color, DTWa->Pa_Color);
+					//DrawPostureColor(Pass_posture1, pattern, view_segment, view_segments, DTWa->Seg_Color, DTWa->Pa_Color);
 					DrawPostureShadow(Pass_posture1, shadow_dir, shadow_color);
 					//2人目の動作の可視化(白･灰)(パス対応)
 					Pass_posture2 = motion2->frames[min(motion2->num_frames - 1, m2f + frame_no - mf)];
-					DrawPostureGray(Pass_posture2, pattern, view_segment, view_segments);
+					//DrawPostureGray(Pass_posture2, pattern, view_segment, view_segments);
 					DrawPostureShadow(Pass_posture2, shadow_dir, shadow_color);
 				}
 			}
