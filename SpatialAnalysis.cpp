@@ -300,16 +300,13 @@ void SpatialAnalyzer::VoxelizeMotion(Motion* m, float time, VoxelGrid& occ, Voxe
 
     // 各セグメント（ボーン）について計算
     for (int s = 0; s < m->body->num_segments; ++s) {
-        string seg_name = m->body->segments[s]->name;
+        const Segment* seg = m->body->segments[s];
         
-        // NEW: 指のセグメントをスキップ（高速化）
-        if (seg_name.find("Finger") != string::npos ||
-            seg_name.find("Thumb") != string::npos ||
-            (seg_name.find("Hand") != string::npos && seg_name != "RightHand" && seg_name != "LeftHand")) {
+        // MODIFIED: 体節名ベースで指をスキップ（BVHファイルによる体節数の違いに対応）
+        if (IsFingerSegment(seg)) {
             continue;
         }
 
-        const Segment* seg = m->body->segments[s];
         Point3f p1, p2, p1_prev, p2_prev;
         
         // セグメントの接続関節数に応じて位置を取得
@@ -890,16 +887,13 @@ void SpatialAnalyzer::VoxelizeMotionBySegment(Motion* m, float time, SegmentVoxe
 
     // 各セグメント（ボーン）について個別に計算
     for (int s = 0; s < m->body->num_segments; ++s) {
-        string seg_name = m->body->segments[s]->name;
+        const Segment* seg = m->body->segments[s];
         
-        // NEW: 指のセグメントをスキップ（高速化）
-        if (seg_name.find("Finger") != string::npos ||
-            seg_name.find("Thumb") != string::npos ||
-            (seg_name.find("Hand") != string::npos && seg_name != "RightHand" && seg_name != "LeftHand")) {
+        // MODIFIED: 体節名ベースで指をスキップ（BVHファイルによる体節数の違いに対応）
+        if (IsFingerSegment(seg)) {
             continue;
         }
 
-        const Segment* seg = m->body->segments[s];
         Point3f p1, p2, p1_prev, p2_prev;
         
         // セグメントの接続関節数に応じて位置を取得

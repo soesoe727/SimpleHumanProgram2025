@@ -460,13 +460,12 @@ void MotionApp::DrawText(int x, int y, const char *text, void *font)
 // ADDED: ボクセル情報を持つ部位かチェック（指などの細部を除外）
 bool MotionApp::HasVoxelData(int segment_index)
 {
-    // 手の細かい部位（指）は17-35の範囲で、ボクセル情報を計算していない
-    // それ以外の部位（0-16, 36-39）はボクセル情報を持つ
-    if (segment_index < 0) return false;
-    if (segment_index <= 16) return true;   // Pelvis, legs, spine, chest, head, right arm
-    if (segment_index >= 17 && segment_index <= 35) return false;  // Fingers (skipped)
-    if (segment_index >= 36 && segment_index <= 39) return true;   // Left arm
-    return false;
+    if (!motion || !motion->body) return false;
+    if (segment_index < 0 || segment_index >= motion->body->num_segments) return false;
+    
+    // MODIFIED: 体節名ベースで指かどうか判定（BVHファイルによる体節数の違いに対応）
+    const Segment* segment = motion->body->segments[segment_index];
+    return !IsFingerSegment(segment);
 }
 
 // ADDED: 次の有効な部位を取得（ボクセル情報を持つ部位のみ）
@@ -477,8 +476,8 @@ int MotionApp::GetNextValidSegment(int current_segment, int direction)
     int num_segments = motion->body->num_segments;
     int next_segment = current_segment;
     
-    // 最大40回ループして次の有効な部位を探す（無限ループ防止）
-    for (int i = 0; i < 40; i++) {
+    // 最大num_segments回ループして次の有効な部位を探す（無限ループ防止）
+    for (int i = 0; i < num_segments; i++) {
         next_segment += direction;
         
         // 範囲外になったらラップアラウンド

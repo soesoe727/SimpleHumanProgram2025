@@ -17,6 +17,9 @@
 #define  _USE_MATH_DEFINES
 #include <math.h>
 
+// ADDED: std::transform用
+#include <algorithm>
+
 
 // グローバル変数の定義
 
@@ -268,7 +271,6 @@ void  Motion::GetPosture( float time, Posture & p ) const
 		return;
 	p = *frame;
 }
-
 
 //
 //  人体モデルのキーフレーム動作を表すクラス
@@ -561,7 +563,6 @@ Skeleton *  CoustructBVHSkeleton( class BVH * bvh )
 	return  body;
 }
 
-
 //
 //  BVH動作から動作データ（＋骨格モデル）を生成
 //
@@ -591,7 +592,6 @@ Motion *  CoustructBVHMotion( class BVH * bvh, const Skeleton * bvh_body )
 	// 生成した動作データを返す
 	return  motion;
 }
-
 
 //
 //  BVHファイルを読み込んで動作データ（＋骨格モデル）を生成
@@ -760,6 +760,52 @@ int  FindJoint( const Skeleton * body, const char * joint_name )
 	return  -1;
 }
 
+
+//
+//  体節名から指かどうかを判定（BVHファイルによって体節数が変わる場合に対応）
+//
+bool  IsFingerSegment( const char * segment_name )
+{
+	if ( !segment_name )
+		return false;
+	
+	// 小文字に変換して比較（大文字小文字を区別しない）
+	std::string name_lower = segment_name;
+	std::transform( name_lower.begin(), name_lower.end(), name_lower.begin(), ::tolower );
+	
+	// 指に関連するキーワードをチェック
+	// Finger, Thumb, Index, Middle, Ring, Pinky などの文字列が含まれていれば指と判定
+	if ( name_lower.find( "finger" ) != std::string::npos )
+		return true;
+	if ( name_lower.find( "thumb" ) != std::string::npos )
+		return true;
+	if ( name_lower.find( "index" ) != std::string::npos )
+		return true;
+	if ( name_lower.find( "middle" ) != std::string::npos )
+		return true;
+	if ( name_lower.find( "ring" ) != std::string::npos )
+		return true;
+	if ( name_lower.find( "pinky" ) != std::string::npos )
+		return true;
+	if ( name_lower.find( "pinkie" ) != std::string::npos )
+		return true;
+	
+	// 日本語の指名もチェック（もしあれば）
+	if ( name_lower.find( "yubi" ) != std::string::npos )
+		return true;
+	
+	return false;
+}
+
+bool  IsFingerSegment( const Segment * segment )
+{
+	if ( !segment )
+		return false;
+	
+	return  IsFingerSegment( segment->name.c_str() );
+}
+
+
 //
 //  順運動学計算のための反復計算（ルート体節から末端体節に向かって繰り返し再帰呼び出し）
 //
@@ -905,7 +951,6 @@ void  PostureInterpolation( const Posture & p0, const Posture & p1, float ratio,
 	p.root_pos.set( v );
 }
 
-
 //
 //  変換行列の水平向き（方位角）成分を計算（Ｚ軸の正の方向を０とする時計回りの角度を -180～180 の範囲で求める）
 //
@@ -918,7 +963,6 @@ float  ComputeOrientationAngle( float dx, float dz )
 {
 	return  atan2( dx, dz ) * 180.0f / M_PI;
 }
-
 
 //
 //  水平回転を表す変換行列を計算（Ｚ軸の正の方向を０とする時計回りの角度を -180～180 の範囲で指定する）
@@ -935,7 +979,6 @@ Matrix3f  ComputeOrientationMatrix( float angle )
 	return  ori;
 }
 
-
 //
 //  姿勢の位置・向きに変換行列を適用
 //
@@ -949,7 +992,6 @@ void  TransformPosture( const Matrix4f & trans, Posture & posture )
 	// 腰の位置に変換行列を適用
 	trans.transform( &posture.root_pos );
 }
-
 
 //
 //  骨格モデルの１本のリンクを楕円体で描画
@@ -1052,12 +1094,13 @@ void  DrawPosture( const Posture & posture )
 	// 各体節の描画
 	for ( int i = 0; i < seg_frame_array.size(); i++ )
 	{
-		// MODIFIED: 指の細かい部分は描画しない（ボクセル計算対象外の部位を除外）
-		if (i >= 17 && i <= 35) {
-			continue;  // 指の部位をスキップ
+		const Segment *  segment = posture.body->segments[i];
+		
+		// MODIFIED: 体節名ベースで指をスキップ（BVHファイルによる体節数の違いに対応）
+		if ( IsFingerSegment( segment ) ) {
+			continue;
 		}
 
-		const Segment *  segment = posture.body->segments[i];
 		const int  num_joints = segment->num_joints;
 
 		// 体節の中心の位置・向きを基準とする変換行列を適用
@@ -1180,8 +1223,12 @@ void DrawPostureSelective(const Posture& posture, int selected_segment_index, co
 	// 各体節の描画
 	for ( int i = 0; i < seg_frame_array.size(); i++ )
 	{
-		// 手の細かい部分は描画しない (元々のDrawPostureのロジックを維持)
+		const Segment * segment = posture.body->segments[i];
 		
+		// MODIFIED: 体節名ベースで指をスキップ（BVHファイルによる体節数の違いに対応）
+		if ( IsFingerSegment( segment ) ) {
+			continue;
+		}
 
         // 色を設定: 選択された部位はハイライト色、それ以外はベース色
         if (i == selected_segment_index) {
@@ -1190,7 +1237,6 @@ void DrawPostureSelective(const Posture& posture, int selected_segment_index, co
             glColor3f(base_color.x, base_color.y, base_color.z);
         }
 
-		const Segment * segment = posture.body->segments[i];
 		const int  num_joints = segment->num_joints;
 
 		// 体節の中心の位置・向きを基準とする変換行列を適用

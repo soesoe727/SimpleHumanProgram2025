@@ -250,6 +250,10 @@ int  FindSegment( const Skeleton * body, const char * segment_name );
 // 骨格モデルから関節を名前で探索
 int  FindJoint( const Skeleton * body, const char * joint_name );
 
+// ADDED: 体節名から指かどうかを判定（BVHファイルによって体節数が変わる場合に対応）
+bool  IsFingerSegment( const char * segment_name );
+bool  IsFingerSegment( const Segment * segment );
+
 // 順運動学計算
 void  ForwardKinematics( const Posture & posture, vector< Matrix4f > & seg_frame_array, vector< Point3f > & joi_pos_array );
 
