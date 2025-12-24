@@ -1,14 +1,14 @@
-#include "SpatialAnalysis.h"
-#include "SimpleHumanGLUT.h" // OpenGL—p
+ï»¿#include "SpatialAnalysis.h"
+#include "SimpleHumanGLUT.h" // OpenGLç”¨
 #include <cmath>
 #include <algorithm>
 #include <cstdio>
 #include <iostream>
-#include <fstream>  // NEW: ƒtƒ@ƒCƒ‹I/O—p
+#include <fstream>  // NEW: ãƒ•ã‚¡ã‚¤ãƒ«I/Oç”¨
 
 using namespace std;
 
-// --- “à•”ƒwƒ‹ƒp[ŠÖ” (MotionApp.cpp‚©‚çˆÚA) ---
+// --- å†…éƒ¨ãƒ˜ãƒ«ãƒ‘ãƒ¼é–¢æ•° (MotionApp.cppã‹ã‚‰ç§»æ¤) ---
 
 static float sa_get_axis_value(const Point3f& p, int axis_index) {
 	if (axis_index == 0) return p.x; 
@@ -50,33 +50,33 @@ float VoxelGrid::Get(int x, int y, int z) const {
     return data[static_cast<std::vector<float, std::allocator<float>>::size_type>(z) * resolution * resolution + y * resolution + x];
 }
 
-// NEW: ƒtƒ@ƒCƒ‹‚Ö•Û‘¶iŠî€p¨î•ñ‚àŠÜ‚Şj
+// NEW: ãƒ•ã‚¡ã‚¤ãƒ«ã¸ä¿å­˜ï¼ˆåŸºæº–å§¿å‹¢æƒ…å ±ã‚‚å«ã‚€ï¼‰
 bool VoxelGrid::SaveToFile(const char* filename) const {
     ofstream ofs(filename, ios::binary);
     if (!ofs) return false;
     
-    // ƒo[ƒWƒ‡ƒ“î•ñ‚ğ‘‚«‚İ
-    int version = 2;  // ƒo[ƒWƒ‡ƒ“2FŠî€p¨î•ñ‚ğŠÜ‚Ş
+    // ãƒãƒ¼ã‚¸ãƒ§ãƒ³æƒ…å ±ã‚’æ›¸ãè¾¼ã¿
+    int version = 2;  // ãƒãƒ¼ã‚¸ãƒ§ãƒ³2ï¼šåŸºæº–å§¿å‹¢æƒ…å ±ã‚’å«ã‚€
     ofs.write(reinterpret_cast<const char*>(&version), sizeof(int));
     
-    // ‰ğ‘œ“x‚ğ‘‚«‚İ
+    // è§£åƒåº¦ã‚’æ›¸ãè¾¼ã¿
     ofs.write(reinterpret_cast<const char*>(&resolution), sizeof(int));
     
-    // ƒf[ƒ^ƒTƒCƒY‚ğ‘‚«‚İ
+    // ãƒ‡ãƒ¼ã‚¿ã‚µã‚¤ã‚ºã‚’æ›¸ãè¾¼ã¿
     int data_size = data.size();
     ofs.write(reinterpret_cast<const char*>(&data_size), sizeof(int));
     
-    // ƒf[ƒ^‚ğ‘‚«‚İ
+    // ãƒ‡ãƒ¼ã‚¿ã‚’æ›¸ãè¾¼ã¿
     ofs.write(reinterpret_cast<const char*>(data.data()), data_size * sizeof(float));
     
-    // NEW: Šî€p¨î•ñ‚ğ‘‚«‚İ
+    // NEW: åŸºæº–å§¿å‹¢æƒ…å ±ã‚’æ›¸ãè¾¼ã¿
     ofs.write(reinterpret_cast<const char*>(&has_reference), sizeof(bool));
     if (has_reference) {
         ofs.write(reinterpret_cast<const char*>(&reference_root_pos.x), sizeof(float));
         ofs.write(reinterpret_cast<const char*>(&reference_root_pos.y), sizeof(float));
         ofs.write(reinterpret_cast<const char*>(&reference_root_pos.z), sizeof(float));
         
-        // ‰ñ“]s—ñ‚ğ•Û‘¶
+        // å›è»¢è¡Œåˆ—ã‚’ä¿å­˜
         for (int i = 0; i < 3; ++i) {
             for (int j = 0; j < 3; ++j) {
                 float val = 0.0f;
@@ -97,28 +97,28 @@ bool VoxelGrid::SaveToFile(const char* filename) const {
     return ofs.good();
 }
 
-// NEW: ƒtƒ@ƒCƒ‹‚©‚ç“Ç‚İ‚İiƒo[ƒWƒ‡ƒ“‘Î‰j
+// NEW: ãƒ•ã‚¡ã‚¤ãƒ«ã‹ã‚‰èª­ã¿è¾¼ã¿ï¼ˆãƒãƒ¼ã‚¸ãƒ§ãƒ³å¯¾å¿œï¼‰
 bool VoxelGrid::LoadFromFile(const char* filename) {
     ifstream ifs(filename, ios::binary);
     if (!ifs) return false;
     
-    // ƒo[ƒWƒ‡ƒ“î•ñ‚ğ“Ç‚İ‚İ
+    // ãƒãƒ¼ã‚¸ãƒ§ãƒ³æƒ…å ±ã‚’èª­ã¿è¾¼ã¿
     int version;
     ifs.read(reinterpret_cast<char*>(&version), sizeof(int));
     
-    // ‰ğ‘œ“x‚ğ“Ç‚İ‚İ
+    // è§£åƒåº¦ã‚’èª­ã¿è¾¼ã¿
     int res;
     ifs.read(reinterpret_cast<char*>(&res), sizeof(int));
     
-    // ƒf[ƒ^ƒTƒCƒY‚ğ“Ç‚İ‚İ
+    // ãƒ‡ãƒ¼ã‚¿ã‚µã‚¤ã‚ºã‚’èª­ã¿è¾¼ã¿
     int data_size;
     ifs.read(reinterpret_cast<char*>(&data_size), sizeof(int));
     
-    // ƒŠƒTƒCƒY‚µ‚Ä“Ç‚İ‚İ
+    // ãƒªã‚µã‚¤ã‚ºã—ã¦èª­ã¿è¾¼ã¿
     Resize(res);
     ifs.read(reinterpret_cast<char*>(data.data()), data_size * sizeof(float));
     
-    // ƒo[ƒWƒ‡ƒ“2ˆÈ~‚ÍŠî€p¨î•ñ‚ğ“Ç‚İ‚İ
+    // ãƒãƒ¼ã‚¸ãƒ§ãƒ³2ä»¥é™ã¯åŸºæº–å§¿å‹¢æƒ…å ±ã‚’èª­ã¿è¾¼ã¿
     if (version >= 2) {
         ifs.read(reinterpret_cast<char*>(&has_reference), sizeof(bool));
         if (has_reference) {
@@ -126,7 +126,7 @@ bool VoxelGrid::LoadFromFile(const char* filename) {
             ifs.read(reinterpret_cast<char*>(&reference_root_pos.y), sizeof(float));
             ifs.read(reinterpret_cast<char*>(&reference_root_pos.z), sizeof(float));
             
-            // ‰ñ“]s—ñ‚ğ“Ç‚İ‚İ
+            // å›è»¢è¡Œåˆ—ã‚’èª­ã¿è¾¼ã¿
             float m[9];
             for (int i = 0; i < 9; ++i) {
                 ifs.read(reinterpret_cast<char*>(&m[i]), sizeof(float));
@@ -136,64 +136,64 @@ bool VoxelGrid::LoadFromFile(const char* filename) {
                                   m[6], m[7], m[8]);
         }
     } else {
-        // ‹Œƒo[ƒWƒ‡ƒ“‚ÍŠî€p¨‚È‚µ
+        // æ—§ãƒãƒ¼ã‚¸ãƒ§ãƒ³ã¯åŸºæº–å§¿å‹¢ãªã—
         has_reference = false;
     }
     
     return ifs.good();
 }
 
-// NEW: SegmentVoxelData‚Ìƒtƒ@ƒCƒ‹•Û‘¶
+// NEW: SegmentVoxelDataã®ãƒ•ã‚¡ã‚¤ãƒ«ä¿å­˜
 bool SegmentVoxelData::SaveToFile(const char* filename) const {
     ofstream ofs(filename, ios::binary);
     if (!ofs) return false;
     
-    // ƒZƒOƒƒ“ƒg”‚ğ‘‚«‚İ
+    // ã‚»ã‚°ãƒ¡ãƒ³ãƒˆæ•°ã‚’æ›¸ãè¾¼ã¿
     ofs.write(reinterpret_cast<const char*>(&num_segments), sizeof(int));
     
-    // ŠeƒZƒOƒƒ“ƒg‚ÌƒOƒŠƒbƒh‚ğ‘‚«‚İ
+    // å„ã‚»ã‚°ãƒ¡ãƒ³ãƒˆã®ã‚°ãƒªãƒƒãƒ‰ã‚’æ›¸ãè¾¼ã¿
     for (int i = 0; i < num_segments; ++i) {
         const VoxelGrid& grid = segment_grids[i];
         
-        // ‰ğ‘œ“x
+        // è§£åƒåº¦
         ofs.write(reinterpret_cast<const char*>(&grid.resolution), sizeof(int));
         
-        // ƒf[ƒ^ƒTƒCƒY
+        // ãƒ‡ãƒ¼ã‚¿ã‚µã‚¤ã‚º
         int data_size = grid.data.size();
         ofs.write(reinterpret_cast<const char*>(&data_size), sizeof(int));
         
-        // ƒf[ƒ^
+        // ãƒ‡ãƒ¼ã‚¿
         ofs.write(reinterpret_cast<const char*>(grid.data.data()), data_size * sizeof(float));
     }
     
     return ofs.good();
 }
 
-// NEW: SegmentVoxelData‚Ìƒtƒ@ƒCƒ‹“Ç‚İ‚İ
+// NEW: SegmentVoxelDataã®ãƒ•ã‚¡ã‚¤ãƒ«èª­ã¿è¾¼ã¿
 bool SegmentVoxelData::LoadFromFile(const char* filename) {
     ifstream ifs(filename, ios::binary);
     if (!ifs) return false;
     
-    // ƒZƒOƒƒ“ƒg”‚ğ“Ç‚İ‚İ
+    // ã‚»ã‚°ãƒ¡ãƒ³ãƒˆæ•°ã‚’èª­ã¿è¾¼ã¿
     int num_seg;
     ifs.read(reinterpret_cast<char*>(&num_seg), sizeof(int));
     
     num_segments = num_seg;
     segment_grids.resize(num_seg);
     
-    // ŠeƒZƒOƒƒ“ƒg‚ÌƒOƒŠƒbƒh‚ğ“Ç‚İ‚İ
+    // å„ã‚»ã‚°ãƒ¡ãƒ³ãƒˆã®ã‚°ãƒªãƒƒãƒ‰ã‚’èª­ã¿è¾¼ã¿
     for (int i = 0; i < num_segments; ++i) {
         VoxelGrid& grid = segment_grids[i];
         
-        // ‰ğ‘œ“x
+        // è§£åƒåº¦
         int res;
         ifs.read(reinterpret_cast<char*>(&res), sizeof(int));
         
-        // ƒf[ƒ^ƒTƒCƒY
+        // ãƒ‡ãƒ¼ã‚¿ã‚µã‚¤ã‚º
         int data_size;
         ifs.read(reinterpret_cast<char*>(&data_size), sizeof(int));
         
-        // ƒŠƒTƒCƒY‚µ‚Ä“Ç‚İ‚İ
+        // ãƒªã‚µã‚¤ã‚ºã—ã¦èª­ã¿è¾¼ã¿
         grid.Resize(res);
         ifs.read(reinterpret_cast<char*>(grid.data.data()), data_size * sizeof(float));
     }
@@ -205,7 +205,7 @@ bool SegmentVoxelData::LoadFromFile(const char* filename) {
 
 SpatialAnalyzer::SpatialAnalyzer() {
     grid_resolution = 64; 
-    h_axis = 0; v_axis = 1;  // ‰Šú‚ÍXY•½–Ê
+    h_axis = 0; v_axis = 1;  // åˆæœŸã¯XYå¹³é¢
     ResizeGrids(grid_resolution);
     
     zoom = 1.0f;
@@ -219,22 +219,22 @@ SpatialAnalyzer::SpatialAnalyzer() {
     global_max_spd = 1.0f;
     max_accumulated_val = 1.0f;
     
-    // NEW: •”ˆÊ•Ê•\¦ƒ‚[ƒh
-    selected_segment_index = -1;  // -1‚Í‘S‘Ì•\¦
+    // NEW: éƒ¨ä½åˆ¥è¡¨ç¤ºãƒ¢ãƒ¼ãƒ‰
+    selected_segment_index = -1;  // -1ã¯å…¨ä½“è¡¨ç¤º
     show_segment_mode = false;
     
-    // NEW: ƒXƒ‰ƒCƒX•½–Ê‚Ì‰ñ“]ƒpƒ‰ƒ[ƒ^‰Šú‰»
+    // NEW: ã‚¹ãƒ©ã‚¤ã‚¹å¹³é¢ã®å›è»¢ãƒ‘ãƒ©ãƒ¡ãƒ¼ã‚¿åˆæœŸåŒ–
     slice_rotation_x = 0.0f;
     slice_rotation_y = 0.0f;
     slice_rotation_z = 0.0f;
     slice_plane_center.set(0.0f, 0.0f, 0.0f);
-    slice_plane_normal.set(0.0f, 0.0f, 1.0f);  // ‰Šú‚ÍZ²•ûŒü
-    slice_plane_u.set(1.0f, 0.0f, 0.0f);       // U•ûŒü‚ÍX²
-    slice_plane_v.set(0.0f, 1.0f, 0.0f);       // V•ûŒü‚ÍY²
-    use_rotated_slice = true;  // MODIFIED: ƒfƒtƒHƒ‹ƒg‚ÅON
+    slice_plane_normal.set(0.0f, 0.0f, 1.0f);  // åˆæœŸã¯Zè»¸æ–¹å‘
+    slice_plane_u.set(1.0f, 0.0f, 0.0f);       // Uæ–¹å‘ã¯Xè»¸
+    slice_plane_v.set(0.0f, 1.0f, 0.0f);       // Væ–¹å‘ã¯Yè»¸
+    use_rotated_slice = true;  // ãƒ‡ãƒ•ã‚©ãƒ«ãƒˆã§ON
     
-    slice_positions.push_back(0.5f);  // MODIFIED: ’†SˆÊ’u‚ğƒfƒtƒHƒ‹ƒg‚É
-    slice_positions.push_back(0.3f);
+    // ã‚¹ãƒ©ã‚¤ã‚¹ä½ç½®ã¯1ã¤ã ã‘
+    slice_positions.push_back(0.5f);  // ä¸­å¿ƒä½ç½®
     active_slice_index = 0;
 }
 
@@ -245,7 +245,7 @@ void SpatialAnalyzer::ResizeGrids(int res) {
     voxels1_occ.Resize(res); voxels2_occ.Resize(res); voxels_diff.Resize(res);
     voxels1_spd.Resize(res); voxels2_spd.Resize(res); voxels_spd_diff.Resize(res);
     
-    // NEW: —İÏƒOƒŠƒbƒh‚àƒŠƒTƒCƒY
+    // NEW: ç´¯ç©ã‚°ãƒªãƒƒãƒ‰ã‚‚ãƒªã‚µã‚¤ã‚º
     voxels1_accumulated.Resize(res);
     voxels2_accumulated.Resize(res);
     voxels_accumulated_diff.Resize(res);
@@ -257,7 +257,7 @@ void SpatialAnalyzer::SetWorldBounds(float bounds[3][2]) {
         world_bounds[i][1] = bounds[i][1];
     }
     
-    // NEW: ‰ñ“]ƒXƒ‰ƒCƒX‚Ì’†S‚ğƒ[ƒ‹ƒh’†S‚Éİ’è
+    // NEW: å›è»¢ã‚¹ãƒ©ã‚¤ã‚¹ã®ä¸­å¿ƒã‚’ãƒ¯ãƒ¼ãƒ«ãƒ‰ä¸­å¿ƒã«è¨­å®š
     slice_plane_center.set(
         (world_bounds[0][0] + world_bounds[0][1]) / 2.0f,
         (world_bounds[1][0] + world_bounds[1][1]) / 2.0f,
@@ -266,23 +266,23 @@ void SpatialAnalyzer::SetWorldBounds(float bounds[3][2]) {
     UpdateSlicePlaneVectors();
 }
 
-// “à•”—p FK (Motion ƒNƒ‰ƒX‚Ìƒƒ\ƒbƒh‚ğ—˜—p)
+// å†…éƒ¨ç”¨ FK (Motion ã‚¯ãƒ©ã‚¹ã®ãƒ¡ã‚½ãƒƒãƒ‰ã‚’åˆ©ç”¨)
 static void ComputeFK(Motion* m, float time, vector<Point3f>& joints) {
     if(!m) return;
     Posture posture(m->body);
-    m->GetPosture(time, posture); // w’èŠÔ‚Ìp¨‚ğæ“¾
+    m->GetPosture(time, posture); // æŒ‡å®šæ™‚é–“ã®å§¿å‹¢ã‚’å–å¾—
     
-    // ‘SŠÖß‚Ìƒ[ƒ‹ƒhÀ•W‚ğŒvZ
+    // å…¨é–¢ç¯€ã®ãƒ¯ãƒ¼ãƒ«ãƒ‰åº§æ¨™ã‚’è¨ˆç®—
     vector<Matrix4f> frames;
-    // SimpleHuman‚Ìd—l‚É‡‚í‚¹‚ÄFKŒvZ (‚±‚±‚Å‚ÍŠÈˆÕ“I‚ÉÀ‘•‚·‚é‚©Am->body->FK‚ª‚ ‚ê‚Î‚»‚ê‚ğg‚¤)
-    // ˆê”Ê“I‚ÈSimpleHuman‚ÌÀ‘•‚ğ‘z’è:
+    // SimpleHumanã®ä»•æ§˜ã«åˆã‚ã›ã¦FKè¨ˆç®— (ã“ã“ã§ã¯ç°¡æ˜“çš„ã«å®Ÿè£…ã™ã‚‹ã‹ã€m->body->FKãŒã‚ã‚Œã°ãã‚Œã‚’ä½¿ã†)
+    // ä¸€èˆ¬çš„ãªSimpleHumanã®å®Ÿè£…ã‚’æƒ³å®š:
     posture.ForwardKinematics(frames);
     
     joints.clear();
     for(int i=0; i<m->body->num_joints; ++i) {
-        // Joint‚ÌˆÊ’u‚ğæ“¾
-        // ¦SimpleHuman‚Ì\‘¢‚É‚æ‚é‚ªA‚±‚±‚Å‚Ísegments‚Ì•ÏŠ·s—ñ‚©‚çæ“¾‚·‚é‚Æ‰¼’è
-        // Segment‚ÆJoint‚Ì‘Î‰‚ª•K—v‚¾‚ªAŠÈˆÕ“I‚Ésegments‚ÌÀ•W‚ğg‚¤
+        // Jointã®ä½ç½®ã‚’å–å¾—
+        // â€»SimpleHumanã®æ§‹é€ ã«ã‚ˆã‚‹ãŒã€ã“ã“ã§ã¯segmentsã®å¤‰æ›è¡Œåˆ—ã‹ã‚‰å–å¾—ã™ã‚‹ã¨ä»®å®š
+        // Segmentã¨Jointã®å¯¾å¿œãŒå¿…è¦ã ãŒã€ç°¡æ˜“çš„ã«segmentsã®åº§æ¨™ã‚’ä½¿ã†
         if(i < m->body->num_segments) {
              const Matrix4f& M = frames[i];
              joints.push_back(Point3f(M.m03, M.m13, M.m23));
@@ -295,7 +295,7 @@ static void ComputeFK(Motion* m, float time, vector<Point3f>& joints) {
 void SpatialAnalyzer::VoxelizeMotion(Motion* m, float time, VoxelGrid& occ, VoxelGrid& spd) {
     if (!m) return;
     
-    // Œ»İƒtƒŒ[ƒ€‚Æ‘OƒtƒŒ[ƒ€‚Ìp¨‚ğæ“¾
+    // ç¾åœ¨ãƒ•ãƒ¬ãƒ¼ãƒ ã¨å‰ãƒ•ãƒ¬ãƒ¼ãƒ ã®å§¿å‹¢ã‚’å–å¾—
     Posture curr_pose(m->body);
     Posture prev_pose(m->body);
     
@@ -306,7 +306,7 @@ void SpatialAnalyzer::VoxelizeMotion(Motion* m, float time, VoxelGrid& occ, Voxe
     m->GetPosture(time, curr_pose);
     m->GetPosture(prev_time, prev_pose);
 
-    // ‡‰^“®ŠwŒvZiŠÖßˆÊ’u‚àæ“¾j
+    // é †é‹å‹•å­¦è¨ˆç®—ï¼ˆé–¢ç¯€ä½ç½®ã‚‚å–å¾—ï¼‰
     vector<Matrix4f> curr_frames, prev_frames;
     vector<Point3f> curr_joint_pos, prev_joint_pos;
     curr_pose.ForwardKinematics(curr_frames, curr_joint_pos);
@@ -316,25 +316,25 @@ void SpatialAnalyzer::VoxelizeMotion(Motion* m, float time, VoxelGrid& occ, Voxe
     float world_range[3];
     for(int i=0; i<3; ++i) world_range[i] = world_bounds[i][1] - world_bounds[i][0];
 
-    // ŠeƒZƒOƒƒ“ƒgiƒ{[ƒ“j‚É‚Â‚¢‚ÄŒvZ
+    // å„ã‚»ã‚°ãƒ¡ãƒ³ãƒˆï¼ˆãƒœãƒ¼ãƒ³ï¼‰ã«ã¤ã„ã¦è¨ˆç®—
     for (int s = 0; s < m->body->num_segments; ++s) {
         const Segment* seg = m->body->segments[s];
         
-        // MODIFIED: ‘Ìß–¼ƒx[ƒX‚Åw‚ğƒXƒLƒbƒviBVHƒtƒ@ƒCƒ‹‚É‚æ‚é‘Ìß”‚Ìˆá‚¢‚É‘Î‰j
+        // MODIFIED: ä½“ç¯€åãƒ™ãƒ¼ã‚¹ã§æŒ‡ã‚’ã‚¹ã‚­ãƒƒãƒ—ï¼ˆBVHãƒ•ã‚¡ã‚¤ãƒ«ã«ã‚ˆã‚‹ä½“ç¯€æ•°ã®é•ã„ã«å¯¾å¿œï¼‰
         if (IsFingerSegment(seg)) {
             continue;
         }
 
         Point3f p1, p2, p1_prev, p2_prev;
         
-        // ƒZƒOƒƒ“ƒg‚ÌÚ‘±ŠÖß”‚É‰‚¶‚ÄˆÊ’u‚ğæ“¾
+        // ã‚»ã‚°ãƒ¡ãƒ³ãƒˆã®æ¥ç¶šé–¢ç¯€æ•°ã«å¿œã˜ã¦ä½ç½®ã‚’å–å¾—
         if (seg->num_joints == 1) {
-            // ––’[ƒZƒOƒƒ“ƒgFƒZƒOƒƒ“ƒg‚ÌŒ´“_‚©‚ç––’[ˆÊ’uisitej‚Ü‚Å
+            // æœ«ç«¯ã‚»ã‚°ãƒ¡ãƒ³ãƒˆï¼šã‚»ã‚°ãƒ¡ãƒ³ãƒˆã®åŸç‚¹ã‹ã‚‰æœ«ç«¯ä½ç½®ï¼ˆsiteï¼‰ã¾ã§
             p1 = Point3f(curr_frames[s].m03, curr_frames[s].m13, curr_frames[s].m23);
             p1_prev = Point3f(prev_frames[s].m03, prev_frames[s].m13, prev_frames[s].m23);
             
             if (seg->has_site) {
-                // site_position‚ğƒ[ƒ‹ƒhÀ•W‚É•ÏŠ·
+                // site_positionã‚’ãƒ¯ãƒ¼ãƒ«ãƒ‰åº§æ¨™ã«å¤‰æ›
                 Matrix3f R_curr(curr_frames[s].m00, curr_frames[s].m01, curr_frames[s].m02, 
                                 curr_frames[s].m10, curr_frames[s].m11, curr_frames[s].m12, 
                                 curr_frames[s].m20, curr_frames[s].m21, curr_frames[s].m22);
@@ -349,17 +349,17 @@ void SpatialAnalyzer::VoxelizeMotion(Motion* m, float time, VoxelGrid& occ, Voxe
                 R_prev.transform(&offset_prev);
                 p2_prev = p1_prev + offset_prev;
             } else {
-                // site‚ª‚È‚¢ê‡‚ÍƒXƒLƒbƒv
+                // siteãŒãªã„å ´åˆã¯ã‚¹ã‚­ãƒƒãƒ—
                 continue;
             }
 
         } else if (seg->num_joints >= 2) {
-            // ’Êí‚Ìƒ{[ƒ“FeŠÖß‚©‚çqŠÖß‚Ö
-            // seg->joints[0] ‚ªƒ‹[ƒg‘¤Aseg->joints[1] ‚ª––’[‘¤
+            // é€šå¸¸ã®ãƒœãƒ¼ãƒ³ï¼šè¦ªé–¢ç¯€ã‹ã‚‰å­é–¢ç¯€ã¸
+            // seg->joints[0] ãŒãƒ«ãƒ¼ãƒˆå´ã€seg->joints[1] ãŒæœ«ç«¯å´
             Joint* root_joint = seg->joints[0];
             Joint* end_joint = seg->joints[1];
             
-            // ŠÖßˆÊ’u‚ğæ“¾
+            // é–¢ç¯€ä½ç½®ã‚’å–å¾—
             p1 = curr_joint_pos[root_joint->index];
             p2 = curr_joint_pos[end_joint->index];
             
@@ -369,12 +369,12 @@ void SpatialAnalyzer::VoxelizeMotion(Motion* m, float time, VoxelGrid& occ, Voxe
             continue;
         }
 
-        // ‘¬“xŒvZ
+        // é€Ÿåº¦è¨ˆç®—
         Vector3f vel1 = p1 - p1_prev;
         Vector3f vel2 = p2 - p2_prev;
         float speed = ((vel1.length() + vel2.length()) / 2.0f) / dt;
 
-        // ƒ{ƒNƒZƒ‹‚Ö‚Ì‘‚«‚İ (AABBÅ“K‰»•t‚«)
+        // ãƒœã‚¯ã‚»ãƒ«ã¸ã®æ›¸ãè¾¼ã¿ (AABBæœ€é©åŒ–ä»˜ã)
         float b_min[3], b_max[3];
         for(int i=0; i<3; ++i) {
             b_min[i] = min(sa_get_axis_value(p1, i), sa_get_axis_value(p2, i)) - bone_radius;
@@ -470,7 +470,7 @@ void SpatialAnalyzer::CalculateViewBounds(float& h_min, float& h_max, float& v_m
 }
 
 void SpatialAnalyzer::DrawSlicePlanes() {
-    // NEW: ‰ñ“]ƒXƒ‰ƒCƒXƒ‚[ƒh‚Ìê‡‚Í•Ê‚Ì•`‰æŠÖ”‚ğg—p
+    // NEW: å›è»¢ã‚¹ãƒ©ã‚¤ã‚¹ãƒ¢ãƒ¼ãƒ‰ã®å ´åˆã¯åˆ¥ã®æç”»é–¢æ•°ã‚’ä½¿ç”¨
     if (use_rotated_slice) {
         DrawRotatedSlicePlane();
         return;
@@ -487,40 +487,38 @@ void SpatialAnalyzer::DrawSlicePlanes() {
         float slice_val = slice_positions[i];
         Point3f p[4];
         
-        if (d_axis == 0) { // XƒXƒ‰ƒCƒX
+        if (d_axis == 0) { // Xã‚¹ãƒ©ã‚¤ã‚¹
             p[0].set(slice_val, v_min, h_min); p[1].set(slice_val, v_max, h_min);
             p[2].set(slice_val, v_max, h_max); p[3].set(slice_val, v_min, h_max);
-        } else if (d_axis == 1) { // YƒXƒ‰ƒCƒX
+        } else if (d_axis == 1) { // Yã‚¹ãƒ©ã‚¤ã‚¹
             p[0].set(h_min, slice_val, v_min); p[1].set(h_max, slice_val, v_min);
             p[2].set(h_max, slice_val, v_max); p[3].set(h_min, slice_val, v_max);
-        } else { // ZƒXƒ‰ƒCƒX
+        } else { // Zã‚¹ãƒ©ã‚¤ã‚¹
             p[0].set(h_min, v_min, slice_val); p[1].set(h_max, v_min, slice_val);
             p[2].set(h_max, v_max, slice_val); p[3].set(h_min, v_max, slice_val);
         }
 
+        // æ ç·šã®ã¿æç”»ï¼ˆå¡—ã‚Šã¤ã¶ã—ãªã—ï¼‰
         if ((int)i == active_slice_index) {
-            glColor4f(1.0f, 1.0f, 0.8f, 0.25f); glLineWidth(2.0f);
+            glColor4f(1.0f, 1.0f, 0.0f, 0.9f);  // é»„è‰²
+            glLineWidth(2.0f);
         } else {
-            glColor4f(0.7f, 0.7f, 1.0f, 0.15f); glLineWidth(1.0f);
+            glColor4f(0.5f, 0.5f, 1.0f, 0.7f);  // é’
+            glLineWidth(1.0f);
         }
-
-        glBegin(GL_QUADS);
-        for(int k=0; k<4; ++k) glVertex3f(p[k].x, p[k].y, p[k].z);
-        glEnd();
-        
         glBegin(GL_LINE_LOOP);
-        if ((int)i == active_slice_index) glColor4f(1.0f, 1.0f, 0.0f, 0.8f);
-        else glColor4f(0.5f, 0.5f, 1.0f, 0.5f);
         for(int k=0; k<4; ++k) glVertex3f(p[k].x, p[k].y, p[k].z);
         glEnd();
     }
+    
+    glLineWidth(1.0f);
     glDisable(GL_BLEND);
 }
 
 void SpatialAnalyzer::DrawCTMaps(int win_width, int win_height) {
     if (!show_maps) return;
     
-    // OpenGL 2Dİ’è
+    // OpenGL 2Dè¨­å®š
     glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity();
 	gluOrtho2D(0.0, win_width, win_height, 0.0);
 	glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity();
@@ -533,15 +531,16 @@ void SpatialAnalyzer::DrawCTMaps(int win_width, int win_height) {
     if (map_w > 250) map_w = 250; 
     int map_h = map_w; 
     
+    
     int start_x = margin;
     int start_y = win_height - margin - (num_rows * map_h + (num_rows - 1) * gap);
 
     float h_min, h_max, v_min, v_max;
     CalculateViewBounds(h_min, h_max, v_min, v_max);
 
-    // NEW: ‰ñ“]ƒXƒ‰ƒCƒXƒ‚[ƒh‚Ìê‡
+    // NEW: å›è»¢ã‚¹ãƒ©ã‚¤ã‚¹ãƒ¢ãƒ¼ãƒ‰ã®å ´åˆ
     if (use_rotated_slice) {
-        // ‰ñ“]ƒXƒ‰ƒCƒXƒ‚[ƒh‚Å‚Í1‚Â‚ÌƒXƒ‰ƒCƒXiƒAƒNƒeƒBƒu‚È‚à‚Ìj‚Ì‚İ•\¦
+        // å›è»¢ã‚¹ãƒ©ã‚¤ã‚¹ãƒ¢ãƒ¼ãƒ‰ã§ã¯1ã¤ã®ã‚¹ãƒ©ã‚¤ã‚¹ï¼ˆã‚¢ã‚¯ãƒ†ã‚£ãƒ–ãªã‚‚ã®ï¼‰ã®ã¿è¡¨ç¤º
         int y_pos = start_y;
         
         char t1[64], t2[64], t3[64];
@@ -554,7 +553,7 @@ void SpatialAnalyzer::DrawCTMaps(int win_width, int win_height) {
         VoxelGrid* grid_diff = nullptr;
         float max_value = 1.0f;
         
-        // •\¦‚·‚éƒ{ƒNƒZƒ‹ƒOƒŠƒbƒh‚ğ‘I‘ğ
+        // è¡¨ç¤ºã™ã‚‹ãƒœã‚¯ã‚»ãƒ«ã‚°ãƒªãƒƒãƒ‰ã‚’é¸æŠ
         if (show_segment_mode && selected_segment_index >= 0 && 
             selected_segment_index < segment_voxels1.num_segments) {
             grid1 = &segment_voxels1.GetSegmentGrid(selected_segment_index);
@@ -593,7 +592,7 @@ void SpatialAnalyzer::DrawCTMaps(int win_width, int win_height) {
             }
         }
         
-        // ‰ñ“]ƒXƒ‰ƒCƒXƒ}ƒbƒv‚ğ•`‰æ
+        // å›è»¢ã‚¹ãƒ©ã‚¤ã‚¹ãƒãƒƒãƒ—ã‚’æç”»
         DrawRotatedSliceMap(start_x, y_pos, map_w, map_h, *grid1, max_value, t1);
         DrawRotatedSliceMap(start_x + map_w + gap, y_pos, map_w, map_h, *grid2, max_value, t2);
         DrawRotatedSliceMap(start_x + 2*(map_w + gap), y_pos, map_w, map_h, *grid_diff, max_value, t3);
@@ -604,14 +603,14 @@ void SpatialAnalyzer::DrawCTMaps(int win_width, int win_height) {
         return;
     }
 
-    // ’Êíƒ‚[ƒhiŠù‘¶ƒR[ƒhj
+    // é€šå¸¸ãƒ¢ãƒ¼ãƒ‰ï¼ˆæ—¢å­˜ã‚³ãƒ¼ãƒ‰ï¼‰
     for (int i = 0; i < num_rows; ++i) {
         int y_pos = start_y + i * (map_h + gap);
         float slice_val = slice_positions[i];
         
         char t1[64], t2[64], t3[64];
         
-        // •”ˆÊ•Ê•\¦ƒ‚[ƒh‚Ìê‡‚Íƒ^ƒCƒgƒ‹‚ğ•ÏX
+        // éƒ¨ä½åˆ¥è¡¨ç¤ºãƒ¢ãƒ¼ãƒ‰ã®å ´åˆã¯ã‚¿ã‚¤ãƒˆãƒ«ã‚’å¤‰æ›´
         if (show_segment_mode && selected_segment_index >= 0) {
             sprintf(t1, "S%d M1 (Seg:%d)", i+1, selected_segment_index);
             sprintf(t2, "S%d M2 (Seg:%d)", i+1, selected_segment_index);
@@ -627,14 +626,14 @@ void SpatialAnalyzer::DrawCTMaps(int win_width, int win_height) {
         VoxelGrid* grid_diff = nullptr;
         float max_value = 1.0f;
 
-        // NEW: ƒ{ƒNƒZƒ‹ƒf[ƒ^‚ğ’¼Úg—p‚·‚é‚æ‚¤‚ÉC³
+        // NEW: ãƒœã‚¯ã‚»ãƒ«ãƒ‡ãƒ¼ã‚¿ã‚’ç›´æ¥ä½¿ç”¨ã™ã‚‹ã‚ˆã†ã«ä¿®æ­£
         if (show_segment_mode && selected_segment_index >= 0 && 
             selected_segment_index < segment_voxels1.num_segments) {
-            // •”ˆÊ•Ê•\¦ƒ‚[ƒh: •”ˆÊ‚²‚Æ‚Ì—İÏƒ{ƒNƒZƒ‹‚ğg—p
+            // éƒ¨ä½åˆ¥è¡¨ç¤ºãƒ¢ãƒ¼ãƒ‰: éƒ¨ä½ã”ã¨ã®ç´¯ç©ãƒœã‚¯ã‚»ãƒ«ã‚’ä½¿ç”¨
             grid1 = &segment_voxels1.GetSegmentGrid(selected_segment_index);
             grid2 = &segment_voxels2.GetSegmentGrid(selected_segment_index);
             
-            // ·•ª‚ğŒvZ
+            // å·®åˆ†ã‚’è¨ˆç®—
             static VoxelGrid temp_diff;
             temp_diff.Resize(grid_resolution);
             temp_diff.Clear();
@@ -649,24 +648,24 @@ void SpatialAnalyzer::DrawCTMaps(int win_width, int win_height) {
             grid_diff = &temp_diff;
             
         } else {
-            // ‘S‘Ì•\¦ƒ‚[ƒh: norm_mode‚Å—İÏ/Œ»İƒtƒŒ[ƒ€‚ğØ‚è‘Ö‚¦
+            // å…¨ä½“è¡¨ç¤ºãƒ¢ãƒ¼ãƒ‰: norm_modeã§ç´¯ç©/ç¾åœ¨ãƒ•ãƒ¬ãƒ¼ãƒ ã‚’åˆ‡ã‚Šæ›¿ãˆ
             if (norm_mode == 0) {
-                // Œ»İƒtƒŒ[ƒ€‚Ìƒ{ƒNƒZƒ‹ƒf[ƒ^
+                // ç¾åœ¨ãƒ•ãƒ¬ãƒ¼ãƒ ã®ãƒœã‚¯ã‚»ãƒ«ãƒ‡ãƒ¼ã‚¿
                 if (feature_mode == 0) {
-                    // è—L—¦
+                    // å æœ‰ç‡
                     grid1 = &voxels1_occ;
                     grid2 = &voxels2_occ;
                     grid_diff = &voxels_diff;
                     max_value = max_occ_val;
                 } else {
-                    // ‘¬“x
+                    // é€Ÿåº¦
                     grid1 = &voxels1_spd;
                     grid2 = &voxels2_spd;
                     grid_diff = &voxels_spd_diff;
                     max_value = global_max_spd;
                 }
             } else {
-                // —İÏƒ{ƒNƒZƒ‹ƒf[ƒ^
+                // ç´¯ç©ãƒœã‚¯ã‚»ãƒ«ãƒ‡ãƒ¼ã‚¿
                 grid1 = &voxels1_accumulated;
                 grid2 = &voxels2_accumulated;
                 grid_diff = &voxels_accumulated_diff;
@@ -674,7 +673,7 @@ void SpatialAnalyzer::DrawCTMaps(int win_width, int win_height) {
             }
         }
 
-        // ƒ{ƒNƒZƒ‹ƒf[ƒ^‚ğ‚»‚Ì‚Ü‚Ü2Dƒ}ƒbƒv‚É“Š‰e‚µ‚Ä•`‰æ
+        // ãƒœã‚¯ã‚»ãƒ«ãƒ‡ãƒ¼ã‚¿ã‚’ãã®ã¾ã¾2Dãƒãƒƒãƒ—ã«æŠ•å½±ã—ã¦æç”»
         DrawSingleMap(start_x, y_pos, map_w, map_h, *grid1, max_value, t1, slice_val, h_min, h_max, v_min, v_max);
         DrawSingleMap(start_x + map_w + gap, y_pos, map_w, map_h, *grid2, max_value, t2, slice_val, h_min, h_max, v_min, v_max);
         DrawSingleMap(start_x + 2*(map_w + gap), y_pos, map_w, map_h, *grid_diff, max_value, t3, slice_val, h_min, h_max, v_min, v_max);
@@ -708,13 +707,13 @@ void SpatialAnalyzer::DrawSingleMap(int x_pos, int y_pos, int w, int h, VoxelGri
     float world_range[3];
     for(int i=0; i<3; ++i) world_range[i] = world_bounds[i][1] - world_bounds[i][0];
     
-    // ƒXƒ‰ƒCƒXˆÊ’u‚É‘Î‰‚·‚é[‚³²‚ÌƒCƒ“ƒfƒbƒNƒX‚ğŒvZ
+    // ã‚¹ãƒ©ã‚¤ã‚¹ä½ç½®ã«å¯¾å¿œã™ã‚‹æ·±ã•è»¸ã®ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ã‚’è¨ˆç®—
     int z_idx = (int)(((slice_val - world_bounds[d_axis][0]) / world_range[d_axis]) * grid_resolution);
     if (z_idx < 0 || z_idx >= grid_resolution) return;
 
     glBegin(GL_QUADS);
     
-    // 2D•½–Ê‚Å‚Ì•`‰æ‰ğ‘œ“xi‚‘¬‰»‚Ì‚½‚ß‘e‚­İ’èj
+    // 2Då¹³é¢ã§ã®æç”»è§£åƒåº¦ï¼ˆé«˜é€ŸåŒ–ã®ãŸã‚ç²—ãè¨­å®šï¼‰
     int draw_res = 64; 
     float cell_w = (float)w / draw_res;
     float cell_h = (float)h / draw_res;
@@ -722,38 +721,38 @@ void SpatialAnalyzer::DrawSingleMap(int x_pos, int y_pos, int w, int h, VoxelGri
     float h_range_view = h_max - h_min;
     float v_range_view = v_max - v_min;
     
-    // NEW: Y²‚ª‚’¼²‚Ìê‡‚Íã‰º‚ğ”½“]iÀÛ‚Ìƒ[ƒ‹ƒhÀ•W‚Ì‰º‚ª‰æ–Ê‚Ì‰º‚É‚È‚é‚æ‚¤‚Éj
+    // NEW: Yè»¸ãŒå‚ç›´è»¸ã®å ´åˆã¯ä¸Šä¸‹ã‚’åè»¢ï¼ˆå®Ÿéš›ã®ãƒ¯ãƒ¼ãƒ«ãƒ‰åº§æ¨™ã®ä¸‹ãŒç”»é¢ã®ä¸‹ã«ãªã‚‹ã‚ˆã†ã«ï¼‰
     bool flip_v = (v_axis == 1);
 
-    // 2D•½–Ê‚ÌŠeƒsƒNƒZƒ‹‚É‘Î‚µ‚Äƒ{ƒNƒZƒ‹’l‚ğæ“¾‚µ‚Ä•`‰æ
+    // 2Då¹³é¢ã®å„ãƒ”ã‚¯ã‚»ãƒ«ã«å¯¾ã—ã¦ãƒœã‚¯ã‚»ãƒ«å€¤ã‚’å–å¾—ã—ã¦æç”»
     for (int iy = 0; iy < draw_res; ++iy) {
         for (int ix = 0; ix < draw_res; ++ix) {
-            // ƒXƒNƒŠ[ƒ“À•W -> ƒ[ƒ‹ƒhÀ•W‚Ö‚Ì•ÏŠ·
+            // ã‚¹ã‚¯ãƒªãƒ¼ãƒ³åº§æ¨™ -> ãƒ¯ãƒ¼ãƒ«ãƒ‰åº§æ¨™ã¸ã®å¤‰æ›
             float wx = h_min + (ix + 0.5f) * (h_range_view / draw_res);
             float wy = v_min + (iy + 0.5f) * (v_range_view / draw_res);
             
-            // ƒ[ƒ‹ƒhÀ•W -> ƒ{ƒNƒZƒ‹ƒOƒŠƒbƒhƒCƒ“ƒfƒbƒNƒX‚Ö‚Ì•ÏŠ·
+            // ãƒ¯ãƒ¼ãƒ«ãƒ‰åº§æ¨™ -> ãƒœã‚¯ã‚»ãƒ«ã‚°ãƒªãƒƒãƒ‰ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ã¸ã®å¤‰æ›
             int gx = (int)(((wx - world_bounds[h_axis][0]) / world_range[h_axis]) * grid_resolution);
             int gy = (int)(((wy - world_bounds[v_axis][0]) / world_range[v_axis]) * grid_resolution);
             
-            // 3D²ƒ}ƒbƒsƒ“ƒO (h_axis, v_axis, d_axis -> x, y, z)
+            // 3Dè»¸ãƒãƒƒãƒ”ãƒ³ã‚° (h_axis, v_axis, d_axis -> x, y, z)
             int idx[3];
             idx[h_axis] = gx;
             idx[v_axis] = gy;
             idx[d_axis] = z_idx;
             
-            // ƒ{ƒNƒZƒ‹ƒOƒŠƒbƒh‚©‚ç’l‚ğ’¼Úæ“¾i‚±‚ê‚ªƒƒCƒ“‚Ì–§“xƒf[ƒ^j
+            // ãƒœã‚¯ã‚»ãƒ«ã‚°ãƒªãƒƒãƒ‰ã‹ã‚‰å€¤ã‚’ç›´æ¥å–å¾—ï¼ˆã“ã‚ŒãŒãƒ¡ã‚¤ãƒ³ã®å¯†åº¦ãƒ‡ãƒ¼ã‚¿ï¼‰
             float val = grid.Get(idx[0], idx[1], idx[2]);
 
-            // è‡’lˆÈã‚Ì’l‚ğ‚Âƒ{ƒNƒZƒ‹‚Ì‚İ•`‰æ
+            // é–¾å€¤ä»¥ä¸Šã®å€¤ã‚’æŒã¤ãƒœã‚¯ã‚»ãƒ«ã®ã¿æç”»
             if (val > 0.01f) {
-                // ’l‚ğ³‹K‰»‚µ‚Äƒq[ƒgƒ}ƒbƒvƒJƒ‰[‚É•ÏŠ·
+                // å€¤ã‚’æ­£è¦åŒ–ã—ã¦ãƒ’ãƒ¼ãƒˆãƒãƒƒãƒ—ã‚«ãƒ©ãƒ¼ã«å¤‰æ›
                 Color3f c = sa_get_heatmap_color(val / max_val);
                 glColor3f(c.x, c.y, c.z);
                 
-                // ƒXƒNƒŠ[ƒ“À•W‚Å‚ÌlŠpŒ`‚ğ•`‰æ
+                // ã‚¹ã‚¯ãƒªãƒ¼ãƒ³åº§æ¨™ã§ã®å››è§’å½¢ã‚’æç”»
                 float sx = x_pos + ix * cell_w;
-                // NEW: Y²‚ª‚’¼‚Ìê‡‚Íã‰º”½“]
+                // NEW: Yè»¸ãŒå‚ç›´ã®å ´åˆã¯ä¸Šä¸‹åè»¢
                 float sy = flip_v ? (y_pos + (draw_res - 1 - iy) * cell_h) : (y_pos + iy * cell_h);
                 
                 glVertex2f(sx, sy);
@@ -765,19 +764,19 @@ void SpatialAnalyzer::DrawSingleMap(int x_pos, int y_pos, int w, int h, VoxelGri
     }
     glEnd();
     
-    // ƒ^ƒCƒgƒ‹‚ğ•`‰æ
+    // ã‚¿ã‚¤ãƒˆãƒ«ã‚’æç”»
     glColor3f(0,0,0);
     glRasterPos2i(x_pos, y_pos - 5);
     for (const char* c = title; *c != '\0'; c++) glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, *c);
 }
 
 
-// --- ‘€ì ---
+// --- æ“ä½œ ---
 void SpatialAnalyzer::ResetView() { zoom = 1.0f; pan_center.set(0.0f, 0.0f); is_manual_view = false; }
 void SpatialAnalyzer::Pan(float dx, float dy) { pan_center.x += dx; pan_center.y += dy; is_manual_view = true; }
 void SpatialAnalyzer::Zoom(float factor) { zoom *= factor; is_manual_view = true; }
 
-// NEW: 3Dƒ{ƒNƒZƒ‹‚Ì•`‰æ
+// NEW: 3Dãƒœã‚¯ã‚»ãƒ«ã®æç”»
 void SpatialAnalyzer::DrawVoxels3D() {
     if (!show_voxels) return;
 
@@ -792,17 +791,17 @@ void SpatialAnalyzer::DrawVoxels3D() {
     float cell_size_y = world_range[1] / grid_resolution;
     float cell_size_z = world_range[2] / grid_resolution;
     
-    // •`‰æ‰ğ‘œ“x‚ğ‰º‚°‚Ä‚‘¬‰»
-    int step = grid_resolution / 16;
+    // æç”»è§£åƒåº¦ã‚’ä¸‹ã’ã¦é«˜é€ŸåŒ–
+    int step = grid_resolution / 32;
     if (step < 1) step = 1;
     
     VoxelGrid* grid_to_draw = nullptr;
     float max_val = 1.0f;
     
-    // NEW: •”ˆÊ•Ê•\¦ƒ‚[ƒh
+    // NEW: éƒ¨ä½åˆ¥è¡¨ç¤ºãƒ¢ãƒ¼ãƒ‰
     if (show_segment_mode && selected_segment_index >= 0 && 
         selected_segment_index < segment_voxels1.num_segments) {
-        // “Á’è‚Ì•”ˆÊ‚Ì‚İ•\¦i·•ª‚ğŒvZj
+        // ç‰¹å®šã®éƒ¨ä½ã®ã¿è¡¨ç¤ºï¼ˆå·®åˆ†ã‚’è¨ˆç®—ï¼‰
         static VoxelGrid temp_seg_diff;
         temp_seg_diff.Resize(grid_resolution);
         temp_seg_diff.Clear();
@@ -822,7 +821,7 @@ void SpatialAnalyzer::DrawVoxels3D() {
         grid_to_draw = &temp_seg_diff;
         
     } else if (norm_mode == 0) {
-        // Œ»İƒtƒŒ[ƒ€‚Ì‚İ
+        // ç¾åœ¨ãƒ•ãƒ¬ãƒ¼ãƒ ã®ã¿
         if (feature_mode == 0) {
             grid_to_draw = &voxels_diff;
             max_val = max_occ_val;
@@ -831,12 +830,12 @@ void SpatialAnalyzer::DrawVoxels3D() {
             max_val = global_max_spd;
         }
     } else {
-        // “®ì‘S‘Ì‚Ì—İÏƒf[ƒ^
+        // å‹•ä½œå…¨ä½“ã®ç´¯ç©ãƒ‡ãƒ¼ã‚¿
         grid_to_draw = &voxels_accumulated_diff;
         max_val = max_accumulated_val;
     }
     
-    // ƒ{ƒNƒZƒ‹‚ğ•`‰æ
+    // ãƒœã‚¯ã‚»ãƒ«ã‚’æç”»
     for (int z = 0; z < grid_resolution; z += step) {
         for (int y = 0; y < grid_resolution; y += step) {
             for (int x = 0; x < grid_resolution; x += step) {
@@ -867,7 +866,7 @@ void SpatialAnalyzer::DrawVoxels3D() {
     glDisable(GL_BLEND);
 }
 
-// NEW: —İÏƒ{ƒNƒZƒ‹‚ÌƒNƒŠƒA
+// NEW: ç´¯ç©ãƒœã‚¯ã‚»ãƒ«ã®ã‚¯ãƒªã‚¢
 void SpatialAnalyzer::ClearAccumulatedVoxels() {
     voxels1_accumulated.Clear();
     voxels2_accumulated.Clear();
@@ -875,14 +874,14 @@ void SpatialAnalyzer::ClearAccumulatedVoxels() {
     max_accumulated_val = 0.0f;
 }
 
-// NEW: “®ì‘S‘Ì‚ğ’Ê‚µ‚½—İÏƒ{ƒNƒZƒ‹ŒvZ
+// NEW: å‹•ä½œå…¨ä½“ã‚’é€šã—ãŸç´¯ç©ãƒœã‚¯ã‚»ãƒ«è¨ˆç®—
 void SpatialAnalyzer::AccumulateVoxelsAllFrames(Motion* m1, Motion* m2) {
     if (!m1 || !m2) return;
     
-    // —İÏƒOƒŠƒbƒh‚ğƒNƒŠƒA
+    // ç´¯ç©ã‚°ãƒªãƒƒãƒ‰ã‚’ã‚¯ãƒªã‚¢
     ClearAccumulatedVoxels();
     
-    // NEW: Šî€p¨‚ğ•Û‘¶i‰ŠúƒtƒŒ[ƒ€‚Ì˜‚ÌˆÊ’uE‰ñ“]j
+    // NEW: åŸºæº–å§¿å‹¢ã‚’ä¿å­˜ï¼ˆåˆæœŸãƒ•ãƒ¬ãƒ¼ãƒ ã®è…°ã®ä½ç½®ãƒ»å›è»¢ï¼‰
     if (m1->num_frames > 0) {
         voxels1_accumulated.SetReference(m1->frames[0].root_pos, m1->frames[0].root_ori);
     }
@@ -890,12 +889,12 @@ void SpatialAnalyzer::AccumulateVoxelsAllFrames(Motion* m1, Motion* m2) {
         voxels2_accumulated.SetReference(m2->frames[0].root_pos, m2->frames[0].root_ori);
     }
     
-    // —¼•û‚Ìƒ‚[ƒVƒ‡ƒ“‚Ì‘SƒtƒŒ[ƒ€‚ğˆ—
+    // ä¸¡æ–¹ã®ãƒ¢ãƒ¼ã‚·ãƒ§ãƒ³ã®å…¨ãƒ•ãƒ¬ãƒ¼ãƒ ã‚’å‡¦ç†
     int max_frames = max(m1->num_frames, m2->num_frames);
     
     std::cout << "Accumulating voxels for " << max_frames << " frames..." << std::endl;
     
-    // ƒ‚[ƒVƒ‡ƒ“1‚Ì‘SƒtƒŒ[ƒ€‚ğ—İÏ
+    // ãƒ¢ãƒ¼ã‚·ãƒ§ãƒ³1ã®å…¨ãƒ•ãƒ¬ãƒ¼ãƒ ã‚’ç´¯ç©
     for (int f = 0; f < m1->num_frames; ++f) {
         float time = f * m1->interval;
         VoxelGrid temp_occ, temp_spd;
@@ -904,14 +903,14 @@ void SpatialAnalyzer::AccumulateVoxelsAllFrames(Motion* m1, Motion* m2) {
         
         VoxelizeMotion(m1, time, temp_occ, temp_spd);
         
-        // —İÏƒOƒŠƒbƒh‚É‰ÁZ
+        // ç´¯ç©ã‚°ãƒªãƒƒãƒ‰ã«åŠ ç®—
         int size = grid_resolution * grid_resolution * grid_resolution;
         for (int i = 0; i < size; ++i) {
             voxels1_accumulated.data[i] += temp_occ.data[i];
         }
     }
     
-    // ƒ‚[ƒVƒ‡ƒ“2‚Ì‘SƒtƒŒ[ƒ€‚ğ—İÏ
+    // ãƒ¢ãƒ¼ã‚·ãƒ§ãƒ³2ã®å…¨ãƒ•ãƒ¬ãƒ¼ãƒ ã‚’ç´¯ç©
     for (int f = 0; f < m2->num_frames; ++f) {
         float time = f * m2->interval;
         VoxelGrid temp_occ, temp_spd;
@@ -920,14 +919,14 @@ void SpatialAnalyzer::AccumulateVoxelsAllFrames(Motion* m1, Motion* m2) {
         
         VoxelizeMotion(m2, time, temp_occ, temp_spd);
         
-        // —İÏƒOƒŠƒbƒh‚É‰ÁZ
+        // ç´¯ç©ã‚°ãƒªãƒƒãƒ‰ã«åŠ ç®—
         int size = grid_resolution * grid_resolution * grid_resolution;
         for (int i = 0; i < size; ++i) {
             voxels2_accumulated.data[i] += temp_occ.data[i];
         }
     }
     
-    // ·•ª‚ğŒvZ‚µAÅ‘å’l‚ğXV
+    // å·®åˆ†ã‚’è¨ˆç®—ã—ã€æœ€å¤§å€¤ã‚’æ›´æ–°
     int size = grid_resolution * grid_resolution * grid_resolution;
     max_accumulated_val = 0.0f;
     
@@ -941,7 +940,7 @@ void SpatialAnalyzer::AccumulateVoxelsAllFrames(Motion* m1, Motion* m2) {
     
     if (max_accumulated_val < 1e-5f) max_accumulated_val = 1.0f;
     
-    // NEW: ·•ªƒOƒŠƒbƒh‚É‚àŠî€p¨‚ğİ’èiƒ‚[ƒVƒ‡ƒ“1‚ÌŠî€‚ğg—pj
+    // NEW: å·®åˆ†ã‚°ãƒªãƒƒãƒ‰ã«ã‚‚åŸºæº–å§¿å‹¢ã‚’è¨­å®šï¼ˆãƒ¢ãƒ¼ã‚·ãƒ§ãƒ³1ã®åŸºæº–ã‚’ä½¿ç”¨ï¼‰
     if (voxels1_accumulated.has_reference) {
         voxels_accumulated_diff.SetReference(voxels1_accumulated.reference_root_pos, 
                                              voxels1_accumulated.reference_root_ori);
@@ -950,11 +949,11 @@ void SpatialAnalyzer::AccumulateVoxelsAllFrames(Motion* m1, Motion* m2) {
     std::cout << "Accumulation complete. Max accumulated value: " << max_accumulated_val << std::endl;
 }
 
-// NEW: •”ˆÊ‚²‚Æ‚Ìƒ{ƒNƒZƒ‹‰»
+// NEW: éƒ¨ä½ã”ã¨ã®ãƒœã‚¯ã‚»ãƒ«åŒ–
 void SpatialAnalyzer::VoxelizeMotionBySegment(Motion* m, float time, SegmentVoxelData& seg_data) {
     if (!m) return;
     
-    // Œ»İƒtƒŒ[ƒ€‚Æ‘OƒtƒŒ[ƒ€‚Ìp¨‚ğæ“¾
+    // ç¾åœ¨ãƒ•ãƒ¬ãƒ¼ãƒ ã¨å‰ãƒ•ãƒ¬ãƒ¼ãƒ ã®å§¿å‹¢ã‚’å–å¾—
     Posture curr_pose(m->body);
     Posture prev_pose(m->body);
     
@@ -965,7 +964,7 @@ void SpatialAnalyzer::VoxelizeMotionBySegment(Motion* m, float time, SegmentVoxe
     m->GetPosture(time, curr_pose);
     m->GetPosture(prev_time, prev_pose);
 
-    // ‡‰^“®ŠwŒvZiŠÖßˆÊ’u‚àæ“¾j
+    // é †é‹å‹•å­¦è¨ˆç®—ï¼ˆé–¢ç¯€ä½ç½®ã‚‚å–å¾—ï¼‰
     vector<Matrix4f> curr_frames, prev_frames;
     vector<Point3f> curr_joint_pos, prev_joint_pos;
     curr_pose.ForwardKinematics(curr_frames, curr_joint_pos);
@@ -975,25 +974,25 @@ void SpatialAnalyzer::VoxelizeMotionBySegment(Motion* m, float time, SegmentVoxe
     float world_range[3];
     for(int i=0; i<3; ++i) world_range[i] = world_bounds[i][1] - world_bounds[i][0];
 
-    // ŠeƒZƒOƒƒ“ƒgiƒ{[ƒ“j‚É‚Â‚¢‚ÄŒÂ•Ê‚ÉŒvZ
+    // å„ã‚»ã‚°ãƒ¡ãƒ³ãƒˆï¼ˆãƒœãƒ¼ãƒ³ï¼‰ã«ã¤ã„ã¦å€‹åˆ¥ã«è¨ˆç®—
     for (int s = 0; s < m->body->num_segments; ++s) {
         const Segment* seg = m->body->segments[s];
         
-        // MODIFIED: ‘Ìß–¼ƒx[ƒX‚Åw‚ğƒXƒLƒbƒviBVHƒtƒ@ƒCƒ‹‚É‚æ‚é‘Ìß”‚Ìˆá‚¢‚É‘Î‰j
+        // MODIFIED: ä½“ç¯€åãƒ™ãƒ¼ã‚¹ã§æŒ‡ã‚’ã‚¹ã‚­ãƒƒãƒ—ï¼ˆBVHãƒ•ã‚¡ã‚¤ãƒ«ã«ã‚ˆã‚‹ä½“ç¯€æ•°ã®é•ã„ã«å¯¾å¿œï¼‰
         if (IsFingerSegment(seg)) {
             continue;
         }
 
         Point3f p1, p2, p1_prev, p2_prev;
         
-        // ƒZƒOƒƒ“ƒg‚ÌÚ‘±ŠÖß”‚É‰‚¶‚ÄˆÊ’u‚ğæ“¾
+        // ã‚»ã‚°ãƒ¡ãƒ³ãƒˆã®æ¥ç¶šé–¢ç¯€æ•°ã«å¿œã˜ã¦ä½ç½®ã‚’å–å¾—
         if (seg->num_joints == 1) {
-            // ––’[ƒZƒOƒƒ“ƒgFƒZƒOƒƒ“ƒg‚ÌŒ´“_‚©‚ç––’[ˆÊ’uisitej‚Ü‚Å
+            // æœ«ç«¯ã‚»ã‚°ãƒ¡ãƒ³ãƒˆï¼šã‚»ã‚°ãƒ¡ãƒ³ãƒˆã®åŸç‚¹ã‹ã‚‰æœ«ç«¯ä½ç½®ï¼ˆsiteï¼‰ã¾ã§
             p1 = Point3f(curr_frames[s].m03, curr_frames[s].m13, curr_frames[s].m23);
             p1_prev = Point3f(prev_frames[s].m03, prev_frames[s].m13, prev_frames[s].m23);
             
             if (seg->has_site) {
-                // site_position‚ğƒ[ƒ‹ƒhÀ•W‚É•ÏŠ·
+                // site_positionã‚’ãƒ¯ãƒ¼ãƒ«ãƒ‰åº§æ¨™ã«å¤‰æ›
                 Matrix3f R_curr(curr_frames[s].m00, curr_frames[s].m01, curr_frames[s].m02, 
                                 curr_frames[s].m10, curr_frames[s].m11, curr_frames[s].m12, 
                                 curr_frames[s].m20, curr_frames[s].m21, curr_frames[s].m22);
@@ -1008,17 +1007,17 @@ void SpatialAnalyzer::VoxelizeMotionBySegment(Motion* m, float time, SegmentVoxe
                 R_prev.transform(&offset_prev);
                 p2_prev = p1_prev + offset_prev;
             } else {
-                // site‚ª‚È‚¢ê‡‚ÍƒXƒLƒbƒv
+                // siteãŒãªã„å ´åˆã¯ã‚¹ã‚­ãƒƒãƒ—
                 continue;
             }
 
         } else if (seg->num_joints >= 2) {
-            // ’Êí‚Ìƒ{[ƒ“FeŠÖß‚©‚çqŠÖß‚Ö
-            // seg->joints[0] ‚ªƒ‹[ƒg‘¤Aseg->joints[1] ‚ª––’[‘¤
+            // é€šå¸¸ã®ãƒœãƒ¼ãƒ³ï¼šè¦ªé–¢ç¯€ã‹ã‚‰å­é–¢ç¯€ã¸
+            // seg->joints[0] ãŒãƒ«ãƒ¼ãƒˆå´ã€seg->joints[1] ãŒæœ«ç«¯å´
             Joint* root_joint = seg->joints[0];
             Joint* end_joint = seg->joints[1];
             
-            // ŠÖßˆÊ’u‚ğæ“¾
+            // é–¢ç¯€ä½ç½®ã‚’å–å¾—
             p1 = curr_joint_pos[root_joint->index];
             p2 = curr_joint_pos[end_joint->index];
             
@@ -1028,7 +1027,7 @@ void SpatialAnalyzer::VoxelizeMotionBySegment(Motion* m, float time, SegmentVoxe
             continue;
         }
 
-        // AABBÅ“K‰»
+        // AABBæœ€é©åŒ–
         float b_min[3], b_max[3];
         for(int i=0; i<3; ++i) {
             b_min[i] = min(sa_get_axis_value(p1, i), sa_get_axis_value(p2, i)) - bone_radius;
@@ -1041,7 +1040,7 @@ void SpatialAnalyzer::VoxelizeMotionBySegment(Motion* m, float time, SegmentVoxe
             idx_max[i] = min(grid_resolution - 1, (int)(((b_max[i] - world_bounds[i][0]) / world_range[i]) * grid_resolution));
         }
 
-        // ‚±‚ÌƒZƒOƒƒ“ƒgê—p‚ÌƒOƒŠƒbƒh‚É‘‚«‚İ
+        // ã“ã®ã‚»ã‚°ãƒ¡ãƒ³ãƒˆå°‚ç”¨ã®ã‚°ãƒªãƒƒãƒ‰ã«æ›¸ãè¾¼ã¿
         VoxelGrid& seg_grid = seg_data.GetSegmentGrid(s);
 
         for (int z = idx_min[2]; z <= idx_max[2]; ++z) {
@@ -1076,20 +1075,20 @@ void SpatialAnalyzer::VoxelizeMotionBySegment(Motion* m, float time, SegmentVoxe
     }
 }
 
-// NEW: •”ˆÊ‚²‚Æ‚Ì—İÏƒ{ƒNƒZƒ‹ŒvZ
+// NEW: éƒ¨ä½ã”ã¨ã®ç´¯ç©ãƒœã‚¯ã‚»ãƒ«è¨ˆç®—
 void SpatialAnalyzer::AccumulateVoxelsBySegmentAllFrames(Motion* m1, Motion* m2) {
     if (!m1 || !m2) return;
     
-    // •”ˆÊ”‚ğæ“¾
+    // éƒ¨ä½æ•°ã‚’å–å¾—
     int num_segments = m1->body->num_segments;
     
-    // •”ˆÊ‚²‚Æ‚ÌƒOƒŠƒbƒh‚ğƒŠƒTƒCƒY
+    // éƒ¨ä½ã”ã¨ã®ã‚°ãƒªãƒƒãƒ‰ã‚’ãƒªã‚µã‚¤ã‚º
     segment_voxels1.Resize(num_segments, grid_resolution);
     segment_voxels2.Resize(num_segments, grid_resolution);
     
     std::cout << "Accumulating voxels by segment for " << num_segments << " segments..." << std::endl;
     
-    // ƒ‚[ƒVƒ‡ƒ“1‚Ì‘SƒtƒŒ[ƒ€‚ğ•”ˆÊ‚²‚Æ‚É—İÏ
+    // ãƒ¢ãƒ¼ã‚·ãƒ§ãƒ³1ã®å…¨ãƒ•ãƒ¬ãƒ¼ãƒ ã‚’éƒ¨ä½ã”ã¨ã«ç´¯ç©
     for (int f = 0; f < m1->num_frames; ++f) {
         float time = f * m1->interval;
         SegmentVoxelData temp_seg_data;
@@ -1097,7 +1096,7 @@ void SpatialAnalyzer::AccumulateVoxelsBySegmentAllFrames(Motion* m1, Motion* m2)
         
         VoxelizeMotionBySegment(m1, time, temp_seg_data);
         
-        // —İÏ
+        // ç´¯ç©
         for (int s = 0; s < num_segments; ++s) {
             int size = grid_resolution * grid_resolution * grid_resolution;
             for (int i = 0; i < size; ++i) {
@@ -1106,7 +1105,7 @@ void SpatialAnalyzer::AccumulateVoxelsBySegmentAllFrames(Motion* m1, Motion* m2)
         }
     }
     
-    // ƒ‚[ƒVƒ‡ƒ“2‚Ì‘SƒtƒŒ[ƒ€‚ğ•”ˆÊ‚²‚Æ‚É—İÏ
+    // ãƒ¢ãƒ¼ã‚·ãƒ§ãƒ³2ã®å…¨ãƒ•ãƒ¬ãƒ¼ãƒ ã‚’éƒ¨ä½ã”ã¨ã«ç´¯ç©
     for (int f = 0; f < m2->num_frames; ++f) {
         float time = f * m2->interval;
         SegmentVoxelData temp_seg_data;
@@ -1114,7 +1113,7 @@ void SpatialAnalyzer::AccumulateVoxelsBySegmentAllFrames(Motion* m1, Motion* m2)
         
         VoxelizeMotionBySegment(m2, time, temp_seg_data);
         
-        // —İÏ
+        // ç´¯ç©
         for (int s = 0; s < num_segments; ++s) {
             int size = grid_resolution * grid_resolution * grid_resolution;
             for (int i = 0; i < size; ++i) {
@@ -1126,7 +1125,7 @@ void SpatialAnalyzer::AccumulateVoxelsBySegmentAllFrames(Motion* m1, Motion* m2)
     std::cout << "Segment-wise accumulation complete." << std::endl;
 }
 
-// NEW: ƒLƒƒƒbƒVƒ…ƒtƒ@ƒCƒ‹–¼‚ğ¶¬
+// NEW: ã‚­ãƒ£ãƒƒã‚·ãƒ¥ãƒ•ã‚¡ã‚¤ãƒ«åã‚’ç”Ÿæˆ
 std::string SpatialAnalyzer::GenerateCacheFilename(const char* motion1_name, const char* motion2_name) const {
     std::string filename = "voxel_cache_";
     filename += motion1_name;
@@ -1136,13 +1135,13 @@ std::string SpatialAnalyzer::GenerateCacheFilename(const char* motion1_name, con
     return filename;
 }
 
-// NEW: ƒ{ƒNƒZƒ‹ƒLƒƒƒbƒVƒ…‚ğ•Û‘¶
+// NEW: ãƒœã‚¯ã‚»ãƒ«ã‚­ãƒ£ãƒƒã‚·ãƒ¥ã‚’ä¿å­˜
 bool SpatialAnalyzer::SaveVoxelCache(const char* motion1_name, const char* motion2_name) {
     std::string base_filename = GenerateCacheFilename(motion1_name, motion2_name);
     
     std::cout << "Saving voxel cache to " << base_filename << "..." << std::endl;
     
-    // —İÏƒ{ƒNƒZƒ‹ƒf[ƒ^‚ğ•Û‘¶
+    // ç´¯ç©ãƒœã‚¯ã‚»ãƒ«ãƒ‡ãƒ¼ã‚¿ã‚’ä¿å­˜
     std::string accumulated1_file = base_filename + "_acc1.bin";
     std::string accumulated2_file = base_filename + "_acc2.bin";
     std::string accumulated_diff_file = base_filename + "_acc_diff.bin";
@@ -1151,14 +1150,14 @@ bool SpatialAnalyzer::SaveVoxelCache(const char* motion1_name, const char* motio
     if (!voxels2_accumulated.SaveToFile(accumulated2_file.c_str())) return false;
     if (!voxels_accumulated_diff.SaveToFile(accumulated_diff_file.c_str())) return false;
     
-    // •”ˆÊ‚²‚Æ‚Ìƒ{ƒNƒZƒ‹ƒf[ƒ^‚ğ•Û‘¶
+    // éƒ¨ä½ã”ã¨ã®ãƒœã‚¯ã‚»ãƒ«ãƒ‡ãƒ¼ã‚¿ã‚’ä¿å­˜
     std::string segment1_file = base_filename + "_seg1.bin";
     std::string segment2_file = base_filename + "_seg2.bin";
     
     if (!segment_voxels1.SaveToFile(segment1_file.c_str())) return false;
     if (!segment_voxels2.SaveToFile(segment2_file.c_str())) return false;
     
-    // ƒƒ^ƒf[ƒ^‚ğ•Û‘¶
+    // ãƒ¡ã‚¿ãƒ‡ãƒ¼ã‚¿ã‚’ä¿å­˜
     std::string meta_file = base_filename + "_meta.txt";
     ofstream meta_ofs(meta_file);
     if (!meta_ofs) return false;
@@ -1174,13 +1173,13 @@ bool SpatialAnalyzer::SaveVoxelCache(const char* motion1_name, const char* motio
     return true;
 }
 
-// NEW: ƒ{ƒNƒZƒ‹ƒLƒƒƒbƒVƒ…‚ğ“Ç‚İ‚İ
+// NEW: ãƒœã‚¯ã‚»ãƒ«ã‚­ãƒ£ãƒƒã‚·ãƒ¥ã‚’èª­ã¿è¾¼ã¿
 bool SpatialAnalyzer::LoadVoxelCache(const char* motion1_name, const char* motion2_name) {
     std::string base_filename = GenerateCacheFilename(motion1_name, motion2_name);
     
     std::cout << "Loading voxel cache from " << base_filename << "..." << std::endl;
     
-    // ƒƒ^ƒf[ƒ^‚ğ“Ç‚İ‚İ
+    // ãƒ¡ã‚¿ãƒ‡ãƒ¼ã‚¿ã‚’èª­ã¿è¾¼ã¿
     std::string meta_file = base_filename + "_meta.txt";
     ifstream meta_ifs(meta_file);
     if (!meta_ifs) {
@@ -1196,10 +1195,10 @@ bool SpatialAnalyzer::LoadVoxelCache(const char* motion1_name, const char* motio
     }
     meta_ifs.close();
     
-    // ƒOƒŠƒbƒh‚ğƒŠƒTƒCƒY
+    // ã‚°ãƒªãƒƒãƒ‰ã‚’ãƒªã‚µã‚¤ã‚º
     ResizeGrids(res);
     
-    // —İÏƒ{ƒNƒZƒ‹ƒf[ƒ^‚ğ“Ç‚İ‚İ
+    // ç´¯ç©ãƒœã‚¯ã‚»ãƒ«ãƒ‡ãƒ¼ã‚¿ã‚’èª­ã¿è¾¼ã¿
     std::string accumulated1_file = base_filename + "_acc1.bin";
     std::string accumulated2_file = base_filename + "_acc2.bin";
     std::string accumulated_diff_file = base_filename + "_acc_diff.bin";
@@ -1217,7 +1216,7 @@ bool SpatialAnalyzer::LoadVoxelCache(const char* motion1_name, const char* motio
         return false;
     }
     
-    // •”ˆÊ‚²‚Æ‚Ìƒ{ƒNƒZƒ‹ƒf[ƒ^‚ğ“Ç‚İ‚İ
+    // éƒ¨ä½ã”ã¨ã®ãƒœã‚¯ã‚»ãƒ«ãƒ‡ãƒ¼ã‚¿ã‚’èª­ã¿è¾¼ã¿
     std::string segment1_file = base_filename + "_seg1.bin";
     std::string segment2_file = base_filename + "_seg2.bin";
     
@@ -1234,13 +1233,13 @@ bool SpatialAnalyzer::LoadVoxelCache(const char* motion1_name, const char* motio
     return true;
 }
 
-// NEW: ƒXƒ‰ƒCƒX•½–Ê‚Ì‰ñ“]‘€ì
+// NEW: ã‚¹ãƒ©ã‚¤ã‚¹å¹³é¢ã®å›è»¢æ“ä½œ
 void SpatialAnalyzer::RotateSlicePlane(float dx, float dy, float dz) {
     slice_rotation_x += dx;
     slice_rotation_y += dy;
     slice_rotation_z += dz;
     
-    // Šp“x‚ğ-180?180“x‚Ì”ÍˆÍ‚É³‹K‰»
+    // è§’åº¦ã‚’-180ã€œ180åº¦ã®ç¯„å›²ã«æ­£è¦åŒ–
     while (slice_rotation_x > 180.0f) slice_rotation_x -= 360.0f;
     while (slice_rotation_x < -180.0f) slice_rotation_x += 360.0f;
     while (slice_rotation_y > 180.0f) slice_rotation_y -= 360.0f;
@@ -1268,7 +1267,7 @@ void SpatialAnalyzer::SetSliceRotation(float rx, float ry, float rz) {
 void SpatialAnalyzer::ToggleRotatedSliceMode() {
     use_rotated_slice = !use_rotated_slice;
     if (use_rotated_slice) {
-        // ‰ñ“]ƒXƒ‰ƒCƒXƒ‚[ƒh‚ğƒIƒ“‚É‚µ‚½Aƒ[ƒ‹ƒh’†S‚ğ‰ñ“]’†S‚Éİ’è
+        // å›è»¢ã‚¹ãƒ©ã‚¤ã‚¹ãƒ¢ãƒ¼ãƒ‰ã‚’ã‚ªãƒ³ã«ã—ãŸæ™‚ã€ãƒ¯ãƒ¼ãƒ«ãƒ‰ä¸­å¿ƒã‚’å›è»¢ä¸­å¿ƒã«è¨­å®š
         slice_plane_center.set(
             (world_bounds[0][0] + world_bounds[0][1]) / 2.0f,
             (world_bounds[1][0] + world_bounds[1][1]) / 2.0f,
@@ -1280,17 +1279,17 @@ void SpatialAnalyzer::ToggleRotatedSliceMode() {
 }
 
 void SpatialAnalyzer::UpdateSlicePlaneVectors() {
-    // ‰ñ“]Šp“x‚ğƒ‰ƒWƒAƒ“‚É•ÏŠ·
+    // å›è»¢è§’åº¦ã‚’ãƒ©ã‚¸ã‚¢ãƒ³ã«å¤‰æ›
     float rx = slice_rotation_x * 3.14159265f / 180.0f;
     float ry = slice_rotation_y * 3.14159265f / 180.0f;
     float rz = slice_rotation_z * 3.14159265f / 180.0f;
     
-    // ‰ñ“]s—ñ‚ğŒvZiƒIƒCƒ‰[Šp: Z -> Y -> X ‚Ì‡j
+    // å›è»¢è¡Œåˆ—ã‚’è¨ˆç®—ï¼ˆã‚ªã‚¤ãƒ©ãƒ¼è§’: Z -> Y -> X ã®é †ï¼‰
     float cx = cos(rx), sx = sin(rx);
     float cy = cos(ry), sy = sin(ry);
     float cz = cos(rz), sz = sin(rz);
     
-    // ‰ñ“]s—ñ‚ÌŠe¬•ª
+    // å›è»¢è¡Œåˆ—ã®å„æˆåˆ†
     float r00 = cy * cz;
     float r01 = -cy * sz;
     float r02 = sy;
@@ -1301,17 +1300,17 @@ void SpatialAnalyzer::UpdateSlicePlaneVectors() {
     float r21 = cx * sy * sz + sx * cz;
     float r22 = cx * cy;
     
-    // ‰Šú‚Ì•½–ÊƒxƒNƒgƒ‹‚É‰ñ“]‚ğ“K—p
-    // –@ü‚Í‰ŠúZ²•ûŒü (0, 0, 1)
+    // åˆæœŸã®å¹³é¢ãƒ™ã‚¯ãƒˆãƒ«ã«å›è»¢ã‚’é©ç”¨
+    // æ³•ç·šã¯åˆæœŸZè»¸æ–¹å‘ (0, 0, 1)
     slice_plane_normal.set(r02, r12, r22);
     
-    // U•ûŒü‚Í‰ŠúX²•ûŒü (1, 0, 0)
+    // Uæ–¹å‘ã¯åˆæœŸXè»¸æ–¹å‘ (1, 0, 0)
     slice_plane_u.set(r00, r10, r20);
     
-    // V•ûŒü‚Í‰ŠúY²•ûŒü (0, 1, 0)
+    // Væ–¹å‘ã¯åˆæœŸYè»¸æ–¹å‘ (0, 1, 0)
     slice_plane_v.set(r01, r11, r21);
     
-    // ³‹K‰»
+    // æ­£è¦åŒ–
     float len_n = sqrt(slice_plane_normal.x * slice_plane_normal.x + 
                        slice_plane_normal.y * slice_plane_normal.y + 
                        slice_plane_normal.z * slice_plane_normal.z);
@@ -1340,14 +1339,14 @@ void SpatialAnalyzer::UpdateSlicePlaneVectors() {
     }
 }
 
-// NEW: ƒ[ƒ‹ƒhÀ•W‚Åƒ{ƒNƒZƒ‹’l‚ğƒTƒ“ƒvƒŠƒ“ƒO
+// NEW: ãƒ¯ãƒ¼ãƒ«ãƒ‰åº§æ¨™ã§ãƒœã‚¯ã‚»ãƒ«å€¤ã‚’ã‚µãƒ³ãƒ—ãƒªãƒ³ã‚°
 float SpatialAnalyzer::SampleVoxelAtWorldPos(VoxelGrid& grid, const Point3f& world_pos) {
     float world_range[3];
     for (int i = 0; i < 3; ++i) {
         world_range[i] = world_bounds[i][1] - world_bounds[i][0];
     }
     
-    // ƒ[ƒ‹ƒhÀ•W‚ğƒ{ƒNƒZƒ‹ƒCƒ“ƒfƒbƒNƒX‚É•ÏŠ·
+    // ãƒ¯ãƒ¼ãƒ«ãƒ‰åº§æ¨™ã‚’ãƒœã‚¯ã‚»ãƒ«ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ã«å¤‰æ›
     int gx = (int)(((world_pos.x - world_bounds[0][0]) / world_range[0]) * grid_resolution);
     int gy = (int)(((world_pos.y - world_bounds[1][0]) / world_range[1]) * grid_resolution);
     int gz = (int)(((world_pos.z - world_bounds[2][0]) / world_range[2]) * grid_resolution);
@@ -1355,34 +1354,34 @@ float SpatialAnalyzer::SampleVoxelAtWorldPos(VoxelGrid& grid, const Point3f& wor
     return grid.Get(gx, gy, gz);
 }
 
-// NEW: ‰ñ“]ƒXƒ‰ƒCƒX•½–Ê‚Ì•`‰æ
+// NEW: å›è»¢ã‚¹ãƒ©ã‚¤ã‚¹å¹³é¢ã®æç”»
 void SpatialAnalyzer::DrawRotatedSlicePlane() {
     if (!use_rotated_slice) return;
     
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     
-    // •½–Ê‚ÌƒTƒCƒY‚ğŒvZ
+    // å¹³é¢ã®ã‚µã‚¤ã‚ºã‚’è¨ˆç®—
     float world_range[3];
     for (int i = 0; i < 3; ++i) {
         world_range[i] = world_bounds[i][1] - world_bounds[i][0];
     }
     float max_range = max(world_range[0], max(world_range[1], world_range[2]));
     
-    // MODIFIED: ƒY[ƒ€‚ğ“K—p
+    // ã‚ºãƒ¼ãƒ ã‚’é©ç”¨
     float half_size = max_range * 0.6f * zoom;
     
-    // ŠeƒXƒ‰ƒCƒXˆÊ’u‚É‚Â‚¢‚Ä•½–Ê‚ğ•`‰æ
+    // å„ã‚¹ãƒ©ã‚¤ã‚¹ä½ç½®ã«ã¤ã„ã¦æ ç·šã‚’æç”»
     for (size_t i = 0; i < slice_positions.size(); ++i) {
-        float offset = (slice_positions[i] - 0.5f) * max_range;  // ’†S‚©‚ç‚ÌƒIƒtƒZƒbƒg
+        float offset = (slice_positions[i] - 0.5f) * max_range;  // ä¸­å¿ƒã‹ã‚‰ã®ã‚ªãƒ•ã‚»ãƒƒãƒˆ
         
-        // •½–Êã‚Ì4’¸“_‚ğŒvZ
+        // å¹³é¢ä¸Šã®4é ‚ç‚¹ã‚’è¨ˆç®—
         Point3f center = slice_plane_center;
         center.x += slice_plane_normal.x * offset;
         center.y += slice_plane_normal.y * offset;
         center.z += slice_plane_normal.z * offset;
         
-        // MODIFIED: ƒpƒ“‚ğ“K—p
+        // ãƒ‘ãƒ³ã‚’é©ç”¨
         center.x += slice_plane_u.x * pan_center.x + slice_plane_v.x * pan_center.y;
         center.y += slice_plane_u.y * pan_center.x + slice_plane_v.y * pan_center.y;
         center.z += slice_plane_u.z * pan_center.x + slice_plane_v.z * pan_center.y;
@@ -1401,31 +1400,22 @@ void SpatialAnalyzer::DrawRotatedSlicePlane() {
                  center.y - slice_plane_u.y * half_size + slice_plane_v.y * half_size,
                  center.z - slice_plane_u.z * half_size + slice_plane_v.z * half_size);
         
-        // “h‚è‚Â‚Ô‚µ
+        // æ ç·šã®ã¿æç”»ï¼ˆå¡—ã‚Šã¤ã¶ã—ãªã—ï¼‰
         if ((int)i == active_slice_index) {
-            glColor4f(1.0f, 1.0f, 0.8f, 0.25f);
-        } else {
-            glColor4f(0.7f, 0.7f, 1.0f, 0.15f);
-        }
-        glBegin(GL_QUADS);
-        for (int k = 0; k < 4; ++k) glVertex3f(p[k].x, p[k].y, p[k].z);
-        glEnd();
-        
-        // ˜gü
-        if ((int)i == active_slice_index) {
-            glColor4f(1.0f, 1.0f, 0.0f, 0.8f);
+            glColor4f(1.0f, 1.0f, 0.0f, 0.9f);  // é»„è‰²
             glLineWidth(2.0f);
         } else {
-            glColor4f(0.5f, 0.5f, 1.0f, 0.5f);
+            glColor4f(0.5f, 0.5f, 1.0f, 0.7f);  // é’
             glLineWidth(1.0f);
         }
         glBegin(GL_LINE_LOOP);
         for (int k = 0; k < 4; ++k) glVertex3f(p[k].x, p[k].y, p[k].z);
         glEnd();
         
-        // –@ü‚Ì–îˆó‚ğ•`‰æi•½–Ê‚ÌŒü‚«‚ğ¦‚·j
+        // æ³•ç·šã®çŸ¢å°ã‚’æç”»ï¼ˆå¹³é¢ã®å‘ãã‚’ç¤ºã™ï¼‰
         if ((int)i == active_slice_index) {
-            glColor4f(1.0f, 0.3f, 0.3f, 0.8f);
+            glColor4f(1.0f, 0.3f, 0.3f, 0.9f);
+            glLineWidth(2.0f);
             glBegin(GL_LINES);
             glVertex3f(center.x, center.y, center.z);
             glVertex3f(center.x + slice_plane_normal.x * half_size * 0.3f,
@@ -1435,12 +1425,13 @@ void SpatialAnalyzer::DrawRotatedSlicePlane() {
         }
     }
     
+    glLineWidth(1.0f);
     glDisable(GL_BLEND);
 }
 
-// NEW: ‰ñ“]ƒXƒ‰ƒCƒX—p‚Ì2Dƒ}ƒbƒv•`‰æ
+// NEW: å›è»¢ã‚¹ãƒ©ã‚¤ã‚¹ç”¨ã®2Dãƒãƒƒãƒ—æç”»
 void SpatialAnalyzer::DrawRotatedSliceMap(int x_pos, int y_pos, int w, int h, VoxelGrid& grid, float max_val, const char* title) {
-    // ”wŒi‚ğ•`‰æ
+    // èƒŒæ™¯ã‚’æç”»
     glColor4f(0.9f, 0.9f, 0.9f, 1.0f);
     glBegin(GL_QUADS);
     glVertex2i(x_pos, y_pos);
@@ -1449,7 +1440,7 @@ void SpatialAnalyzer::DrawRotatedSliceMap(int x_pos, int y_pos, int w, int h, Vo
     glVertex2i(x_pos + w, y_pos);
     glEnd();
     
-    // ˜gü
+    // æ ç·š
     glColor4f(0, 0, 0, 1);
     glBegin(GL_LINE_LOOP);
     glVertex2i(x_pos, y_pos);
@@ -1458,29 +1449,29 @@ void SpatialAnalyzer::DrawRotatedSliceMap(int x_pos, int y_pos, int w, int h, Vo
     glVertex2i(x_pos + w, y_pos);
     glEnd();
     
-    // •½–Ê‚ÌƒTƒCƒY‚ğŒvZ
+    // å¹³é¢ã®ã‚µã‚¤ã‚ºã‚’è¨ˆç®—
     float world_range[3];
     for (int i = 0; i < 3; ++i) {
         world_range[i] = world_bounds[i][1] - world_bounds[i][0];
     }
     float max_range = max(world_range[0], max(world_range[1], world_range[2]));
     
-    // MODIFIED: ƒY[ƒ€‚Æƒpƒ“‚ğ“K—p
+    // ã‚ºãƒ¼ãƒ ã¨ãƒ‘ãƒ³ã‚’é©ç”¨
     float half_size = max_range * 0.6f * zoom;
     
-    // ƒXƒ‰ƒCƒXˆÊ’uiƒAƒNƒeƒBƒu‚ÈƒXƒ‰ƒCƒXj
+    // ã‚¹ãƒ©ã‚¤ã‚¹ä½ç½®ï¼ˆã‚¢ã‚¯ãƒ†ã‚£ãƒ–ãªã‚¹ãƒ©ã‚¤ã‚¹ï¼‰
     float offset = (slice_positions[active_slice_index] - 0.5f) * max_range;
     Point3f center = slice_plane_center;
     center.x += slice_plane_normal.x * offset;
     center.y += slice_plane_normal.y * offset;
     center.z += slice_plane_normal.z * offset;
     
-    // MODIFIED: ƒpƒ“‚ğ“K—pi•½–Ê‚ÌU/V•ûŒü‚É‰ˆ‚Á‚ÄˆÚ“®j
+    // ãƒ‘ãƒ³ã‚’é©ç”¨
     center.x += slice_plane_u.x * pan_center.x + slice_plane_v.x * pan_center.y;
     center.y += slice_plane_u.y * pan_center.x + slice_plane_v.y * pan_center.y;
     center.z += slice_plane_u.z * pan_center.x + slice_plane_v.z * pan_center.y;
     
-    // •`‰æ‰ğ‘œ“x
+    // æç”»è§£åƒåº¦
     int draw_res = 64;
     float cell_w = (float)w / draw_res;
     float cell_h = (float)h / draw_res;
@@ -1488,7 +1479,7 @@ void SpatialAnalyzer::DrawRotatedSliceMap(int x_pos, int y_pos, int w, int h, Vo
     glBegin(GL_QUADS);
     for (int iy = 0; iy < draw_res; ++iy) {
         for (int ix = 0; ix < draw_res; ++ix) {
-            // 2DÀ•W‚ğ•½–Êã‚Ì3DÀ•W‚É•ÏŠ·
+            // 2Dåº§æ¨™ã‚’å¹³é¢ä¸Šã®3Dåº§æ¨™ã«å¤‰æ›
             float u = ((float)ix / draw_res - 0.5f) * 2.0f * half_size;
             float v = ((float)iy / draw_res - 0.5f) * 2.0f * half_size;
             
@@ -1497,7 +1488,7 @@ void SpatialAnalyzer::DrawRotatedSliceMap(int x_pos, int y_pos, int w, int h, Vo
             world_pos.y = center.y + slice_plane_u.y * u + slice_plane_v.y * v;
             world_pos.z = center.z + slice_plane_u.z * u + slice_plane_v.z * v;
             
-            // ƒ{ƒNƒZƒ‹’l‚ğƒTƒ“ƒvƒŠƒ“ƒO
+            // ãƒœã‚¯ã‚»ãƒ«å€¤ã‚’ã‚µãƒ³ãƒ—ãƒªãƒ³ã‚°
             float val = SampleVoxelAtWorldPos(grid, world_pos);
             
             if (val > 0.01f) {
@@ -1505,7 +1496,7 @@ void SpatialAnalyzer::DrawRotatedSliceMap(int x_pos, int y_pos, int w, int h, Vo
                 glColor3f(c.x, c.y, c.z);
                 
                 float sx = x_pos + ix * cell_w;
-                float sy = y_pos + (draw_res - 1 - iy) * cell_h;  // Y²”½“]
+                float sy = y_pos + (draw_res - 1 - iy) * cell_h;  // Yè»¸åè»¢
                 
                 glVertex2f(sx, sy);
                 glVertex2f(sx, sy + cell_h);
@@ -1516,14 +1507,14 @@ void SpatialAnalyzer::DrawRotatedSliceMap(int x_pos, int y_pos, int w, int h, Vo
     }
     glEnd();
     
-    // ƒ^ƒCƒgƒ‹‚ğ•`‰æ
+    // ã‚¿ã‚¤ãƒˆãƒ«ã‚’æç”»
     glColor3f(0, 0, 0);
     glRasterPos2i(x_pos, y_pos - 5);
     for (const char* c = title; *c != '\0'; c++) {
         glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, *c);
     }
     
-    // ‰ñ“]Šp“x‚ğ•\¦
+    // å›è»¢è§’åº¦ã‚’è¡¨ç¤º
     char rot_info[128];
     sprintf(rot_info, "Rot: X=%.0f Y=%.0f Z=%.0f", slice_rotation_x, slice_rotation_y, slice_rotation_z);
     glRasterPos2i(x_pos, y_pos + h + 22);
