@@ -92,22 +92,27 @@ void MotionApp::Keyboard(unsigned char key, int mx, int my) {
             analyzer.projection_mode = !analyzer.projection_mode; 
             break;
         
-        // スライスの移動
+        // スライスの移動（回転スライスモードでも動作）
         case 'w': 
             if(!analyzer.slice_positions.empty()) 
-                analyzer.slice_positions[0] += 0.01f; 
+                analyzer.slice_positions[analyzer.active_slice_index] += 0.02f; 
             break;
         case 's': 
             if(!analyzer.slice_positions.empty()) 
-                analyzer.slice_positions[0] -= 0.01f; 
+                analyzer.slice_positions[analyzer.active_slice_index] -= 0.02f; 
             break;
         case 't': 
             if(analyzer.slice_positions.size() > 1) 
-                analyzer.slice_positions[1] += 0.01f; 
+                analyzer.slice_positions[1] += 0.02f; 
             break;
         case 'g': 
             if(analyzer.slice_positions.size() > 1) 
-                analyzer.slice_positions[1] -= 0.01f; 
+                analyzer.slice_positions[1] -= 0.02f; 
+            break;
+        
+        // NEW: アクティブスライスの切り替え
+        case 'q':
+            analyzer.active_slice_index = (analyzer.active_slice_index + 1) % analyzer.slice_positions.size();
             break;
 
         // 特徴量・正規化モード
@@ -127,6 +132,41 @@ void MotionApp::Keyboard(unsigned char key, int mx, int my) {
             break;
         case 'k': 
             analyzer.show_voxels = !analyzer.show_voxels; 
+            break;
+        
+        // NEW: 回転スライスモードの切り替え
+        case 'p':
+            analyzer.ToggleRotatedSliceMode();
+            break;
+        
+        // NEW: 平面の回転操作（回転スライスモード時のみ有効）
+        case '1':  // X軸周りに+5度回転
+            if (analyzer.use_rotated_slice)
+                analyzer.RotateSlicePlane(5.0f, 0.0f, 0.0f);
+            break;
+        case '2':  // X軸周りに-5度回転
+            if (analyzer.use_rotated_slice)
+                analyzer.RotateSlicePlane(-5.0f, 0.0f, 0.0f);
+            break;
+        case '3':  // Y軸周りに+5度回転
+            if (analyzer.use_rotated_slice)
+                analyzer.RotateSlicePlane(0.0f, 5.0f, 0.0f);
+            break;
+        case '4':  // Y軸周りに-5度回転
+            if (analyzer.use_rotated_slice)
+                analyzer.RotateSlicePlane(0.0f, -5.0f, 0.0f);
+            break;
+        case '5':  // Z軸周りに+5度回転
+            if (analyzer.use_rotated_slice)
+                analyzer.RotateSlicePlane(0.0f, 0.0f, 5.0f);
+            break;
+        case '6':  // Z軸周りに-5度回転
+            if (analyzer.use_rotated_slice)
+                analyzer.RotateSlicePlane(0.0f, 0.0f, -5.0f);
+            break;
+        case '0':  // 回転リセット
+            if (analyzer.use_rotated_slice)
+                analyzer.ResetSliceRotation();
             break;
         
         // 部位別表示モード
@@ -262,6 +302,7 @@ void MotionApp::Display()
     const char* maps_on_str = (analyzer.show_maps) ? "ON" : "OFF";
     const char* voxels_on_str = (analyzer.show_voxels) ? "ON" : "OFF";
     const char* segment_mode_str = (analyzer.show_segment_mode) ? "ON" : "OFF";
+    const char* rotated_slice_str = (analyzer.use_rotated_slice) ? "ON" : "OFF";
     
     float s1 = (analyzer.slice_positions.size() > 0) ? analyzer.slice_positions[0] : 0.0f;
     float s2 = (analyzer.slice_positions.size() > 1) ? analyzer.slice_positions[1] : 0.0f;
@@ -273,11 +314,19 @@ void MotionApp::Display()
                 motion->body->segments[analyzer.selected_segment_index]->name.c_str(),
                 analyzer.selected_segment_index);
     }
+    
+    // 回転情報
+    char rotation_info[64] = "";
+    if (analyzer.use_rotated_slice) {
+        sprintf(rotation_info, " | Rot:X%.0f Y%.0f Z%.0f", 
+                analyzer.slice_rotation_x, analyzer.slice_rotation_y, analyzer.slice_rotation_z);
+    }
 
-    sprintf(title, "CT-Scan Mode | H:%c V:%c | Mode:%s | Feature:%s | Data:%s | SegMode:%s | Seg:%s | Planes:%s | Maps:%s | Voxels:%s | S1:%.2f S2:%.2f",
-        'X' + analyzer.h_axis, 'X' + analyzer.v_axis, slice_mode_str, 
-        feature_mode_str, norm_mode_str, segment_mode_str, segment_info,
-        planes_on_str, maps_on_str, voxels_on_str, s1, s2);
+    sprintf(title, "CT-Scan | H:%c V:%c | RotSlice:%s%s | Feature:%s | Data:%s | Seg:%s | Planes:%s | Maps:%s | Voxels:%s",
+        'X' + analyzer.h_axis, 'X' + analyzer.v_axis, 
+        rotated_slice_str, rotation_info,
+        feature_mode_str, norm_mode_str, segment_info,
+        planes_on_str, maps_on_str, voxels_on_str);
 	
 	DrawTextInformation(0, title);
 	if (motion) { 

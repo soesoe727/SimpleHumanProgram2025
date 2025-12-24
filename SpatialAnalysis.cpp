@@ -223,8 +223,18 @@ SpatialAnalyzer::SpatialAnalyzer() {
     selected_segment_index = -1;  // -1は全体表示
     show_segment_mode = false;
     
-    slice_positions.push_back(1.0f);
-    slice_positions.push_back(0.5f);
+    // NEW: スライス平面の回転パラメータ初期化
+    slice_rotation_x = 0.0f;
+    slice_rotation_y = 0.0f;
+    slice_rotation_z = 0.0f;
+    slice_plane_center.set(0.0f, 0.0f, 0.0f);
+    slice_plane_normal.set(0.0f, 0.0f, 1.0f);  // 初期はZ軸方向
+    slice_plane_u.set(1.0f, 0.0f, 0.0f);       // U方向はX軸
+    slice_plane_v.set(0.0f, 1.0f, 0.0f);       // V方向はY軸
+    use_rotated_slice = true;  // MODIFIED: デフォルトでON
+    
+    slice_positions.push_back(0.5f);  // MODIFIED: 中心位置をデフォルトに
+    slice_positions.push_back(0.3f);
     active_slice_index = 0;
 }
 
@@ -246,9 +256,17 @@ void SpatialAnalyzer::SetWorldBounds(float bounds[3][2]) {
         world_bounds[i][0] = bounds[i][0];
         world_bounds[i][1] = bounds[i][1];
     }
+    
+    // NEW: 回転スライスの中心をワールド中心に設定
+    slice_plane_center.set(
+        (world_bounds[0][0] + world_bounds[0][1]) / 2.0f,
+        (world_bounds[1][0] + world_bounds[1][1]) / 2.0f,
+        (world_bounds[2][0] + world_bounds[2][1]) / 2.0f
+    );
+    UpdateSlicePlaneVectors();
 }
 
-// 内部用FK (Motionクラスのメソッドを利用)
+// 内部用 FK (Motion クラスのメソッドを利用)
 static void ComputeFK(Motion* m, float time, vector<Point3f>& joints) {
     if(!m) return;
     Posture posture(m->body);
@@ -452,6 +470,12 @@ void SpatialAnalyzer::CalculateViewBounds(float& h_min, float& h_max, float& v_m
 }
 
 void SpatialAnalyzer::DrawSlicePlanes() {
+    // NEW: 回転スライスモードの場合は別の描画関数を使用
+    if (use_rotated_slice) {
+        DrawRotatedSlicePlane();
+        return;
+    }
+    
     int d_axis = 3 - h_axis - v_axis;
     float h_min, h_max, v_min, v_max;
     CalculateViewBounds(h_min, h_max, v_min, v_max);
@@ -515,6 +539,72 @@ void SpatialAnalyzer::DrawCTMaps(int win_width, int win_height) {
     float h_min, h_max, v_min, v_max;
     CalculateViewBounds(h_min, h_max, v_min, v_max);
 
+    // NEW: 回転スライスモードの場合
+    if (use_rotated_slice) {
+        // 回転スライスモードでは1つのスライス（アクティブなもの）のみ表示
+        int y_pos = start_y;
+        
+        char t1[64], t2[64], t3[64];
+        sprintf(t1, "Rotated M1");
+        sprintf(t2, "Rotated M2");
+        sprintf(t3, "Rotated Diff");
+        
+        VoxelGrid* grid1 = nullptr;
+        VoxelGrid* grid2 = nullptr;
+        VoxelGrid* grid_diff = nullptr;
+        float max_value = 1.0f;
+        
+        // 表示するボクセルグリッドを選択
+        if (show_segment_mode && selected_segment_index >= 0 && 
+            selected_segment_index < segment_voxels1.num_segments) {
+            grid1 = &segment_voxels1.GetSegmentGrid(selected_segment_index);
+            grid2 = &segment_voxels2.GetSegmentGrid(selected_segment_index);
+            
+            static VoxelGrid temp_diff;
+            temp_diff.Resize(grid_resolution);
+            temp_diff.Clear();
+            int size = grid_resolution * grid_resolution * grid_resolution;
+            max_value = 0.0f;
+            for (int j = 0; j < size; ++j) {
+                float diff = abs(grid1->data[j] - grid2->data[j]);
+                temp_diff.data[j] = diff;
+                if (diff > max_value) max_value = diff;
+            }
+            if (max_value < 1e-5f) max_value = 1.0f;
+            grid_diff = &temp_diff;
+        } else {
+            if (norm_mode == 0) {
+                if (feature_mode == 0) {
+                    grid1 = &voxels1_occ;
+                    grid2 = &voxels2_occ;
+                    grid_diff = &voxels_diff;
+                    max_value = max_occ_val;
+                } else {
+                    grid1 = &voxels1_spd;
+                    grid2 = &voxels2_spd;
+                    grid_diff = &voxels_spd_diff;
+                    max_value = global_max_spd;
+                }
+            } else {
+                grid1 = &voxels1_accumulated;
+                grid2 = &voxels2_accumulated;
+                grid_diff = &voxels_accumulated_diff;
+                max_value = max_accumulated_val;
+            }
+        }
+        
+        // 回転スライスマップを描画
+        DrawRotatedSliceMap(start_x, y_pos, map_w, map_h, *grid1, max_value, t1);
+        DrawRotatedSliceMap(start_x + map_w + gap, y_pos, map_w, map_h, *grid2, max_value, t2);
+        DrawRotatedSliceMap(start_x + 2*(map_w + gap), y_pos, map_w, map_h, *grid_diff, max_value, t3);
+        
+        glPopAttrib();
+        glMatrixMode(GL_PROJECTION); glPopMatrix();
+        glMatrixMode(GL_MODELVIEW); glPopMatrix();
+        return;
+    }
+
+    // 通常モード（既存コード）
     for (int i = 0; i < num_rows; ++i) {
         int y_pos = start_y + i * (map_h + gap);
         float slice_val = slice_positions[i];
@@ -1142,4 +1232,302 @@ bool SpatialAnalyzer::LoadVoxelCache(const char* motion1_name, const char* motio
     
     std::cout << "Voxel cache loaded successfully!" << std::endl;
     return true;
+}
+
+// NEW: スライス平面の回転操作
+void SpatialAnalyzer::RotateSlicePlane(float dx, float dy, float dz) {
+    slice_rotation_x += dx;
+    slice_rotation_y += dy;
+    slice_rotation_z += dz;
+    
+    // 角度を-180?180度の範囲に正規化
+    while (slice_rotation_x > 180.0f) slice_rotation_x -= 360.0f;
+    while (slice_rotation_x < -180.0f) slice_rotation_x += 360.0f;
+    while (slice_rotation_y > 180.0f) slice_rotation_y -= 360.0f;
+    while (slice_rotation_y < -180.0f) slice_rotation_y += 360.0f;
+    while (slice_rotation_z > 180.0f) slice_rotation_z -= 360.0f;
+    while (slice_rotation_z < -180.0f) slice_rotation_z += 360.0f;
+    
+    UpdateSlicePlaneVectors();
+}
+
+void SpatialAnalyzer::ResetSliceRotation() {
+    slice_rotation_x = 0.0f;
+    slice_rotation_y = 0.0f;
+    slice_rotation_z = 0.0f;
+    UpdateSlicePlaneVectors();
+}
+
+void SpatialAnalyzer::SetSliceRotation(float rx, float ry, float rz) {
+    slice_rotation_x = rx;
+    slice_rotation_y = ry;
+    slice_rotation_z = rz;
+    UpdateSlicePlaneVectors();
+}
+
+void SpatialAnalyzer::ToggleRotatedSliceMode() {
+    use_rotated_slice = !use_rotated_slice;
+    if (use_rotated_slice) {
+        // 回転スライスモードをオンにした時、ワールド中心を回転中心に設定
+        slice_plane_center.set(
+            (world_bounds[0][0] + world_bounds[0][1]) / 2.0f,
+            (world_bounds[1][0] + world_bounds[1][1]) / 2.0f,
+            (world_bounds[2][0] + world_bounds[2][1]) / 2.0f
+        );
+        UpdateSlicePlaneVectors();
+    }
+    std::cout << "Rotated slice mode: " << (use_rotated_slice ? "ON" : "OFF") << std::endl;
+}
+
+void SpatialAnalyzer::UpdateSlicePlaneVectors() {
+    // 回転角度をラジアンに変換
+    float rx = slice_rotation_x * 3.14159265f / 180.0f;
+    float ry = slice_rotation_y * 3.14159265f / 180.0f;
+    float rz = slice_rotation_z * 3.14159265f / 180.0f;
+    
+    // 回転行列を計算（オイラー角: Z -> Y -> X の順）
+    float cx = cos(rx), sx = sin(rx);
+    float cy = cos(ry), sy = sin(ry);
+    float cz = cos(rz), sz = sin(rz);
+    
+    // 回転行列の各成分
+    float r00 = cy * cz;
+    float r01 = -cy * sz;
+    float r02 = sy;
+    float r10 = sx * sy * cz + cx * sz;
+    float r11 = -sx * sy * sz + cx * cz;
+    float r12 = -sx * cy;
+    float r20 = -cx * sy * cz + sx * sz;
+    float r21 = cx * sy * sz + sx * cz;
+    float r22 = cx * cy;
+    
+    // 初期の平面ベクトルに回転を適用
+    // 法線は初期Z軸方向 (0, 0, 1)
+    slice_plane_normal.set(r02, r12, r22);
+    
+    // U方向は初期X軸方向 (1, 0, 0)
+    slice_plane_u.set(r00, r10, r20);
+    
+    // V方向は初期Y軸方向 (0, 1, 0)
+    slice_plane_v.set(r01, r11, r21);
+    
+    // 正規化
+    float len_n = sqrt(slice_plane_normal.x * slice_plane_normal.x + 
+                       slice_plane_normal.y * slice_plane_normal.y + 
+                       slice_plane_normal.z * slice_plane_normal.z);
+    if (len_n > 1e-6f) {
+        slice_plane_normal.x /= len_n;
+        slice_plane_normal.y /= len_n;
+        slice_plane_normal.z /= len_n;
+    }
+    
+    float len_u = sqrt(slice_plane_u.x * slice_plane_u.x + 
+                       slice_plane_u.y * slice_plane_u.y + 
+                       slice_plane_u.z * slice_plane_u.z);
+    if (len_u > 1e-6f) {
+        slice_plane_u.x /= len_u;
+        slice_plane_u.y /= len_u;
+        slice_plane_u.z /= len_u;
+    }
+    
+    float len_v = sqrt(slice_plane_v.x * slice_plane_v.x + 
+                       slice_plane_v.y * slice_plane_v.y + 
+                       slice_plane_v.z * slice_plane_v.z);
+    if (len_v > 1e-6f) {
+        slice_plane_v.x /= len_v;
+        slice_plane_v.y /= len_v;
+        slice_plane_v.z /= len_v;
+    }
+}
+
+// NEW: ワールド座標でボクセル値をサンプリング
+float SpatialAnalyzer::SampleVoxelAtWorldPos(VoxelGrid& grid, const Point3f& world_pos) {
+    float world_range[3];
+    for (int i = 0; i < 3; ++i) {
+        world_range[i] = world_bounds[i][1] - world_bounds[i][0];
+    }
+    
+    // ワールド座標をボクセルインデックスに変換
+    int gx = (int)(((world_pos.x - world_bounds[0][0]) / world_range[0]) * grid_resolution);
+    int gy = (int)(((world_pos.y - world_bounds[1][0]) / world_range[1]) * grid_resolution);
+    int gz = (int)(((world_pos.z - world_bounds[2][0]) / world_range[2]) * grid_resolution);
+    
+    return grid.Get(gx, gy, gz);
+}
+
+// NEW: 回転スライス平面の描画
+void SpatialAnalyzer::DrawRotatedSlicePlane() {
+    if (!use_rotated_slice) return;
+    
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    
+    // 平面のサイズを計算
+    float world_range[3];
+    for (int i = 0; i < 3; ++i) {
+        world_range[i] = world_bounds[i][1] - world_bounds[i][0];
+    }
+    float max_range = max(world_range[0], max(world_range[1], world_range[2]));
+    
+    // MODIFIED: ズームを適用
+    float half_size = max_range * 0.6f * zoom;
+    
+    // 各スライス位置について平面を描画
+    for (size_t i = 0; i < slice_positions.size(); ++i) {
+        float offset = (slice_positions[i] - 0.5f) * max_range;  // 中心からのオフセット
+        
+        // 平面上の4頂点を計算
+        Point3f center = slice_plane_center;
+        center.x += slice_plane_normal.x * offset;
+        center.y += slice_plane_normal.y * offset;
+        center.z += slice_plane_normal.z * offset;
+        
+        // MODIFIED: パンを適用
+        center.x += slice_plane_u.x * pan_center.x + slice_plane_v.x * pan_center.y;
+        center.y += slice_plane_u.y * pan_center.x + slice_plane_v.y * pan_center.y;
+        center.z += slice_plane_u.z * pan_center.x + slice_plane_v.z * pan_center.y;
+        
+        Point3f p[4];
+        p[0].set(center.x - slice_plane_u.x * half_size - slice_plane_v.x * half_size,
+                 center.y - slice_plane_u.y * half_size - slice_plane_v.y * half_size,
+                 center.z - slice_plane_u.z * half_size - slice_plane_v.z * half_size);
+        p[1].set(center.x + slice_plane_u.x * half_size - slice_plane_v.x * half_size,
+                 center.y + slice_plane_u.y * half_size - slice_plane_v.y * half_size,
+                 center.z + slice_plane_u.z * half_size - slice_plane_v.z * half_size);
+        p[2].set(center.x + slice_plane_u.x * half_size + slice_plane_v.x * half_size,
+                 center.y + slice_plane_u.y * half_size + slice_plane_v.y * half_size,
+                 center.z + slice_plane_u.z * half_size + slice_plane_v.z * half_size);
+        p[3].set(center.x - slice_plane_u.x * half_size + slice_plane_v.x * half_size,
+                 center.y - slice_plane_u.y * half_size + slice_plane_v.y * half_size,
+                 center.z - slice_plane_u.z * half_size + slice_plane_v.z * half_size);
+        
+        // 塗りつぶし
+        if ((int)i == active_slice_index) {
+            glColor4f(1.0f, 1.0f, 0.8f, 0.25f);
+        } else {
+            glColor4f(0.7f, 0.7f, 1.0f, 0.15f);
+        }
+        glBegin(GL_QUADS);
+        for (int k = 0; k < 4; ++k) glVertex3f(p[k].x, p[k].y, p[k].z);
+        glEnd();
+        
+        // 枠線
+        if ((int)i == active_slice_index) {
+            glColor4f(1.0f, 1.0f, 0.0f, 0.8f);
+            glLineWidth(2.0f);
+        } else {
+            glColor4f(0.5f, 0.5f, 1.0f, 0.5f);
+            glLineWidth(1.0f);
+        }
+        glBegin(GL_LINE_LOOP);
+        for (int k = 0; k < 4; ++k) glVertex3f(p[k].x, p[k].y, p[k].z);
+        glEnd();
+        
+        // 法線の矢印を描画（平面の向きを示す）
+        if ((int)i == active_slice_index) {
+            glColor4f(1.0f, 0.3f, 0.3f, 0.8f);
+            glBegin(GL_LINES);
+            glVertex3f(center.x, center.y, center.z);
+            glVertex3f(center.x + slice_plane_normal.x * half_size * 0.3f,
+                       center.y + slice_plane_normal.y * half_size * 0.3f,
+                       center.z + slice_plane_normal.z * half_size * 0.3f);
+            glEnd();
+        }
+    }
+    
+    glDisable(GL_BLEND);
+}
+
+// NEW: 回転スライス用の2Dマップ描画
+void SpatialAnalyzer::DrawRotatedSliceMap(int x_pos, int y_pos, int w, int h, VoxelGrid& grid, float max_val, const char* title) {
+    // 背景を描画
+    glColor4f(0.9f, 0.9f, 0.9f, 1.0f);
+    glBegin(GL_QUADS);
+    glVertex2i(x_pos, y_pos);
+    glVertex2i(x_pos, y_pos + h);
+    glVertex2i(x_pos + w, y_pos + h);
+    glVertex2i(x_pos + w, y_pos);
+    glEnd();
+    
+    // 枠線
+    glColor4f(0, 0, 0, 1);
+    glBegin(GL_LINE_LOOP);
+    glVertex2i(x_pos, y_pos);
+    glVertex2i(x_pos, y_pos + h);
+    glVertex2i(x_pos + w, y_pos + h);
+    glVertex2i(x_pos + w, y_pos);
+    glEnd();
+    
+    // 平面のサイズを計算
+    float world_range[3];
+    for (int i = 0; i < 3; ++i) {
+        world_range[i] = world_bounds[i][1] - world_bounds[i][0];
+    }
+    float max_range = max(world_range[0], max(world_range[1], world_range[2]));
+    
+    // MODIFIED: ズームとパンを適用
+    float half_size = max_range * 0.6f * zoom;
+    
+    // スライス位置（アクティブなスライス）
+    float offset = (slice_positions[active_slice_index] - 0.5f) * max_range;
+    Point3f center = slice_plane_center;
+    center.x += slice_plane_normal.x * offset;
+    center.y += slice_plane_normal.y * offset;
+    center.z += slice_plane_normal.z * offset;
+    
+    // MODIFIED: パンを適用（平面のU/V方向に沿って移動）
+    center.x += slice_plane_u.x * pan_center.x + slice_plane_v.x * pan_center.y;
+    center.y += slice_plane_u.y * pan_center.x + slice_plane_v.y * pan_center.y;
+    center.z += slice_plane_u.z * pan_center.x + slice_plane_v.z * pan_center.y;
+    
+    // 描画解像度
+    int draw_res = 64;
+    float cell_w = (float)w / draw_res;
+    float cell_h = (float)h / draw_res;
+    
+    glBegin(GL_QUADS);
+    for (int iy = 0; iy < draw_res; ++iy) {
+        for (int ix = 0; ix < draw_res; ++ix) {
+            // 2D座標を平面上の3D座標に変換
+            float u = ((float)ix / draw_res - 0.5f) * 2.0f * half_size;
+            float v = ((float)iy / draw_res - 0.5f) * 2.0f * half_size;
+            
+            Point3f world_pos;
+            world_pos.x = center.x + slice_plane_u.x * u + slice_plane_v.x * v;
+            world_pos.y = center.y + slice_plane_u.y * u + slice_plane_v.y * v;
+            world_pos.z = center.z + slice_plane_u.z * u + slice_plane_v.z * v;
+            
+            // ボクセル値をサンプリング
+            float val = SampleVoxelAtWorldPos(grid, world_pos);
+            
+            if (val > 0.01f) {
+                Color3f c = sa_get_heatmap_color(val / max_val);
+                glColor3f(c.x, c.y, c.z);
+                
+                float sx = x_pos + ix * cell_w;
+                float sy = y_pos + (draw_res - 1 - iy) * cell_h;  // Y軸反転
+                
+                glVertex2f(sx, sy);
+                glVertex2f(sx, sy + cell_h);
+                glVertex2f(sx + cell_w, sy + cell_h);
+                glVertex2f(sx + cell_w, sy);
+            }
+        }
+    }
+    glEnd();
+    
+    // タイトルを描画
+    glColor3f(0, 0, 0);
+    glRasterPos2i(x_pos, y_pos - 5);
+    for (const char* c = title; *c != '\0'; c++) {
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, *c);
+    }
+    
+    // 回転角度を表示
+    char rot_info[128];
+    sprintf(rot_info, "Rot: X=%.0f Y=%.0f Z=%.0f", slice_rotation_x, slice_rotation_y, slice_rotation_z);
+    glRasterPos2i(x_pos, y_pos + h + 22);
+    for (const char* c = rot_info; *c != '\0'; c++) {
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, *c);
+    }
 }

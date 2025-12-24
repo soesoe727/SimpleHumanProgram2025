@@ -94,7 +94,7 @@ public:
     VoxelGrid voxels1_occ, voxels2_occ, voxels_diff;
     VoxelGrid voxels1_spd, voxels2_spd, voxels_spd_diff;
     
-    // NEW: 累積ボクセル（動作全体を通した占有率）
+    // NEW: 累積ボクセル（動作全体を通した累積）
     VoxelGrid voxels1_accumulated;
     VoxelGrid voxels2_accumulated;
     VoxelGrid voxels_accumulated_diff;
@@ -111,6 +111,16 @@ public:
     bool projection_mode;
     std::vector<float> slice_positions;
     int active_slice_index;
+    
+    // NEW: スライス平面の回転パラメータ
+    float slice_rotation_x;  // X軸周りの回転角度（度）
+    float slice_rotation_y;  // Y軸周りの回転角度（度）
+    float slice_rotation_z;  // Z軸周りの回転角度（度）
+    Point3f slice_plane_center;  // 回転中心
+    Point3f slice_plane_normal;  // 平面の法線ベクトル
+    Point3f slice_plane_u;       // 平面上のU方向ベクトル
+    Point3f slice_plane_v;       // 平面上のV方向ベクトル
+    bool use_rotated_slice;      // 回転スライスモードを使用するか
 
     // --- インタラクティブ操作用 ---
     float zoom;
@@ -164,6 +174,13 @@ public:
     void ResetView();
     void Pan(float dx, float dy);
     void Zoom(float factor);
+    
+    // NEW: スライス平面の回転操作
+    void RotateSlicePlane(float dx, float dy, float dz);
+    void ResetSliceRotation();
+    void SetSliceRotation(float rx, float ry, float rz);
+    void UpdateSlicePlaneVectors();  // 回転後の平面ベクトルを更新
+    void ToggleRotatedSliceMode();   // 回転スライスモードの切り替え
 
     // ヘルパー
     void CalculateViewBounds(float& h_min, float& h_max, float& v_min, float& v_max);
@@ -172,4 +189,9 @@ private:
     void VoxelizeMotion(Motion* m, float time, VoxelGrid& occ, VoxelGrid& spd);
     void DrawSingleMap(int x, int y, int w, int h, VoxelGrid& grid, float max_val, const char* title, float slice_val, float h_min, float h_max, float v_min, float v_max);
     void DrawAxes(int x, int y, int w, int h, float h_min, float h_max, float v_min, float v_max, const char* h_lbl, const char* v_lbl);
+    
+    // NEW: 回転スライス用のヘルパー
+    void DrawRotatedSlicePlane();
+    void DrawRotatedSliceMap(int x, int y, int w, int h, VoxelGrid& grid, float max_val, const char* title);
+    float SampleVoxelAtWorldPos(VoxelGrid& grid, const Point3f& world_pos);
 };
