@@ -102,11 +102,25 @@ void MotionApp::Keyboard(unsigned char key, int mx, int my) {
         // スライスの移動（回転スライスモードでも動作）
         case 'w': 
             if(!analyzer.slice_positions.empty()) 
+            if (analyzer.use_rotated_slice) {
+                Vector3f n = analyzer.slice_plane_normal; n.normalize();
+                analyzer.slice_plane_center.x += n.x * 0.02f;
+                analyzer.slice_plane_center.y += n.y * 0.02f;
+                analyzer.slice_plane_center.z += n.z * 0.02f;
+            } else if(!analyzer.slice_positions.empty()) {
                 analyzer.slice_positions[analyzer.active_slice_index] += 0.02f; 
+            }
             break;
         case 's': 
             if(!analyzer.slice_positions.empty()) 
+            if (analyzer.use_rotated_slice) {
+                Vector3f n = analyzer.slice_plane_normal; n.normalize();
+                analyzer.slice_plane_center.x -= n.x * 0.02f;
+                analyzer.slice_plane_center.y -= n.y * 0.02f;
+                analyzer.slice_plane_center.z -= n.z * 0.02f;
+            } else if(!analyzer.slice_positions.empty()) {
                 analyzer.slice_positions[analyzer.active_slice_index] -= 0.02f; 
+            }
             break;
         case 't': 
             if(analyzer.slice_positions.size() > 1) 
@@ -258,6 +272,7 @@ void MotionApp::MouseClick(int button, int state, int mx, int my)
         SyncGizmoToSliceState();
         Point3f gizmo_pos = GetSliceGizmoPosition();
         Matrix3f gizmo_ori = GetSliceGizmoOrientation();
+        slice_gizmo.SetActiveOrientation(gizmo_ori);
         GizmoAxis axis = slice_gizmo.PickAxis(mx, my, gizmo_pos, gizmo_ori, ComputeGizmoScale(), win_width, win_height);
         slice_gizmo.SetSelectedAxis(axis);
         if (axis != GIZMO_NONE) {
@@ -661,19 +676,8 @@ Point3f MotionApp::GetSliceGizmoPosition() const
 {
     Point3f pos = analyzer.slice_plane_center;
 
-    // 回転スライスモード: アクティブスライスの位置とパンに追従させる
+    // 回転スライスモード: スライス中心 + パン
     if (analyzer.use_rotated_slice) {
-        float world_range_x = analyzer.world_bounds[0][1] - analyzer.world_bounds[0][0];
-        float world_range_y = analyzer.world_bounds[1][1] - analyzer.world_bounds[1][0];
-        float world_range_z = analyzer.world_bounds[2][1] - analyzer.world_bounds[2][0];
-        float max_range = (std::max)(world_range_x, (std::max)(world_range_y, world_range_z));
-        if (!analyzer.slice_positions.empty()) {
-            float offset = (analyzer.slice_positions[analyzer.active_slice_index] - 0.5f) * max_range;
-            pos.x += analyzer.slice_plane_normal.x * offset;
-            pos.y += analyzer.slice_plane_normal.y * offset;
-            pos.z += analyzer.slice_plane_normal.z * offset;
-        }
-        // パンも反映
         pos.x += analyzer.slice_plane_u.x * analyzer.pan_center.x + analyzer.slice_plane_v.x * analyzer.pan_center.y;
         pos.y += analyzer.slice_plane_u.y * analyzer.pan_center.x + analyzer.slice_plane_v.y * analyzer.pan_center.y;
         pos.z += analyzer.slice_plane_u.z * analyzer.pan_center.x + analyzer.slice_plane_v.z * analyzer.pan_center.y;

@@ -15,6 +15,7 @@ TransformGizmo::TransformGizmo()
     m_drag_start_pos.set(0, 0, 0);
     m_drag_start_world_pos.set(0, 0, 0);
     m_drag_plane_normal.set(0, 1, 0);
+    m_active_orientation.setIdentity();
 }
 
 TransformGizmo::~TransformGizmo() {}
@@ -220,104 +221,68 @@ GizmoAxis TransformGizmo::PickAxis(int mouse_x, int mouse_y, const Point3f& posi
 void TransformGizmo::StartDrag(const Point3f& position, int mouse_x, int mouse_y,
                                int win_width, int win_height) {
     m_drag_start_pos.set(position.x, position.y, position.z);
-    
-    // ドラッグ開始時のマウス座標を記録
     m_last_mouse_x = mouse_x;
     m_last_mouse_y = mouse_y;
     
-    // 回転モードの場合のみ、平面との交差計算が必要
     if (m_mode == GIZMO_ROTATE) {
         Point3f ray_origin;
         Vector3f ray_dir;
         ScreenToWorldRay(mouse_x, mouse_y, win_width, win_height, ray_origin, ray_dir);
         
-        // 回転モード：回転軸が法線の平面
+        Vector3f normal_world;
         if (m_selected_axis == GIZMO_X) {
-            m_drag_plane_normal.set(1, 0, 0);
+            normal_world.set(1, 0, 0);
         } else if (m_selected_axis == GIZMO_Y) {
-            m_drag_plane_normal.set(0, 1, 0);
+            normal_world.set(0, 1, 0);
         } else {
-            m_drag_plane_normal.set(0, 0, 1);
+            normal_world.set(0, 0, 1);
         }
+        m_active_orientation.transform(&normal_world);
+        normal_world.normalize();
+        m_drag_plane_normal = normal_world;
         
-        // ドラッグ開始点のワールド座標
         RayIntersectPlane(ray_origin, ray_dir, position, m_drag_plane_normal, m_drag_start_world_pos);
     }
 }
 
 void TransformGizmo::UpdateDrag(int mouse_x, int mouse_y, int win_width, int win_height,
                                 Point3f& out_translation, Matrix3f& out_rotation) {
-    // マウスの移動量を計算
     int delta_x = mouse_x - m_last_mouse_x;
     int delta_y = mouse_y - m_last_mouse_y;
-    
-    // マウス座標を更新
     m_last_mouse_x = mouse_x;
     m_last_mouse_y = mouse_y;
     
     if (m_mode == GIZMO_TRANSLATE) {
-        // 移動モード：カメラの向きを考慮したスクリーン空間での移動
-        
-        // カメラのビュー行列を取得
         GLdouble modelview[16];
         glGetDoublev(GL_MODELVIEW_MATRIX, modelview);
         
-        // カメラの右方向ベクトル（ビュー行列の第1列）
         Vector3f camera_right(modelview[0], modelview[4], modelview[8]);
         camera_right.normalize();
-        
-        // カメラの上方向ベクトル（ビュー行列の第2列）
         Vector3f camera_up(modelview[1], modelview[5], modelview[9]);
         camera_up.normalize();
         
-        // カメラの前方向ベクトル（ビュー行列の第3列の逆）
-        Vector3f camera_forward(-modelview[2], -modelview[6], -modelview[10]);
-        camera_forward.normalize();
-        
-        // 移動感度（ピクセル当たりのワールド単位）
         float sensitivity = 0.005f;
-        
         Vector3f translation(0, 0, 0);
         
-        if (m_selected_axis == GIZMO_X) {
-            // X軸：選択した軸とカメラの右・上ベクトルの内積から、
-            // スクリーン空間での移動量をワールド空間に変換
-            Vector3f axis_dir(1, 0, 0);
-            
-            // スクリーンX方向の移動をX軸方向に投影
-            float move_x = delta_x * camera_right.dot(axis_dir);
-            // スクリーンY方向の移動をX軸方向に投影
-            float move_y = -delta_y * camera_up.dot(axis_dir);
-            
-            float total_move = (move_x + move_y) * sensitivity;
-            translation.x = total_move;
-            
-        } else if (m_selected_axis == GIZMO_Y) {
-            // Y軸：同様の処理
-            Vector3f axis_dir(0, 1, 0);
-            
-            float move_x = delta_x * camera_right.dot(axis_dir);
-            float move_y = -delta_y * camera_up.dot(axis_dir);
-            
-            float total_move = (move_x + move_y) * sensitivity;
-            translation.y = total_move;
-            
-        } else if (m_selected_axis == GIZMO_Z) {
-            // Z軸：同様の処理
-            Vector3f axis_dir(0, 0, 1);
-            
-            float move_x = delta_x * camera_right.dot(axis_dir);
-            float move_y = -delta_y * camera_up.dot(axis_dir);
-            
-            float total_move = (move_x + move_y) * sensitivity;
-            translation.z = total_move;
-        }
+        Vector3f axis_dir(0, 0, 0);
+        if (m_selected_axis == GIZMO_X) axis_dir.set(1, 0, 0);
+        else if (m_selected_axis == GIZMO_Y) axis_dir.set(0, 1, 0);
+        else if (m_selected_axis == GIZMO_Z) axis_dir.set(0, 0, 1);
+        
+        m_active_orientation.transform(&axis_dir);
+        axis_dir.normalize();
+        
+        float move_x = delta_x * camera_right.dot(axis_dir);
+        float move_y = -delta_y * camera_up.dot(axis_dir);
+        float total_move = (move_x + move_y) * sensitivity;
+        translation.x = axis_dir.x * total_move;
+        translation.y = axis_dir.y * total_move;
+        translation.z = axis_dir.z * total_move;
         
         out_translation.set(translation.x, translation.y, translation.z);
         out_rotation.setIdentity();
         
     } else {
-        // 回転モード：元の実装を維持
         Point3f ray_origin;
         Vector3f ray_dir;
         ScreenToWorldRay(mouse_x, mouse_y, win_width, win_height, ray_origin, ray_dir);
@@ -329,10 +294,8 @@ void TransformGizmo::UpdateDrag(int mouse_x, int mouse_y, int win_width, int win
             return;
         }
         
-        // 回転量を計算
         Vector3f v1 = m_drag_start_world_pos - m_drag_start_pos;
         Vector3f v2 = current_pos - m_drag_start_pos;
-        
         v1.normalize();
         v2.normalize();
         
@@ -341,28 +304,30 @@ void TransformGizmo::UpdateDrag(int mouse_x, int mouse_y, int win_width, int win
         if (dot_product < -1.0f) dot_product = -1.0f;
         float angle = acos(dot_product);
         
-        // 回転方向を決定
         Vector3f cross;
         cross.cross(v1, v2);
         if (cross.dot(m_drag_plane_normal) < 0) {
             angle = -angle;
         }
-        
-        // 感度調整
         angle *= 0.5f;
         
-        // 回転行列を作成
-        if (m_selected_axis == GIZMO_X) {
-            out_rotation.rotX(angle);
-        } else if (m_selected_axis == GIZMO_Y) {
-            out_rotation.rotY(angle);
-        } else if (m_selected_axis == GIZMO_Z) {
-            out_rotation.rotZ(angle);
-        }
-        
+        Vector3f axis_world;
+        if (m_selected_axis == GIZMO_X) axis_world.set(1, 0, 0);
+        else if (m_selected_axis == GIZMO_Y) axis_world.set(0, 1, 0);
+        else axis_world.set(0, 0, 1);
+        m_active_orientation.transform(&axis_world);
+        axis_world.normalize();
+
+        // Rodrigues' rotation formula to build rotation matrix around axis_world
+        float c = cos(angle);
+        float s = sin(angle);
+        float t = 1.0f - c;
+        float x = axis_world.x, y = axis_world.y, z = axis_world.z;
+        out_rotation.m00 = t*x*x + c;      out_rotation.m01 = t*x*y - s*z;  out_rotation.m02 = t*x*z + s*y;
+        out_rotation.m10 = t*x*y + s*z;    out_rotation.m11 = t*y*y + c;    out_rotation.m12 = t*y*z - s*x;
+        out_rotation.m20 = t*x*z - s*y;    out_rotation.m21 = t*y*z + s*x;  out_rotation.m22 = t*z*z + c;
+
         out_translation.set(0, 0, 0);
-        
-        // 次の回転計算のために開始位置を更新
         m_drag_start_world_pos = current_pos;
     }
 }

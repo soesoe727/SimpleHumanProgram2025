@@ -1361,27 +1361,24 @@ void SpatialAnalyzer::DrawRotatedSlicePlane() {
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     
-    // 平面のサイズを計算
     float world_range[3];
     for (int i = 0; i < 3; ++i) {
         world_range[i] = world_bounds[i][1] - world_bounds[i][0];
     }
     float max_range = max(world_range[0], max(world_range[1], world_range[2]));
-    
-    // ズームを適用
     float half_size = max_range * 0.6f * zoom;
-    
-    // 各スライス位置について枠線を描画
+
+    Vector3f depth_dir = slice_plane_normal;
+    depth_dir.normalize();
+
     for (size_t i = 0; i < slice_positions.size(); ++i) {
-        float offset = (slice_positions[i] - 0.5f) * max_range;  // 中心からのオフセット
-        
-        // 平面上の4頂点を計算
+        float offset = 0.0f; // rotated mode: center stays at slice_plane_center
+
         Point3f center = slice_plane_center;
-        center.x += slice_plane_normal.x * offset;
-        center.y += slice_plane_normal.y * offset;
-        center.z += slice_plane_normal.z * offset;
-        
-        // パンを適用
+        center.x += depth_dir.x * offset;
+        center.y += depth_dir.y * offset;
+        center.z += depth_dir.z * offset;
+
         center.x += slice_plane_u.x * pan_center.x + slice_plane_v.x * pan_center.y;
         center.y += slice_plane_u.y * pan_center.x + slice_plane_v.y * pan_center.y;
         center.z += slice_plane_u.z * pan_center.x + slice_plane_v.z * pan_center.y;
@@ -1400,19 +1397,17 @@ void SpatialAnalyzer::DrawRotatedSlicePlane() {
                  center.y - slice_plane_u.y * half_size + slice_plane_v.y * half_size,
                  center.z - slice_plane_u.z * half_size + slice_plane_v.z * half_size);
         
-        // 枠線のみ描画（塗りつぶしなし）
         if ((int)i == active_slice_index) {
-            glColor4f(1.0f, 1.0f, 0.0f, 0.9f);  // 黄色
+            glColor4f(1.0f, 1.0f, 0.0f, 0.9f);
             glLineWidth(2.0f);
         } else {
-            glColor4f(0.5f, 0.5f, 1.0f, 0.7f);  // 青
+            glColor4f(0.5f, 0.5f, 1.0f, 0.7f);
             glLineWidth(1.0f);
         }
         glBegin(GL_LINE_LOOP);
         for (int k = 0; k < 4; ++k) glVertex3f(p[k].x, p[k].y, p[k].z);
         glEnd();
         
-        // 法線の矢印を描画（平面の向きを示す）
         if ((int)i == active_slice_index) {
             glColor4f(1.0f, 0.3f, 0.3f, 0.9f);
             glLineWidth(2.0f);
@@ -1431,7 +1426,6 @@ void SpatialAnalyzer::DrawRotatedSlicePlane() {
 
 // NEW: 回転スライス用の2Dマップ描画
 void SpatialAnalyzer::DrawRotatedSliceMap(int x_pos, int y_pos, int w, int h, VoxelGrid& grid, float max_val, const char* title) {
-    // 背景を描画
     glColor4f(0.9f, 0.9f, 0.9f, 1.0f);
     glBegin(GL_QUADS);
     glVertex2i(x_pos, y_pos);
@@ -1440,7 +1434,6 @@ void SpatialAnalyzer::DrawRotatedSliceMap(int x_pos, int y_pos, int w, int h, Vo
     glVertex2i(x_pos + w, y_pos);
     glEnd();
     
-    // 枠線
     glColor4f(0, 0, 0, 1);
     glBegin(GL_LINE_LOOP);
     glVertex2i(x_pos, y_pos);
@@ -1449,29 +1442,27 @@ void SpatialAnalyzer::DrawRotatedSliceMap(int x_pos, int y_pos, int w, int h, Vo
     glVertex2i(x_pos + w, y_pos);
     glEnd();
     
-    // 平面のサイズを計算
     float world_range[3];
     for (int i = 0; i < 3; ++i) {
         world_range[i] = world_bounds[i][1] - world_bounds[i][0];
     }
     float max_range = max(world_range[0], max(world_range[1], world_range[2]));
-    
-    // ズームとパンを適用
     float half_size = max_range * 0.6f * zoom;
-    
-    // スライス位置（アクティブなスライス）
-    float offset = (slice_positions[active_slice_index] - 0.5f) * max_range;
+
+    Vector3f depth_dir = slice_plane_normal;
+    depth_dir.normalize();
+
+    float offset = 0.0f;
+
     Point3f center = slice_plane_center;
-    center.x += slice_plane_normal.x * offset;
-    center.y += slice_plane_normal.y * offset;
-    center.z += slice_plane_normal.z * offset;
-    
-    // パンを適用
+    center.x += depth_dir.x * offset;
+    center.y += depth_dir.y * offset;
+    center.z += depth_dir.z * offset;
+
     center.x += slice_plane_u.x * pan_center.x + slice_plane_v.x * pan_center.y;
     center.y += slice_plane_u.y * pan_center.x + slice_plane_v.y * pan_center.y;
     center.z += slice_plane_u.z * pan_center.x + slice_plane_v.z * pan_center.y;
     
-    // 描画解像度
     int draw_res = 64;
     float cell_w = (float)w / draw_res;
     float cell_h = (float)h / draw_res;
@@ -1479,7 +1470,6 @@ void SpatialAnalyzer::DrawRotatedSliceMap(int x_pos, int y_pos, int w, int h, Vo
     glBegin(GL_QUADS);
     for (int iy = 0; iy < draw_res; ++iy) {
         for (int ix = 0; ix < draw_res; ++ix) {
-            // 2D座標を平面上の3D座標に変換
             float u = ((float)ix / draw_res - 0.5f) * 2.0f * half_size;
             float v = ((float)iy / draw_res - 0.5f) * 2.0f * half_size;
             
@@ -1488,7 +1478,6 @@ void SpatialAnalyzer::DrawRotatedSliceMap(int x_pos, int y_pos, int w, int h, Vo
             world_pos.y = center.y + slice_plane_u.y * u + slice_plane_v.y * v;
             world_pos.z = center.z + slice_plane_u.z * u + slice_plane_v.z * v;
             
-            // ボクセル値をサンプリング
             float val = SampleVoxelAtWorldPos(grid, world_pos);
             
             if (val > 0.01f) {
@@ -1496,7 +1485,7 @@ void SpatialAnalyzer::DrawRotatedSliceMap(int x_pos, int y_pos, int w, int h, Vo
                 glColor3f(c.x, c.y, c.z);
                 
                 float sx = x_pos + ix * cell_w;
-                float sy = y_pos + (draw_res - 1 - iy) * cell_h;  // Y軸反転
+                float sy = y_pos + (draw_res - 1 - iy) * cell_h;
                 
                 glVertex2f(sx, sy);
                 glVertex2f(sx, sy + cell_h);
@@ -1507,14 +1496,12 @@ void SpatialAnalyzer::DrawRotatedSliceMap(int x_pos, int y_pos, int w, int h, Vo
     }
     glEnd();
     
-    // タイトルを描画
     glColor3f(0, 0, 0);
     glRasterPos2i(x_pos, y_pos - 5);
     for (const char* c = title; *c != '\0'; c++) {
         glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, *c);
     }
     
-    // 回転角度を表示
     char rot_info[128];
     sprintf(rot_info, "Rot: X=%.0f Y=%.0f Z=%.0f", slice_rotation_x, slice_rotation_y, slice_rotation_z);
     glRasterPos2i(x_pos, y_pos + h + 22);

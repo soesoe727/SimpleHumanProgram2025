@@ -44,21 +44,19 @@ public:
     void SetSelectedAxis(GizmoAxis axis) { m_selected_axis = axis; }
     GizmoAxis GetSelectedAxis() const { return m_selected_axis; }
     
+    void SetActiveOrientation(const Matrix3f& orientation) { m_active_orientation = orientation; }
+    
     bool IsActive() const { return m_selected_axis != GIZMO_NONE; }
 
 private:
     GizmoMode m_mode;
     GizmoAxis m_selected_axis;
-    
-    // ドラッグ開始時の情報
     Point3f m_drag_start_pos;
     Point3f m_drag_start_world_pos;
     Vector3f m_drag_plane_normal;
     float m_drag_start_angle;
-    
-    // NEW: マウス座標の記録
-    int m_last_mouse_x;
-    int m_last_mouse_y;
+    int m_last_mouse_x, m_last_mouse_y;
+    Matrix3f m_active_orientation;
     
     // 描画ヘルパー
     void DrawTranslateGizmo(const Point3f& position, const Matrix3f& orientation, float scale);
