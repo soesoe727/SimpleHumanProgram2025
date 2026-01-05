@@ -348,7 +348,12 @@ void MotionApp::Display()
         SyncGizmoToSliceState();
         Matrix3f gizmo_ori = GetSliceGizmoOrientation();
         Point3f gizmo_pos = GetSliceGizmoPosition();
+        glPushAttrib(GL_ENABLE_BIT | GL_DEPTH_BUFFER_BIT);
+        glDepthMask(GL_FALSE);
+        glDepthFunc(GL_ALWAYS);
+        glDisable(GL_DEPTH_TEST);
         slice_gizmo.Draw(gizmo_pos, gizmo_ori, ComputeGizmoScale());
+        glPopAttrib();
     }
 
     // 3. 2D UIの描画（CTマップ）
@@ -656,8 +661,27 @@ Point3f MotionApp::GetSliceGizmoPosition() const
 {
     Point3f pos = analyzer.slice_plane_center;
 
-    // 回転スライスの中心が未初期化の場合は、現在のスライス位置を中心に使用
-    if (pos.x == 0.0f && pos.y == 0.0f && pos.z == 0.0f && !analyzer.slice_positions.empty()) {
+    // 回転スライスモード: アクティブスライスの位置とパンに追従させる
+    if (analyzer.use_rotated_slice) {
+        float world_range_x = analyzer.world_bounds[0][1] - analyzer.world_bounds[0][0];
+        float world_range_y = analyzer.world_bounds[1][1] - analyzer.world_bounds[1][0];
+        float world_range_z = analyzer.world_bounds[2][1] - analyzer.world_bounds[2][0];
+        float max_range = (std::max)(world_range_x, (std::max)(world_range_y, world_range_z));
+        if (!analyzer.slice_positions.empty()) {
+            float offset = (analyzer.slice_positions[analyzer.active_slice_index] - 0.5f) * max_range;
+            pos.x += analyzer.slice_plane_normal.x * offset;
+            pos.y += analyzer.slice_plane_normal.y * offset;
+            pos.z += analyzer.slice_plane_normal.z * offset;
+        }
+        // パンも反映
+        pos.x += analyzer.slice_plane_u.x * analyzer.pan_center.x + analyzer.slice_plane_v.x * analyzer.pan_center.y;
+        pos.y += analyzer.slice_plane_u.y * analyzer.pan_center.x + analyzer.slice_plane_v.y * analyzer.pan_center.y;
+        pos.z += analyzer.slice_plane_u.z * analyzer.pan_center.x + analyzer.slice_plane_v.z * analyzer.pan_center.y;
+        return pos;
+    }
+
+    // 非回転モード: アクティブスライスの位置を使用
+    if (!analyzer.slice_positions.empty()) {
         int depth_axis = 3 - analyzer.h_axis - analyzer.v_axis;
         float depth = analyzer.slice_positions[analyzer.active_slice_index];
         pos.x = (analyzer.world_bounds[0][0] + analyzer.world_bounds[0][1]) * 0.5f;

@@ -20,21 +20,19 @@ TransformGizmo::TransformGizmo()
 TransformGizmo::~TransformGizmo() {}
 
 void TransformGizmo::Draw(const Point3f& position, const Matrix3f& orientation, float scale) {
-    // OpenGLの状態を保存
+    // OpenGL状態の保存
     glPushAttrib(GL_ENABLE_BIT | GL_LIGHTING_BIT | GL_DEPTH_BUFFER_BIT);
     
-    // ライティングを無効化（ギズモは常に明るく表示）
+    // ライティングを無効化（ギズモは明示的に描画）
     glDisable(GL_LIGHTING);
     
-    // 深度テストは有効のまま（フィギュアの前後関係を保つ）
-    glEnable(GL_DEPTH_TEST);
-    
+    // 深度テストは呼び出し側の設定に従う
     glPushMatrix();
     
     // ギズモの位置に移動
     glTranslatef(position.x, position.y, position.z);
     
-    // 向きを適用（Matrix3fからGLfloat[16]への正しい変換）
+    // 回転の適用（Matrix3fからGLfloat[16]への行列変換）
     GLfloat m[16];
     m[0] = orientation.m00;  m[4] = orientation.m01;  m[8]  = orientation.m02;  m[12] = 0.0f;
     m[1] = orientation.m10;  m[5] = orientation.m11;  m[9]  = orientation.m12;  m[13] = 0.0f;
@@ -42,7 +40,7 @@ void TransformGizmo::Draw(const Point3f& position, const Matrix3f& orientation, 
     m[3] = 0.0f;             m[7] = 0.0f;             m[11] = 0.0f;             m[15] = 1.0f;
     glMultMatrixf(m);
     
-    // モードに応じて描画
+    // ローカルに描画
     Matrix3f identity_mat;
     identity_mat.setIdentity();
     
@@ -54,7 +52,7 @@ void TransformGizmo::Draw(const Point3f& position, const Matrix3f& orientation, 
     
     glPopMatrix();
     
-    // OpenGLの状態を復元
+    // OpenGL状態の復元
     glPopAttrib();
 }
 
