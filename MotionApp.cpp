@@ -8,6 +8,8 @@
 
 using namespace std;
 
+static const float kPi = 3.14159265358979323846f;
+
 // ADDED: インスタンスを保持する static ポインタ
 static MotionApp* g_app_instance = NULL;
 
@@ -20,8 +22,8 @@ static void SpecialKeyWrapper(int key, int x, int y)
 }
 
 MotionApp::MotionApp() {
-	g_app_instance = this;
-	app_name = "Motion Analysis App";
+    g_app_instance = this;
+    app_name = "Motion Analysis App";
     motion = NULL; 
     motion2 = NULL; 
     curr_posture = NULL; 
@@ -29,43 +31,48 @@ MotionApp::MotionApp() {
     on_animation = true; 
     animation_time = 0.0f; 
     animation_speed = 1.0f;
+
+    // ギズモ初期化
+    use_slice_gizmo = false;
+    gizmo_dragging = false;
+    slice_gizmo.SetMode(GIZMO_TRANSLATE);
 }
 
 MotionApp::~MotionApp() 
 {
-	if ( motion ) { 
-		if (motion->body) delete motion->body;
-		delete motion;
-	} 
-	if ( motion2 ) delete motion2; 
-	if ( curr_posture ) delete curr_posture;
-	if ( curr_posture2 ) delete curr_posture2;
+    if ( motion ) { 
+        if (motion->body) delete motion->body;
+        delete motion;
+    } 
+    if ( motion2 ) delete motion2; 
+    if ( curr_posture ) delete curr_posture;
+    if ( curr_posture2 ) delete curr_posture2;
 }
 
 void MotionApp::Initialize() 
 {
-	GLUTBaseApp::Initialize();
-	glutSpecialFunc(SpecialKeyWrapper);
-	OpenNewBVH(); 
-	OpenNewBVH2();
+    GLUTBaseApp::Initialize();
+    glutSpecialFunc(SpecialKeyWrapper);
+    OpenNewBVH(); 
+    OpenNewBVH2();
 }
 
 void MotionApp::Start()
 {
-	GLUTBaseApp::Start();
-	on_animation = true;
-	animation_time = 0.0f;
-	Animation(0.0f);
+    GLUTBaseApp::Start();
+    on_animation = true;
+    animation_time = 0.0f;
+    Animation(0.0f);
 }
 
 void MotionApp::Keyboard(unsigned char key, int mx, int my) {
-	GLUTBaseApp::Keyboard(key, mx, my);
-	
+    GLUTBaseApp::Keyboard(key, mx, my);
+    
     // 基本操作
-	switch (key) {
-		case ' ': on_animation = !on_animation; break;
-		case 'l': {OpenNewBVH(); OpenNewBVH2();} break;
-	}
+    switch (key) {
+        case ' ': on_animation = !on_animation; break;
+        case 'l': {OpenNewBVH(); OpenNewBVH2();} break;
+    }
 
     // CTスキャン操作
     switch(key) {
@@ -211,6 +218,15 @@ void MotionApp::Keyboard(unsigned char key, int mx, int my) {
         case 'r': 
             analyzer.ResetView(); 
             break;
+
+        // NEW: ギズモON/OFF
+        case 'y':
+            ToggleSliceGizmo();
+            break;
+        // NEW: ギズモモード切り替え
+        case 'u':
+            ToggleSliceGizmoMode();
+            break;
     }
 }
 
@@ -231,23 +247,63 @@ void MotionApp::Special(int key, int mx, int my)
     }
 }
 
+void MotionApp::MouseClick(int button, int state, int mx, int my)
+{
+    GLUTBaseApp::MouseClick(button, state, mx, my);
+
+    if (!use_slice_gizmo || !analyzer.use_rotated_slice)
+        return;
+
+    if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
+        SyncGizmoToSliceState();
+        Point3f gizmo_pos = GetSliceGizmoPosition();
+        Matrix3f gizmo_ori = GetSliceGizmoOrientation();
+        GizmoAxis axis = slice_gizmo.PickAxis(mx, my, gizmo_pos, gizmo_ori, ComputeGizmoScale(), win_width, win_height);
+        slice_gizmo.SetSelectedAxis(axis);
+        if (axis != GIZMO_NONE) {
+            slice_gizmo.StartDrag(gizmo_pos, mx, my, win_width, win_height);
+            gizmo_dragging = true;
+        }
+    } else if (button == GLUT_LEFT_BUTTON && state == GLUT_UP) {
+        slice_gizmo.SetSelectedAxis(GIZMO_NONE);
+        gizmo_dragging = false;
+    }
+}
+
+void MotionApp::MouseDrag(int mx, int my)
+{
+    if (use_slice_gizmo && gizmo_dragging && slice_gizmo.GetSelectedAxis() != GIZMO_NONE) {
+        Point3f translation;
+        Matrix3f rotation;
+        slice_gizmo.UpdateDrag(mx, my, win_width, win_height, translation, rotation);
+        ApplySliceGizmoDelta(translation, rotation);
+    }
+
+    GLUTBaseApp::MouseDrag(mx, my);
+}
+
+void MotionApp::MouseMotion(int mx, int my)
+{
+    GLUTBaseApp::MouseMotion(mx, my);
+}
+
 void MotionApp::Animation(float delta)
 {
-	if (!on_animation || drag_mouse_l || !motion || !motion2) return;
-	animation_time += delta * animation_speed;
-	float max_duration = max(motion->GetDuration(), motion2->GetDuration());
-	if (animation_time >= max_duration) animation_time = 0.0f;
-	if (animation_time < 0.0f) animation_time = 0.0f;
-	motion->GetPosture(animation_time, *curr_posture);
-	motion2->GetPosture(animation_time, *curr_posture2);
+    if (!on_animation || drag_mouse_l || !motion || !motion2) return;
+    animation_time += delta * animation_speed;
+    float max_duration = max(motion->GetDuration(), motion2->GetDuration());
+    if (animation_time >= max_duration) animation_time = 0.0f;
+    if (animation_time < 0.0f) animation_time = 0.0f;
+    motion->GetPosture(animation_time, *curr_posture);
+    motion2->GetPosture(animation_time, *curr_posture2);
 }
 
 void MotionApp::Display()
 {
-	GLUTBaseApp::Display();
-	
+    GLUTBaseApp::Display();
+    
     // 1. 3Dモデルの描画
-	if (curr_posture) {
+    if (curr_posture) {
         // MODIFIED: 部位別表示モードの場合は選択的描画
         if (analyzer.show_segment_mode && analyzer.selected_segment_index >= 0) {
             // 選択部位のみ赤色、他は灰色
@@ -263,7 +319,7 @@ void MotionApp::Display()
         glColor3f(0.0f, 0.0f, 0.0f);
         DrawPostureShadow(*curr_posture, shadow_dir, shadow_color); 
     }
-	if (curr_posture2) {
+    if (curr_posture2) {
         // MODIFIED: 部位別表示モードの場合は選択的描画
         if (analyzer.show_segment_mode && analyzer.selected_segment_index >= 0) {
             // 選択部位のみ青色、他は灰色
@@ -276,16 +332,24 @@ void MotionApp::Display()
             glColor3f(0.0f, 0.0f, 1.0f);
             DrawPosture(*curr_posture2);
         }
-		glColor3f(0.0f, 0.0f, 0.0f);
+        glColor3f(0.0f, 0.0f, 0.0f);
         DrawPostureShadow(*curr_posture2, shadow_dir, shadow_color); 
     }
 
-	// 2. Analyzerによる3D描画
+    // 2. Analyzerによる3D描画
     if (analyzer.show_planes) {
         analyzer.DrawSlicePlanes();
     }
     UpdateVoxelDataWrapper();
     analyzer.DrawVoxels3D();
+
+    // 2.5 ギズモの描画
+    if (use_slice_gizmo && analyzer.use_rotated_slice) {
+        SyncGizmoToSliceState();
+        Matrix3f gizmo_ori = GetSliceGizmoOrientation();
+        Point3f gizmo_pos = GetSliceGizmoPosition();
+        slice_gizmo.Draw(gizmo_pos, gizmo_ori, ComputeGizmoScale());
+    }
 
     // 3. 2D UIの描画（CTマップ）
     if (analyzer.show_maps) {
@@ -293,7 +357,7 @@ void MotionApp::Display()
     }
 
     // 4. 情報テキストの表示
-	char title[512];
+    char title[512];
     int d_axis = 3 - analyzer.h_axis - analyzer.v_axis;
     const char* slice_mode_str = analyzer.projection_mode ? "Projection" : "Slice";
     const char* feature_mode_str = (analyzer.feature_mode == 0) ? "Occupancy" : "Speed";
@@ -303,6 +367,8 @@ void MotionApp::Display()
     const char* voxels_on_str = (analyzer.show_voxels) ? "ON" : "OFF";
     const char* segment_mode_str = (analyzer.show_segment_mode) ? "ON" : "OFF";
     const char* rotated_slice_str = (analyzer.use_rotated_slice) ? "ON" : "OFF";
+    const char* gizmo_str = (use_slice_gizmo && analyzer.use_rotated_slice) ? "ON" : "OFF";
+    const char* gizmo_mode_str = (slice_gizmo.GetMode() == GIZMO_TRANSLATE) ? "Move" : "Rotate";
     
     float s1 = (analyzer.slice_positions.size() > 0) ? analyzer.slice_positions[0] : 0.0f;
     float s2 = (analyzer.slice_positions.size() > 1) ? analyzer.slice_positions[1] : 0.0f;
@@ -322,14 +388,14 @@ void MotionApp::Display()
                 analyzer.slice_rotation_x, analyzer.slice_rotation_y, analyzer.slice_rotation_z);
     }
 
-    sprintf(title, "CT-Scan | H:%c V:%c | RotSlice:%s%s | Feature:%s | Data:%s | Seg:%s | Planes:%s | Maps:%s | Voxels:%s",
+    sprintf(title, "CT-Scan | H:%c V:%c | RotSlice:%s%s | Gizmo:%s(%s) | Feature:%s | Data:%s | Seg:%s | Planes:%s | Maps:%s | Voxels:%s",
         'X' + analyzer.h_axis, 'X' + analyzer.v_axis, 
-        rotated_slice_str, rotation_info,
+        rotated_slice_str, rotation_info, gizmo_str, gizmo_mode_str,
         feature_mode_str, norm_mode_str, segment_info,
         planes_on_str, maps_on_str, voxels_on_str);
-	
-	DrawTextInformation(0, title);
-	if (motion) { 
+    
+    DrawTextInformation(0, title);
+    if (motion) { 
         char msg[64]; 
         sprintf(msg, "Time:%.2f(%d)", animation_time, (int)(animation_time / motion->interval)); 
         DrawTextInformation(1, msg); 
@@ -544,4 +610,137 @@ int MotionApp::GetNextValidSegment(int current_segment, int direction)
     
     // 有効な部位が見つからなかった場合は現在の部位を返す
     return current_segment;
+}
+
+void MotionApp::ToggleSliceGizmo()
+{
+    use_slice_gizmo = !use_slice_gizmo;
+    if (use_slice_gizmo && !analyzer.use_rotated_slice) {
+        analyzer.ToggleRotatedSliceMode();
+    }
+    gizmo_dragging = false;
+    slice_gizmo.SetSelectedAxis(GIZMO_NONE);
+    SyncGizmoToSliceState();
+}
+
+void MotionApp::ToggleSliceGizmoMode()
+{
+    GizmoMode mode = slice_gizmo.GetMode();
+    slice_gizmo.SetMode(mode == GIZMO_TRANSLATE ? GIZMO_ROTATE : GIZMO_TRANSLATE);
+}
+
+Matrix3f MotionApp::GetSliceGizmoOrientation() const
+{
+    Matrix3f ori;
+    Vector3f u = analyzer.slice_plane_u;
+    Vector3f v = analyzer.slice_plane_v;
+    Vector3f n = analyzer.slice_plane_normal;
+
+    if (u.length() < 1e-4f || v.length() < 1e-4f || n.length() < 1e-4f) {
+        ori.setIdentity();
+        return ori;
+    }
+
+    u.normalize();
+    v.normalize();
+    n.normalize();
+
+    // 列ベクトルとして設定
+    ori.m00 = u.x; ori.m10 = u.y; ori.m20 = u.z;
+    ori.m01 = v.x; ori.m11 = v.y; ori.m21 = v.z;
+    ori.m02 = n.x; ori.m12 = n.y; ori.m22 = n.z;
+    return ori;
+}
+
+Point3f MotionApp::GetSliceGizmoPosition() const
+{
+    Point3f pos = analyzer.slice_plane_center;
+
+    // 回転スライスの中心が未初期化の場合は、現在のスライス位置を中心に使用
+    if (pos.x == 0.0f && pos.y == 0.0f && pos.z == 0.0f && !analyzer.slice_positions.empty()) {
+        int depth_axis = 3 - analyzer.h_axis - analyzer.v_axis;
+        float depth = analyzer.slice_positions[analyzer.active_slice_index];
+        pos.x = (analyzer.world_bounds[0][0] + analyzer.world_bounds[0][1]) * 0.5f;
+        pos.y = (analyzer.world_bounds[1][0] + analyzer.world_bounds[1][1]) * 0.5f;
+        pos.z = (analyzer.world_bounds[2][0] + analyzer.world_bounds[2][1]) * 0.5f;
+        if (depth_axis == 0) pos.x = depth;
+        if (depth_axis == 1) pos.y = depth;
+        if (depth_axis == 2) pos.z = depth;
+    }
+
+    return pos;
+}
+
+float MotionApp::ComputeGizmoScale() const
+{
+    float extent_x = analyzer.world_bounds[0][1] - analyzer.world_bounds[0][0];
+    float extent_y = analyzer.world_bounds[1][1] - analyzer.world_bounds[1][0];
+    float extent_z = analyzer.world_bounds[2][1] - analyzer.world_bounds[2][0];
+    float max_extent = (std::max)(extent_x, (std::max)(extent_y, extent_z));
+    if (max_extent <= 0.0f) max_extent = 1.0f;
+    // enlarged scale for better UI visibility
+    return max_extent * 0.6;
+}
+
+static float ExtractAxisAngleDeg(const Matrix3f& rot, GizmoAxis axis)
+{
+    float angle_rad = 0.0f;
+    switch (axis) {
+        case GIZMO_X:
+            angle_rad = atan2(rot.m21, rot.m22);
+            break;
+        case GIZMO_Y:
+            angle_rad = atan2(rot.m02, rot.m00);
+            break;
+        case GIZMO_Z:
+            angle_rad = atan2(rot.m10, rot.m00);
+            break;
+        default:
+            break;
+    }
+    return angle_rad * 180.0f / kPi;
+}
+
+void MotionApp::ApplySliceGizmoDelta(const Point3f& translation, const Matrix3f& rotation)
+{
+    // 平行移動
+    analyzer.slice_plane_center.x += translation.x;
+    analyzer.slice_plane_center.y += translation.y;
+    analyzer.slice_plane_center.z += translation.z;
+
+    // 回転（回転ギズモのみ）
+    if (slice_gizmo.GetMode() == GIZMO_ROTATE) {
+        Vector3f u = analyzer.slice_plane_u;
+        Vector3f v = analyzer.slice_plane_v;
+        Vector3f n = analyzer.slice_plane_normal;
+        rotation.transform(&u);
+        rotation.transform(&v);
+        rotation.transform(&n);
+        u.normalize();
+        v.normalize();
+        n.normalize();
+        analyzer.slice_plane_u = u;
+        analyzer.slice_plane_v = v;
+        analyzer.slice_plane_normal = n;
+
+        float delta_deg = ExtractAxisAngleDeg(rotation, slice_gizmo.GetSelectedAxis());
+        if (slice_gizmo.GetSelectedAxis() == GIZMO_X) analyzer.slice_rotation_x += delta_deg;
+        if (slice_gizmo.GetSelectedAxis() == GIZMO_Y) analyzer.slice_rotation_y += delta_deg;
+        if (slice_gizmo.GetSelectedAxis() == GIZMO_Z) analyzer.slice_rotation_z += delta_deg;
+    }
+
+    analyzer.UpdateSlicePlaneVectors();
+}
+
+void MotionApp::SyncGizmoToSliceState()
+{
+    if (!analyzer.use_rotated_slice) {
+        slice_gizmo.SetMode(GIZMO_TRANSLATE);
+        return;
+    }
+
+    // use rotation gizmo by default when rotated slice mode is on
+    if (slice_gizmo.GetMode() == GIZMO_TRANSLATE && analyzer.use_rotated_slice) {
+        // keep current mode; user can toggle with 'u'
+    }
 }

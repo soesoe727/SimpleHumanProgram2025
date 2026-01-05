@@ -6,6 +6,7 @@
 #include "SimpleHuman.h"
 #include "SimpleHumanGLUT.h"
 #include "SpatialAnalysis.h"
+#include "TransformGizmo.h"
 
 class  MotionApp : public GLUTBaseApp
 {
@@ -19,6 +20,11 @@ protected:
     // --- 空間解析機能（ボクセル・CTスキャン）---
     SpatialAnalyzer analyzer;
 
+    // --- スライス用トランスフォームギズモ ---
+    TransformGizmo slice_gizmo;
+    bool use_slice_gizmo;
+    bool gizmo_dragging;
+
 public:
     MotionApp();
     virtual ~MotionApp();
@@ -27,6 +33,9 @@ public:
     virtual void Display() override;
     virtual void Keyboard(unsigned char key, int mx, int my) override;
     void Special(int key, int mx, int my);
+    virtual void MouseClick(int button, int state, int mx, int my) override;
+    virtual void MouseDrag(int mx, int my) override;
+    virtual void MouseMotion(int mx, int my) override;
     virtual void Animation(float delta) override;
     
 protected:
@@ -46,6 +55,15 @@ protected:
     bool HasVoxelData(int segment_index);
     // ADDED: 次の有効な部位を取得
     int GetNextValidSegment(int current_segment, int direction);
+
+    // --- ギズモ補助 ---
+    void ToggleSliceGizmo();
+    void ToggleSliceGizmoMode();
+    float ComputeGizmoScale() const;
+    Matrix3f GetSliceGizmoOrientation() const;
+    Point3f GetSliceGizmoPosition() const;
+    void ApplySliceGizmoDelta(const Point3f& translation, const Matrix3f& rotation);
+    void SyncGizmoToSliceState();
 
     // ユーティリティ
     void DrawText(int x, int y, const char* text, void* font);
