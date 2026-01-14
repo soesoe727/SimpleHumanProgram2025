@@ -218,6 +218,7 @@ SpatialAnalyzer::SpatialAnalyzer() {
     norm_mode = 0;
     global_max_spd = 1.0f;
     max_accumulated_val = 1.0f;
+    max_spd_accumulated_val = 1.0f;  // NEW: 速度累積用の最大値を初期化
     
     // NEW: 部位別表示モード
     selected_segment_index = -1;  // -1は全体表示
@@ -249,6 +250,11 @@ void SpatialAnalyzer::ResizeGrids(int res) {
     voxels1_accumulated.Resize(res);
     voxels2_accumulated.Resize(res);
     voxels_accumulated_diff.Resize(res);
+    
+    // NEW: 速度累積グリッドもリサイズ
+    voxels1_spd_accumulated.Resize(res);
+    voxels2_spd_accumulated.Resize(res);
+    voxels_spd_accumulated_diff.Resize(res);
 }
 
 void SpatialAnalyzer::SetWorldBounds(float bounds[3][2]) {
@@ -369,10 +375,11 @@ void SpatialAnalyzer::VoxelizeMotion(Motion* m, float time, VoxelGrid& occ, Voxe
             continue;
         }
 
-        // 速度計算
+        // 両端の関節速度を計算
         Vector3f vel1 = p1 - p1_prev;
         Vector3f vel2 = p2 - p2_prev;
-        float speed = ((vel1.length() + vel2.length()) / 2.0f) / dt;
+        float s1 = vel1.length() / dt;  // P1の速度
+        float s2 = vel2.length() / dt;  // P2の速度
 
         // ボクセルへの書き込み (AABB最適化付き)
         float b_min[3], b_max[3];
@@ -402,8 +409,8 @@ void SpatialAnalyzer::VoxelizeMotion(Motion* m, float time, VoxelGrid& occ, Voxe
                     
                     Point3f v_to_p1 = voxel_center - p1;
                     float t = (v_to_p1.x*bone_vec.x + v_to_p1.y*bone_vec.y + v_to_p1.z*bone_vec.z) / bone_len_sq;
-                    t = max(0.0f, min(1.0f, t));
-                    Point3f closest = p1 + bone_vec * t;
+                    float k_clamped = max(0.0f, min(1.0f, t));
+                    Point3f closest = p1 + bone_vec * k_clamped;
                     
                     float dist_sq = (voxel_center.x-closest.x)*(voxel_center.x-closest.x) + 
                                     (voxel_center.y-closest.y)*(voxel_center.y-closest.y) + 
@@ -412,8 +419,11 @@ void SpatialAnalyzer::VoxelizeMotion(Motion* m, float time, VoxelGrid& occ, Voxe
                     if (dist_sq < bone_radius * bone_radius) {
                         float presence = exp(-dist_sq / (2.0f * (bone_radius/2.0f)*(bone_radius/2.0f)));
                         occ.At(x, y, z) += presence;
+                        
+                        // 速度を線形補間: s_interp = (1-k)*s1 + k*s2
+                        float s_interp = (1.0f - k_clamped) * s1 + k_clamped * s2;
                         float& current_spd = spd.At(x, y, z);
-                        if(speed > current_spd) current_spd = speed;
+                        if(s_interp > current_spd) current_spd = s_interp;
                     }
                 }
             }
@@ -498,7 +508,7 @@ void SpatialAnalyzer::DrawSlicePlanes() {
             p[2].set(h_max, v_max, slice_val); p[3].set(h_min, v_max, slice_val);
         }
 
-        // 枠線のみ描画（塗りつぶしなし）
+        // 枚数線のみ描画（塗りつぶしなし）
         if ((int)i == active_slice_index) {
             glColor4f(1.0f, 1.0f, 0.0f, 0.9f);  // 黄色
             glLineWidth(2.0f);
@@ -585,10 +595,20 @@ void SpatialAnalyzer::DrawCTMaps(int win_width, int win_height) {
                     max_value = global_max_spd;
                 }
             } else {
-                grid1 = &voxels1_accumulated;
-                grid2 = &voxels2_accumulated;
-                grid_diff = &voxels_accumulated_diff;
-                max_value = max_accumulated_val;
+                // 累積ボクセルデータ
+                if (feature_mode == 0) {
+                    // 累積占有率
+                    grid1 = &voxels1_accumulated;
+                    grid2 = &voxels2_accumulated;
+                    grid_diff = &voxels_accumulated_diff;
+                    max_value = max_accumulated_val;
+                } else {
+                    // 累積最大速度
+                    grid1 = &voxels1_spd_accumulated;
+                    grid2 = &voxels2_spd_accumulated;
+                    grid_diff = &voxels_spd_accumulated_diff;
+                    max_value = max_spd_accumulated_val;
+                }
             }
         }
         
@@ -648,7 +668,7 @@ void SpatialAnalyzer::DrawCTMaps(int win_width, int win_height) {
             grid_diff = &temp_diff;
             
         } else {
-            // 全体表示モード: norm_modeで累積/現在フレームを切り替え
+            // 全体表示モード: norm_modeとfeature_modeで切り替え
             if (norm_mode == 0) {
                 // 現在フレームのボクセルデータ
                 if (feature_mode == 0) {
@@ -666,13 +686,22 @@ void SpatialAnalyzer::DrawCTMaps(int win_width, int win_height) {
                 }
             } else {
                 // 累積ボクセルデータ
-                grid1 = &voxels1_accumulated;
-                grid2 = &voxels2_accumulated;
-                grid_diff = &voxels_accumulated_diff;
-                max_value = max_accumulated_val;
+                if (feature_mode == 0) {
+                    // 累積占有率
+                    grid1 = &voxels1_accumulated;
+                    grid2 = &voxels2_accumulated;
+                    grid_diff = &voxels_accumulated_diff;
+                    max_value = max_accumulated_val;
+                } else {
+                    // 累積最大速度
+                    grid1 = &voxels1_spd_accumulated;
+                    grid2 = &voxels2_spd_accumulated;
+                    grid_diff = &voxels_spd_accumulated_diff;
+                    max_value = max_spd_accumulated_val;
+                }
             }
         }
-
+        
         // ボクセルデータをそのまま2Dマップに投影して描画
         DrawSingleMap(start_x, y_pos, map_w, map_h, *grid1, max_value, t1, slice_val, h_min, h_max, v_min, v_max);
         DrawSingleMap(start_x + map_w + gap, y_pos, map_w, map_h, *grid2, max_value, t2, slice_val, h_min, h_max, v_min, v_max);
@@ -831,8 +860,15 @@ void SpatialAnalyzer::DrawVoxels3D() {
         }
     } else {
         // 動作全体の累積データ
-        grid_to_draw = &voxels_accumulated_diff;
-        max_val = max_accumulated_val;
+        if (feature_mode == 0) {
+            // 累積占有率
+            grid_to_draw = &voxels_accumulated_diff;
+            max_val = max_accumulated_val;
+        } else {
+            // 累積最大速度
+            grid_to_draw = &voxels_spd_accumulated_diff;
+            max_val = max_spd_accumulated_val;
+        }
     }
     
     // ボクセルを描画
@@ -872,6 +908,14 @@ void SpatialAnalyzer::ClearAccumulatedVoxels() {
     voxels2_accumulated.Clear();
     voxels_accumulated_diff.Clear();
     max_accumulated_val = 0.0f;
+}
+
+// NEW: 速度累積のクリア
+void SpatialAnalyzer::ClearAccumulatedSpeed() {
+    voxels1_spd_accumulated.Clear();
+    voxels2_spd_accumulated.Clear();
+    voxels_spd_accumulated_diff.Clear();
+    max_spd_accumulated_val = 0.0f;
 }
 
 // NEW: 動作全体を通した累積ボクセル計算
@@ -947,6 +991,77 @@ void SpatialAnalyzer::AccumulateVoxelsAllFrames(Motion* m1, Motion* m2) {
     }
     
     std::cout << "Accumulation complete. Max accumulated value: " << max_accumulated_val << std::endl;
+}
+
+// NEW: 動作全体を通した速度累積計算（最大速度を保持）
+// ↑モーションの全フレームに対して各ボクセルの最大速度を更新
+void SpatialAnalyzer::AccumulateSpeedAllFrames(Motion* m1, Motion* m2) {
+    if (!m1 || !m2) return;
+    
+    // 速度累積グリッドをクリア
+    ClearAccumulatedSpeed();
+    
+    // 速度累積グリッドをリサイズ
+    voxels1_spd_accumulated.Resize(grid_resolution);
+    voxels2_spd_accumulated.Resize(grid_resolution);
+    voxels_spd_accumulated_diff.Resize(grid_resolution);
+    
+    std::cout << "Accumulating speed for all frames..." << std::endl;
+    
+    // モーション1の全フレームの最大速度を累積
+    for (int f = 0; f < m1->num_frames; ++f) {
+        float time = f * m1->interval;
+        VoxelGrid temp_occ, temp_spd;
+        temp_occ.Resize(grid_resolution);
+        temp_spd.Resize(grid_resolution);
+        
+        VoxelizeMotion(m1, time, temp_occ, temp_spd);
+        
+        // 各ボクセルで最大速度を保持
+        int size = grid_resolution * grid_resolution * grid_resolution;
+        for (int i = 0; i < size; ++i) {
+            if (temp_spd.data[i] > voxels1_spd_accumulated.data[i]) {
+                voxels1_spd_accumulated.data[i] = temp_spd.data[i];
+            }
+        }
+    }
+    
+    // モーション2の全フレームの最大速度を累積
+    for (int f = 0; f < m2->num_frames; ++f) {
+        float time = f * m2->interval;
+        VoxelGrid temp_occ, temp_spd;
+        temp_occ.Resize(grid_resolution);
+        temp_spd.Resize(grid_resolution);
+        
+        VoxelizeMotion(m2, time, temp_occ, temp_spd);
+        
+        // 各ボクセルで最大速度を保持
+        int size = grid_resolution * grid_resolution * grid_resolution;
+        for (int i = 0; i < size; ++i) {
+            if (temp_spd.data[i] > voxels2_spd_accumulated.data[i]) {
+                voxels2_spd_accumulated.data[i] = temp_spd.data[i];
+            }
+        }
+    }
+    
+    // 差分を計算し、最大値を更新
+    int size = grid_resolution * grid_resolution * grid_resolution;
+    max_spd_accumulated_val = 0.0f;
+    
+    for (int i = 0; i < size; ++i) {
+        float diff = abs(voxels1_spd_accumulated.data[i] - voxels2_spd_accumulated.data[i]);
+        voxels_spd_accumulated_diff.data[i] = diff;
+        
+        // 最大速度値も記録
+        float max_spd = max(voxels1_spd_accumulated.data[i], voxels2_spd_accumulated.data[i]);
+        if (max_spd > max_spd_accumulated_val) {
+            max_spd_accumulated_val = max_spd;
+        }
+    }
+    
+    if (max_spd_accumulated_val < 1e-5f) max_spd_accumulated_val = 1.0f;
+    
+    std::cout << "Speed accumulation complete. Max speed value: " << max_spd_accumulated_val << std::endl;
 }
 
 // NEW: 部位ごとのボクセル化
@@ -1058,8 +1173,8 @@ void SpatialAnalyzer::VoxelizeMotionBySegment(Motion* m, float time, SegmentVoxe
                     
                     Point3f v_to_p1 = voxel_center - p1;
                     float t = (v_to_p1.x*bone_vec.x + v_to_p1.y*bone_vec.y + v_to_p1.z*bone_vec.z) / bone_len_sq;
-                    t = max(0.0f, min(1.0f, t));
-                    Point3f closest = p1 + bone_vec * t;
+                    float k_clamped = max(0.0f, min(1.0f, t));
+                    Point3f closest = p1 + bone_vec * k_clamped;
                     
                     float dist_sq = (voxel_center.x-closest.x)*(voxel_center.x-closest.x) + 
                                     (voxel_center.y-closest.y)*(voxel_center.y-closest.y) + 
@@ -1068,6 +1183,138 @@ void SpatialAnalyzer::VoxelizeMotionBySegment(Motion* m, float time, SegmentVoxe
                     if (dist_sq < bone_radius * bone_radius) {
                         float presence = exp(-dist_sq / (2.0f * (bone_radius/2.0f)*(bone_radius/2.0f)));
                         seg_grid.At(x, y, z) += presence;
+                    }
+                }
+            }
+        }
+    }
+}
+
+// NEW: 部位ごとの速度ボクセル化
+void SpatialAnalyzer::VoxelizeMotionSpeedBySegment(Motion* m, float time, SegmentVoxelData& seg_speed_data) {
+    if (!m) return;
+    
+    // 現在フレームと前フレームの姿勢を取得
+    Posture curr_pose(m->body);
+    Posture prev_pose(m->body);
+    
+    float dt = m->interval;
+    float prev_time = time - dt;
+    if(prev_time < 0) prev_time = 0;
+
+    m->GetPosture(time, curr_pose);
+    m->GetPosture(prev_time, prev_pose);
+
+    // 順運動学計算（関節位置も取得）
+    vector<Matrix4f> curr_frames, prev_frames;
+    vector<Point3f> curr_joint_pos, prev_joint_pos;
+    curr_pose.ForwardKinematics(curr_frames, curr_joint_pos);
+    prev_pose.ForwardKinematics(prev_frames, prev_joint_pos);
+
+    float bone_radius = 0.08f;
+    float world_range[3];
+    for(int i=0; i<3; ++i) world_range[i] = world_bounds[i][1] - world_bounds[i][0];
+
+    // 各セグメント（ボーン）について個別に速度計算
+    for (int s = 0; s < m->body->num_segments; ++s) {
+        const Segment* seg = m->body->segments[s];
+        
+        // 体節名ベースで指をスキップ
+        if (IsFingerSegment(seg)) {
+            continue;
+        }
+
+        Point3f p1, p2, p1_prev, p2_prev;
+        
+        // セグメントの接続関節数に応じて位置を取得
+        if (seg->num_joints == 1) {
+            p1 = Point3f(curr_frames[s].m03, curr_frames[s].m13, curr_frames[s].m23);
+            p1_prev = Point3f(prev_frames[s].m03, prev_frames[s].m13, prev_frames[s].m23);
+            
+            if (seg->has_site) {
+                Matrix3f R_curr(curr_frames[s].m00, curr_frames[s].m01, curr_frames[s].m02, 
+                                curr_frames[s].m10, curr_frames[s].m11, curr_frames[s].m12, 
+                                curr_frames[s].m20, curr_frames[s].m21, curr_frames[s].m22);
+                Point3f offset = seg->site_position;
+                R_curr.transform(&offset);
+                p2 = p1 + offset;
+
+                Matrix3f R_prev(prev_frames[s].m00, prev_frames[s].m01, prev_frames[s].m02, 
+                                prev_frames[s].m10, prev_frames[s].m11, prev_frames[s].m12, 
+                                prev_frames[s].m20, prev_frames[s].m21, prev_frames[s].m22);
+                Point3f offset_prev = seg->site_position;
+                R_prev.transform(&offset_prev);
+                p2_prev = p1_prev + offset_prev;
+            } else {
+                continue;
+            }
+
+        } else if (seg->num_joints >= 2) {
+            Joint* root_joint = seg->joints[0];
+            Joint* end_joint = seg->joints[1];
+            
+            p1 = curr_joint_pos[root_joint->index];
+            p2 = curr_joint_pos[end_joint->index];
+            
+            p1_prev = prev_joint_pos[root_joint->index];
+            p2_prev = prev_joint_pos[end_joint->index];
+        } else {
+            continue;
+        }
+
+        // 両端の関節速度を計算
+        Vector3f vel1 = p1 - p1_prev;
+        Vector3f vel2 = p2 - p2_prev;
+        float s1 = vel1.length() / dt;  // P1の速度
+        float s2 = vel2.length() / dt;  // P2の速度
+
+        // AABB最適化
+        float b_min[3], b_max[3];
+        for(int i=0; i<3; ++i) {
+            b_min[i] = min(sa_get_axis_value(p1, i), sa_get_axis_value(p2, i)) - bone_radius;
+            b_max[i] = max(sa_get_axis_value(p1, i), sa_get_axis_value(p2, i)) + bone_radius;
+        }
+
+        int idx_min[3], idx_max[3];
+        for(int i=0; i<3; ++i) {
+            idx_min[i] = max(0, (int)(((b_min[i] - world_bounds[i][0]) / world_range[i]) * grid_resolution));
+            idx_max[i] = min(grid_resolution - 1, (int)(((b_max[i] - world_bounds[i][0]) / world_range[i]) * grid_resolution));
+        }
+
+        // このセグメント専用の速度グリッドに書き込み
+        VoxelGrid& seg_spd_grid = seg_speed_data.GetSegmentGrid(s);
+
+        for (int z = idx_min[2]; z <= idx_max[2]; ++z) {
+            for (int y = idx_min[1]; y <= idx_max[1]; ++y) {
+                for (int x = idx_min[0]; x <= idx_max[0]; ++x) {
+                    float wc[3];
+                    wc[0] = world_bounds[0][0] + (x + 0.5f) * (world_range[0] / grid_resolution);
+                    wc[1] = world_bounds[1][0] + (y + 0.5f) * (world_range[1] / grid_resolution);
+                    wc[2] = world_bounds[2][0] + (z + 0.5f) * (world_range[2] / grid_resolution);
+
+                    Point3f voxel_center(wc[0], wc[1], wc[2]);
+                    Point3f bone_vec = p2 - p1;
+                    float bone_len_sq = bone_vec.x*bone_vec.x + bone_vec.y*bone_vec.y + bone_vec.z*bone_vec.z;
+                    if(bone_len_sq < 1e-6) continue;
+                    
+                    Point3f v_to_p1 = voxel_center - p1;
+                    float t = (v_to_p1.x*bone_vec.x + v_to_p1.y*bone_vec.y + v_to_p1.z*bone_vec.z) / bone_len_sq;
+                    float k_clamped = max(0.0f, min(1.0f, t));
+                    Point3f closest = p1 + bone_vec * k_clamped;
+                    
+                    float dist_sq = (voxel_center.x-closest.x)*(voxel_center.x-closest.x) + 
+                                    (voxel_center.y-closest.y)*(voxel_center.y-closest.y) + 
+                                    (voxel_center.z-closest.z)*(voxel_center.z-closest.z);
+
+                    if (dist_sq < bone_radius * bone_radius) {
+                        // 速度を線形補間
+                        float s_interp = (1.0f - k_clamped) * s1 + k_clamped * s2;
+                        
+                        // 最大値を保持
+                        float& current_spd = seg_spd_grid.At(x, y, z);
+                        if (s_interp > current_spd) {
+                            current_spd = s_interp;
+                        }
                     }
                 }
             }
@@ -1150,12 +1397,28 @@ bool SpatialAnalyzer::SaveVoxelCache(const char* motion1_name, const char* motio
     if (!voxels2_accumulated.SaveToFile(accumulated2_file.c_str())) return false;
     if (!voxels_accumulated_diff.SaveToFile(accumulated_diff_file.c_str())) return false;
     
+    // NEW: 速度累積ボクセルデータを保存
+    std::string spd_acc1_file = base_filename + "_spd_acc1.bin";
+    std::string spd_acc2_file = base_filename + "_spd_acc2.bin";
+    std::string spd_acc_diff_file = base_filename + "_spd_acc_diff.bin";
+    
+    if (!voxels1_spd_accumulated.SaveToFile(spd_acc1_file.c_str())) return false;
+    if (!voxels2_spd_accumulated.SaveToFile(spd_acc2_file.c_str())) return false;
+    if (!voxels_spd_accumulated_diff.SaveToFile(spd_acc_diff_file.c_str())) return false;
+    
     // 部位ごとのボクセルデータを保存
     std::string segment1_file = base_filename + "_seg1.bin";
     std::string segment2_file = base_filename + "_seg2.bin";
     
     if (!segment_voxels1.SaveToFile(segment1_file.c_str())) return false;
     if (!segment_voxels2.SaveToFile(segment2_file.c_str())) return false;
+    
+    // NEW: 部位ごとの速度ボクセルデータを保存
+    std::string seg_spd1_file = base_filename + "_seg_spd1.bin";
+    std::string seg_spd2_file = base_filename + "_seg_spd2.bin";
+    
+    if (!segment_speed_voxels1.SaveToFile(seg_spd1_file.c_str())) return false;
+    if (!segment_speed_voxels2.SaveToFile(seg_spd2_file.c_str())) return false;
     
     // メタデータを保存
     std::string meta_file = base_filename + "_meta.txt";
@@ -1164,6 +1427,7 @@ bool SpatialAnalyzer::SaveVoxelCache(const char* motion1_name, const char* motio
     
     meta_ofs << grid_resolution << std::endl;
     meta_ofs << max_accumulated_val << std::endl;
+    meta_ofs << max_spd_accumulated_val << std::endl;  // NEW: 速度累積最大値
     for (int i = 0; i < 3; ++i) {
         meta_ofs << world_bounds[i][0] << " " << world_bounds[i][1] << std::endl;
     }
@@ -1190,6 +1454,7 @@ bool SpatialAnalyzer::LoadVoxelCache(const char* motion1_name, const char* motio
     int res;
     meta_ifs >> res;
     meta_ifs >> max_accumulated_val;
+    meta_ifs >> max_spd_accumulated_val;  // NEW: 速度累積最大値
     for (int i = 0; i < 3; ++i) {
         meta_ifs >> world_bounds[i][0] >> world_bounds[i][1];
     }
@@ -1216,6 +1481,24 @@ bool SpatialAnalyzer::LoadVoxelCache(const char* motion1_name, const char* motio
         return false;
     }
     
+    // NEW: 速度累積ボクセルデータを読み込み
+    std::string spd_acc1_file = base_filename + "_spd_acc1.bin";
+    std::string spd_acc2_file = base_filename + "_spd_acc2.bin";
+    std::string spd_acc_diff_file = base_filename + "_spd_acc_diff.bin";
+    
+    if (!voxels1_spd_accumulated.LoadFromFile(spd_acc1_file.c_str())) {
+        std::cout << "Failed to load: " << spd_acc1_file << std::endl;
+        return false;
+    }
+    if (!voxels2_spd_accumulated.LoadFromFile(spd_acc2_file.c_str())) {
+        std::cout << "Failed to load: " << spd_acc2_file << std::endl;
+        return false;
+    }
+    if (!voxels_spd_accumulated_diff.LoadFromFile(spd_acc_diff_file.c_str())) {
+        std::cout << "Failed to load: " << spd_acc_diff_file << std::endl;
+        return false;
+    }
+    
     // 部位ごとのボクセルデータを読み込み
     std::string segment1_file = base_filename + "_seg1.bin";
     std::string segment2_file = base_filename + "_seg2.bin";
@@ -1226,6 +1509,19 @@ bool SpatialAnalyzer::LoadVoxelCache(const char* motion1_name, const char* motio
     }
     if (!segment_voxels2.LoadFromFile(segment2_file.c_str())) {
         std::cout << "Failed to load: " << segment2_file << std::endl;
+        return false;
+    }
+    
+    // NEW: 部位ごとの速度ボクセルデータを読み込み
+    std::string seg_spd1_file = base_filename + "_seg_spd1.bin";
+    std::string seg_spd2_file = base_filename + "_seg_spd2.bin";
+    
+    if (!segment_speed_voxels1.LoadFromFile(seg_spd1_file.c_str())) {
+        std::cout << "Failed to load: " << seg_spd1_file << std::endl;
+        return false;
+    }
+    if (!segment_speed_voxels2.LoadFromFile(seg_spd2_file.c_str())) {
+        std::cout << "Failed to load: " << seg_spd2_file << std::endl;
         return false;
     }
     
@@ -1371,19 +1667,21 @@ void SpatialAnalyzer::DrawRotatedSlicePlane() {
     Vector3f depth_dir = slice_plane_normal;
     depth_dir.normalize();
 
+    float offset = 0.0f;
+
+    Point3f center = slice_plane_center;
+    center.x += depth_dir.x * offset;
+    center.y += depth_dir.y * offset;
+    center.z += depth_dir.z * offset;
+
+    center.x += slice_plane_u.x * pan_center.x + slice_plane_v.x * pan_center.y;
+    center.y += slice_plane_u.y * pan_center.x + slice_plane_v.y * pan_center.y;
+    center.z += slice_plane_u.z * pan_center.x + slice_plane_v.z * pan_center.y;
+    
     for (size_t i = 0; i < slice_positions.size(); ++i) {
-        float offset = 0.0f; // rotated mode: center stays at slice_plane_center
-
-        Point3f center = slice_plane_center;
-        center.x += depth_dir.x * offset;
-        center.y += depth_dir.y * offset;
-        center.z += depth_dir.z * offset;
-
-        center.x += slice_plane_u.x * pan_center.x + slice_plane_v.x * pan_center.y;
-        center.y += slice_plane_u.y * pan_center.x + slice_plane_v.y * pan_center.y;
-        center.z += slice_plane_u.z * pan_center.x + slice_plane_v.z * pan_center.y;
-        
+        float slice_val = slice_positions[i];
         Point3f p[4];
+        
         p[0].set(center.x - slice_plane_u.x * half_size - slice_plane_v.x * half_size,
                  center.y - slice_plane_u.y * half_size - slice_plane_v.y * half_size,
                  center.z - slice_plane_u.z * half_size - slice_plane_v.z * half_size);
@@ -1397,17 +1695,15 @@ void SpatialAnalyzer::DrawRotatedSlicePlane() {
                  center.y - slice_plane_u.y * half_size + slice_plane_v.y * half_size,
                  center.z - slice_plane_u.z * half_size + slice_plane_v.z * half_size);
         
-        if ((int)i == active_slice_index) {
-            glColor4f(1.0f, 1.0f, 0.0f, 0.9f);
-            glLineWidth(2.0f);
-        } else {
-            glColor4f(0.5f, 0.5f, 1.0f, 0.7f);
-            glLineWidth(1.0f);
-        }
+        // 枠線
+        glColor4f(1.0f, 1.0f, 0.0f, 0.9f);
+        glLineWidth(1.0f);
+
         glBegin(GL_LINE_LOOP);
         for (int k = 0; k < 4; ++k) glVertex3f(p[k].x, p[k].y, p[k].z);
         glEnd();
         
+        // アクティブなスライスの強調
         if ((int)i == active_slice_index) {
             glColor4f(1.0f, 0.3f, 0.3f, 0.9f);
             glLineWidth(2.0f);
@@ -1420,7 +1716,6 @@ void SpatialAnalyzer::DrawRotatedSlicePlane() {
         }
     }
     
-    glLineWidth(1.0f);
     glDisable(GL_BLEND);
 }
 
@@ -1496,16 +1791,13 @@ void SpatialAnalyzer::DrawRotatedSliceMap(int x_pos, int y_pos, int w, int h, Vo
     }
     glEnd();
     
-    glColor3f(0, 0, 0);
+    // タイトルを描画
+    glColor3f(0,0,0);
     glRasterPos2i(x_pos, y_pos - 5);
-    for (const char* c = title; *c != '\0'; c++) {
-        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, *c);
-    }
+    for (const char* c = title; *c != '\0'; c++) glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, *c);
     
     char rot_info[128];
     sprintf(rot_info, "Rot: X=%.0f Y=%.0f Z=%.0f", slice_rotation_x, slice_rotation_y, slice_rotation_z);
     glRasterPos2i(x_pos, y_pos + h + 22);
-    for (const char* c = rot_info; *c != '\0'; c++) {
-        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, *c);
-    }
+    for (const char* c = rot_info; *c != '\0'; c++) glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, *c);
 }

@@ -99,12 +99,20 @@ public:
     VoxelGrid voxels2_accumulated;
     VoxelGrid voxels_accumulated_diff;
     
+    // NEW: 速度累積ボクセル（動作全体を通した最大速度）
+    VoxelGrid voxels1_spd_accumulated;
+    VoxelGrid voxels2_spd_accumulated;
+    VoxelGrid voxels_spd_accumulated_diff;
+    
     float max_occ_val;
     float max_spd_val;
     float global_max_spd;
     
     // NEW: 累積用の最大値
     float max_accumulated_val;
+    
+    // NEW: 速度累積用の最大値
+    float max_spd_accumulated_val;
 
     // --- ビュー/スライス設定 ---
     int h_axis, v_axis;
@@ -138,6 +146,10 @@ public:
     SegmentVoxelData segment_voxels1;
     SegmentVoxelData segment_voxels2;
     
+    // NEW: 部位ごとの速度ボクセルデータ
+    SegmentVoxelData segment_speed_voxels1;
+    SegmentVoxelData segment_speed_voxels2;
+    
     // NEW: 表示設定
     int selected_segment_index;  // 表示する部位のインデックス (-1で全体)
     bool show_segment_mode;      // 部位別表示モードON/OFF
@@ -156,9 +168,17 @@ public:
     void AccumulateVoxelsAllFrames(Motion* m1, Motion* m2);
     void ClearAccumulatedVoxels();
 
+    // NEW: 速度累積計算
+    void AccumulateSpeedAllFrames(Motion* m1, Motion* m2);
+    void ClearAccumulatedSpeed();
+
     // 部位ごとのボクセル計算
     void VoxelizeMotionBySegment(Motion* m, float time, SegmentVoxelData& seg_data);
     void AccumulateVoxelsBySegmentAllFrames(Motion* m1, Motion* m2);
+    
+    // NEW: 部位ごとの速度計算
+    void VoxelizeMotionSpeedBySegment(Motion* m, float time, SegmentVoxelData& seg_speed_data);
+    void AccumulateSpeedBySegmentAllFrames(Motion* m1, Motion* m2);
     
     // NEW: ボクセルキャッシュ（ファイル保存・読み込み）
     bool SaveVoxelCache(const char* motion1_name, const char* motion2_name);
