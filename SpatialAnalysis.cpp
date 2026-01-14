@@ -375,7 +375,6 @@ void SpatialAnalyzer::VoxelizeMotion(Motion* m, float time, VoxelGrid& occ, Voxe
             continue;
         }
 
-        // 両端の関節速度を計算
         Vector3f vel1 = p1 - p1_prev;
         Vector3f vel2 = p2 - p2_prev;
         float s1 = vel1.length() / dt;  // P1の速度
@@ -800,7 +799,6 @@ void SpatialAnalyzer::DrawSingleMap(int x_pos, int y_pos, int w, int h, VoxelGri
 }
 
 
-// --- 操作 ---
 void SpatialAnalyzer::ResetView() { zoom = 1.0f; pan_center.set(0.0f, 0.0f); is_manual_view = false; }
 void SpatialAnalyzer::Pan(float dx, float dy) { pan_center.x += dx; pan_center.y += dy; is_manual_view = true; }
 void SpatialAnalyzer::Zoom(float factor) { zoom *= factor; is_manual_view = true; }
@@ -1225,11 +1223,11 @@ void SpatialAnalyzer::VoxelizeMotionSpeedBySegment(Motion* m, float time, Segmen
         }
 
         Point3f p1, p2, p1_prev, p2_prev;
-        
         // セグメントの接続関節数に応じて位置を取得
         if (seg->num_joints == 1) {
             p1 = Point3f(curr_frames[s].m03, curr_frames[s].m13, curr_frames[s].m23);
             p1_prev = Point3f(prev_frames[s].m03, prev_frames[s].m13, prev_frames[s].m23);
+            
             
             if (seg->has_site) {
                 Matrix3f R_curr(curr_frames[s].m00, curr_frames[s].m01, curr_frames[s].m02, 
