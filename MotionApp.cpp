@@ -574,6 +574,9 @@ void MotionApp::PrepareAllData() {
         std::cout << "Calculating accumulated voxels by segment..." << std::endl;
         analyzer.AccumulateVoxelsBySegmentAllFrames(motion, motion2);
         
+        std::cout << "Calculating accumulated speed by segment..." << std::endl;
+        analyzer.AccumulateSpeedBySegmentAllFrames(motion, motion2);
+        
         std::cout << "Saving voxel cache..." << std::endl;
         analyzer.SaveVoxelCache(motion->name.c_str(), motion2->name.c_str());
     } else {

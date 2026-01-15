@@ -565,8 +565,16 @@ void SpatialAnalyzer::DrawCTMaps(int win_width, int win_height) {
         // 表示するボクセルグリッドを選択
         if (show_segment_mode && selected_segment_index >= 0 && 
             selected_segment_index < segment_voxels1.num_segments) {
+            // 部位別表示モード: feature_modeに応じて占有率または速度を使用
+            if (feature_mode == 0) {
+                // 占有率
             grid1 = &segment_voxels1.GetSegmentGrid(selected_segment_index);
             grid2 = &segment_voxels2.GetSegmentGrid(selected_segment_index);
+            } else {
+                // 速度
+                grid1 = &segment_speed_voxels1.GetSegmentGrid(selected_segment_index);
+                grid2 = &segment_speed_voxels2.GetSegmentGrid(selected_segment_index);
+            }
             
             static VoxelGrid temp_diff;
             temp_diff.Resize(grid_resolution);
@@ -648,9 +656,16 @@ void SpatialAnalyzer::DrawCTMaps(int win_width, int win_height) {
         // NEW: ボクセルデータを直接使用するように修正
         if (show_segment_mode && selected_segment_index >= 0 && 
             selected_segment_index < segment_voxels1.num_segments) {
-            // 部位別表示モード: 部位ごとの累積ボクセルを使用
+            // 部位別表示モード: feature_modeに応じて占有率または速度を使用
+            if (feature_mode == 0) {
+                // 占有率
             grid1 = &segment_voxels1.GetSegmentGrid(selected_segment_index);
             grid2 = &segment_voxels2.GetSegmentGrid(selected_segment_index);
+            } else {
+                // 速度
+                grid1 = &segment_speed_voxels1.GetSegmentGrid(selected_segment_index);
+                grid2 = &segment_speed_voxels2.GetSegmentGrid(selected_segment_index);
+            }
             
             // 差分を計算
             static VoxelGrid temp_diff;
@@ -833,13 +848,22 @@ void SpatialAnalyzer::DrawVoxels3D() {
         temp_seg_diff.Resize(grid_resolution);
         temp_seg_diff.Clear();
         
-        VoxelGrid& seg1 = segment_voxels1.GetSegmentGrid(selected_segment_index);
-        VoxelGrid& seg2 = segment_voxels2.GetSegmentGrid(selected_segment_index);
+        VoxelGrid* seg1;
+        VoxelGrid* seg2;
+        
+        // feature_modeに応じて占有率または速度を使用
+        if (feature_mode == 0) {
+            seg1 = &segment_voxels1.GetSegmentGrid(selected_segment_index);
+            seg2 = &segment_voxels2.GetSegmentGrid(selected_segment_index);
+        } else {
+            seg1 = &segment_speed_voxels1.GetSegmentGrid(selected_segment_index);
+            seg2 = &segment_speed_voxels2.GetSegmentGrid(selected_segment_index);
+        }
         
         int size = grid_resolution * grid_resolution * grid_resolution;
         max_val = 0.0f;
         for (int i = 0; i < size; ++i) {
-            float diff = abs(seg1.data[i] - seg2.data[i]);
+            float diff = abs(seg1->data[i] - seg2->data[i]);
             temp_seg_diff.data[i] = diff;
             if (diff > max_val) max_val = diff;
         }
@@ -1228,7 +1252,6 @@ void SpatialAnalyzer::VoxelizeMotionSpeedBySegment(Motion* m, float time, Segmen
             p1 = Point3f(curr_frames[s].m03, curr_frames[s].m13, curr_frames[s].m23);
             p1_prev = Point3f(prev_frames[s].m03, prev_frames[s].m13, prev_frames[s].m23);
             
-            
             if (seg->has_site) {
                 Matrix3f R_curr(curr_frames[s].m00, curr_frames[s].m01, curr_frames[s].m02, 
                                 curr_frames[s].m10, curr_frames[s].m11, curr_frames[s].m12, 
@@ -1368,6 +1391,60 @@ void SpatialAnalyzer::AccumulateVoxelsBySegmentAllFrames(Motion* m1, Motion* m2)
     }
     
     std::cout << "Segment-wise accumulation complete." << std::endl;
+}
+
+// NEW: 部位ごとの速度累積計算
+void SpatialAnalyzer::AccumulateSpeedBySegmentAllFrames(Motion* m1, Motion* m2) {
+    if (!m1 || !m2) return;
+    
+    // 部位数を取得
+    int num_segments = m1->body->num_segments;
+    
+    // 部位ごとの速度グリッドをリサイズ
+    segment_speed_voxels1.Resize(num_segments, grid_resolution);
+    segment_speed_voxels2.Resize(num_segments, grid_resolution);
+    
+    std::cout << "Accumulating speed by segment for " << num_segments << " segments..." << std::endl;
+    
+    // モーション1の全フレームを部位ごとに速度累積（最大値を保持）
+    for (int f = 0; f < m1->num_frames; ++f) {
+        float time = f * m1->interval;
+        SegmentVoxelData temp_seg_spd;
+        temp_seg_spd.Resize(num_segments, grid_resolution);
+        
+        VoxelizeMotionSpeedBySegment(m1, time, temp_seg_spd);
+        
+        // 各ボクセルで最大速度を保持
+        for (int s = 0; s < num_segments; ++s) {
+            int size = grid_resolution * grid_resolution * grid_resolution;
+            for (int i = 0; i < size; ++i) {
+                if (temp_seg_spd.segment_grids[s].data[i] > segment_speed_voxels1.segment_grids[s].data[i]) {
+                    segment_speed_voxels1.segment_grids[s].data[i] = temp_seg_spd.segment_grids[s].data[i];
+                }
+            }
+        }
+    }
+    
+    // モーション2の全フレームを部位ごとに速度累積（最大値を保持）
+    for (int f = 0; f < m2->num_frames; ++f) {
+        float time = f * m2->interval;
+        SegmentVoxelData temp_seg_spd;
+        temp_seg_spd.Resize(num_segments, grid_resolution);
+        
+        VoxelizeMotionSpeedBySegment(m2, time, temp_seg_spd);
+        
+        // 各ボクセルで最大速度を保持
+        for (int s = 0; s < num_segments; ++s) {
+            int size = grid_resolution * grid_resolution * grid_resolution;
+            for (int i = 0; i < size; ++i) {
+                if (temp_seg_spd.segment_grids[s].data[i] > segment_speed_voxels2.segment_grids[s].data[i]) {
+                    segment_speed_voxels2.segment_grids[s].data[i] = temp_seg_spd.segment_grids[s].data[i];
+                }
+            }
+        }
+    }
+    
+    std::cout << "Segment-wise speed accumulation complete." << std::endl;
 }
 
 // NEW: キャッシュファイル名を生成
