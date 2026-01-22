@@ -91,20 +91,20 @@ public:
     int grid_resolution;
     float world_bounds[3][2];
     
-    VoxelGrid voxels1_occ, voxels2_occ, voxels_diff;
+    VoxelGrid voxels1_psc, voxels2_psc, voxels_psc_diff;
     VoxelGrid voxels1_spd, voxels2_spd, voxels_spd_diff;
     
-    // NEW: 累積ボクセル（動作全体を通した累積）
-    VoxelGrid voxels1_accumulated;
-    VoxelGrid voxels2_accumulated;
-    VoxelGrid voxels_accumulated_diff;
+    // NEW: 占有率累積ボクセル（動作全体を通した占有率累積値）
+    VoxelGrid voxels1_psc_accumulated;
+    VoxelGrid voxels2_psc_accumulated;
+    VoxelGrid voxels_psc_accumulated_diff;
     
     // NEW: 速度累積ボクセル（動作全体を通した最大速度）
     VoxelGrid voxels1_spd_accumulated;
     VoxelGrid voxels2_spd_accumulated;
     VoxelGrid voxels_spd_accumulated_diff;
     
-    float max_occ_val;
+    float max_psc_val;
     float max_spd_val;
     float global_max_spd;
     
@@ -142,9 +142,9 @@ public:
     int feature_mode; 
     int norm_mode;    
 
-    // NEW: 部位ごとのボクセルデータ
-    SegmentVoxelData segment_voxels1;
-    SegmentVoxelData segment_voxels2;
+    // NEW: 部位ごとの占有率ボクセルデータ
+    SegmentVoxelData segment_presence_voxels1;
+    SegmentVoxelData segment_presence_voxels2;
     
     // NEW: 部位ごとの速度ボクセルデータ
     SegmentVoxelData segment_speed_voxels1;
