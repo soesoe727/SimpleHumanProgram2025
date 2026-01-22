@@ -39,7 +39,7 @@ void VoxelGrid::Clear() {
 }
 
 float& VoxelGrid::At(int x, int y, int z) {
-    if(x<0||x>=resolution||y<0||y>=resolution||z<0||z>=resolution) {
+    if(x<0 || x>=resolution || y<0 || y>=resolution || z<0 || z>=resolution) {
         static float dummy = 0.0f; return dummy;
     }
     return data[z * resolution * resolution + y * resolution + x];
@@ -50,7 +50,7 @@ float VoxelGrid::Get(int x, int y, int z) const {
     return data[static_cast<std::vector<float, std::allocator<float>>::size_type>(z) * resolution * resolution + y * resolution + x];
 }
 
-// NEW: ファイルへ保存（基準姿勢情報も含む）
+// ファイルへ保存（基準姿勢情報も含む）
 bool VoxelGrid::SaveToFile(const char* filename) const {
     ofstream ofs(filename, ios::binary);
     if (!ofs) return false;
@@ -69,7 +69,7 @@ bool VoxelGrid::SaveToFile(const char* filename) const {
     // データを書き込み
     ofs.write(reinterpret_cast<const char*>(data.data()), data_size * sizeof(float));
     
-    // NEW: 基準姿勢情報を書き込み
+    // 基準姿勢情報を書き込み
     ofs.write(reinterpret_cast<const char*>(&has_reference), sizeof(bool));
     if (has_reference) {
         ofs.write(reinterpret_cast<const char*>(&reference_root_pos.x), sizeof(float));
@@ -97,7 +97,7 @@ bool VoxelGrid::SaveToFile(const char* filename) const {
     return ofs.good();
 }
 
-// NEW: ファイルから読み込み（バージョン対応）
+// ファイルから読み込み（バージョン対応）
 bool VoxelGrid::LoadFromFile(const char* filename) {
     ifstream ifs(filename, ios::binary);
     if (!ifs) return false;
@@ -143,7 +143,7 @@ bool VoxelGrid::LoadFromFile(const char* filename) {
     return ifs.good();
 }
 
-// NEW: SegmentVoxelDataのファイル保存
+// SegmentVoxelDataのファイル保存
 bool SegmentVoxelData::SaveToFile(const char* filename) const {
     ofstream ofs(filename, ios::binary);
     if (!ofs) return false;
@@ -169,7 +169,7 @@ bool SegmentVoxelData::SaveToFile(const char* filename) const {
     return ofs.good();
 }
 
-// NEW: SegmentVoxelDataのファイル読み込み
+// SegmentVoxelDataのファイル読み込み
 bool SegmentVoxelData::LoadFromFile(const char* filename) {
     ifstream ifs(filename, ios::binary);
     if (!ifs) return false;
@@ -218,7 +218,7 @@ SpatialAnalyzer::SpatialAnalyzer() {
     norm_mode = 0;
     max_spd_val = 1.0f;
     max_psc_accumulated_val = 1.0f;
-    max_spd_accumulated_val = 1.0f;  // NEW: 速度累積用の最大値を初期化
+    max_spd_accumulated_val = 1.0f;  // 速度累積用の最大値を初期化
     
     // NEW: 部位別表示モード
     selected_segment_index = -1;  // -1は全体表示
@@ -479,11 +479,10 @@ void SpatialAnalyzer::CalculateViewBounds(float& h_min, float& h_max, float& v_m
 }
 
 void SpatialAnalyzer::DrawSlicePlanes() {
-    // NEW: 回転スライスモードの場合は別の描画関数を使用
-    if (use_rotated_slice) {
-        DrawRotatedSlicePlane();
-        return;
-    }
+    // 回転スライスモードの場合は別の描画関数を使用
+	// 常に回転スライスモードを使用する
+    DrawRotatedSlicePlane();
+    return;
     
     int d_axis = 3 - h_axis - v_axis;
     float h_min, h_max, v_min, v_max;
@@ -495,7 +494,7 @@ void SpatialAnalyzer::DrawSlicePlanes() {
     for (size_t i = 0; i < slice_positions.size(); ++i) {
         float slice_val = slice_positions[i];
         Point3f p[4];
-        
+
         if (d_axis == 0) { // Xスライス
             p[0].set(slice_val, v_min, h_min); p[1].set(slice_val, v_max, h_min);
             p[2].set(slice_val, v_max, h_max); p[3].set(slice_val, v_min, h_max);
@@ -547,7 +546,7 @@ void SpatialAnalyzer::DrawCTMaps(int win_width, int win_height) {
     float h_min, h_max, v_min, v_max;
     CalculateViewBounds(h_min, h_max, v_min, v_max);
 
-    // NEW: 回転スライスモードの場合
+    // 回転スライスモードの場合
     if (use_rotated_slice) {
         // 回転スライスモードでは1つのスライス（アクティブなもの）のみ表示
         int y_pos = start_y;
@@ -653,7 +652,7 @@ void SpatialAnalyzer::DrawCTMaps(int win_width, int win_height) {
         VoxelGrid* grid_diff = nullptr;
         float max_value = 1.0f;
 
-        // NEW: ボクセルデータを直接使用するように修正
+        // ボクセルデータを直接使用するように修正
         if (show_segment_mode && selected_segment_index >= 0 && 
             selected_segment_index < segment_presence_voxels1.num_segments) {
             // 部位別表示モード: feature_modeに応じて占有率または速度を使用
@@ -1637,8 +1636,8 @@ void SpatialAnalyzer::SetSliceRotation(float rx, float ry, float rz) {
 }
 
 void SpatialAnalyzer::ToggleRotatedSliceMode() {
-    use_rotated_slice = !use_rotated_slice;
-    if (use_rotated_slice) {
+    //use_rotated_slice = !use_rotated_slice;
+    //if (use_rotated_slice) {
         // 回転スライスモードをオンにした時、ワールド中心を回転中心に設定
         slice_plane_center.set(
             (world_bounds[0][0] + world_bounds[0][1]) / 2.0f,
@@ -1646,8 +1645,8 @@ void SpatialAnalyzer::ToggleRotatedSliceMode() {
             (world_bounds[2][0] + world_bounds[2][1]) / 2.0f
         );
         UpdateSlicePlaneVectors();
-    }
-    std::cout << "Rotated slice mode: " << (use_rotated_slice ? "ON" : "OFF") << std::endl;
+    //}
+    //std::cout << "Rotated slice mode: " << (use_rotated_slice ? "ON" : "OFF") << std::endl;
 }
 
 void SpatialAnalyzer::UpdateSlicePlaneVectors() {
@@ -1711,7 +1710,7 @@ void SpatialAnalyzer::UpdateSlicePlaneVectors() {
     }
 }
 
-// NEW: ワールド座標でボクセル値をサンプリング
+// ワールド座標でボクセル値をサンプリング
 float SpatialAnalyzer::SampleVoxelAtWorldPos(VoxelGrid& grid, const Point3f& world_pos) {
     float world_range[3];
     for (int i = 0; i < 3; ++i) {
@@ -1726,7 +1725,7 @@ float SpatialAnalyzer::SampleVoxelAtWorldPos(VoxelGrid& grid, const Point3f& wor
     return grid.Get(gx, gy, gz);
 }
 
-// NEW: 回転スライス平面の描画
+// 回転スライス平面の描画
 void SpatialAnalyzer::DrawRotatedSlicePlane() {
     if (!use_rotated_slice) return;
     
@@ -1795,7 +1794,7 @@ void SpatialAnalyzer::DrawRotatedSlicePlane() {
     glDisable(GL_BLEND);
 }
 
-// NEW: 回転スライス用の2Dマップ描画
+// 回転スライス用の2Dマップ描画
 void SpatialAnalyzer::DrawRotatedSliceMap(int x_pos, int y_pos, int w, int h, VoxelGrid& grid, float max_val, const char* title) {
     glColor4f(0.9f, 0.9f, 0.9f, 1.0f);
     glBegin(GL_QUADS);

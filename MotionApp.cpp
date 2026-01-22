@@ -155,12 +155,12 @@ void MotionApp::Keyboard(unsigned char key, int mx, int my) {
             analyzer.show_voxels = !analyzer.show_voxels; 
             break;
         
-        // NEW: 回転スライスモードの切り替え
+        // 回転スライスモードの切り替え
         case 'p':
             analyzer.ToggleRotatedSliceMode();
             break;
         
-        // NEW: 平面の回転操作（回転スライスモード時のみ有効）
+        // 平面の回転操作（回転スライスモード時のみ有効）
         case '1':  // X軸周りに+5度回転
             if (analyzer.use_rotated_slice)
                 analyzer.RotateSlicePlane(5.0f, 0.0f, 0.0f);
@@ -193,7 +193,7 @@ void MotionApp::Keyboard(unsigned char key, int mx, int my) {
         // 部位別表示モード
         case 'e': 
             analyzer.show_segment_mode = !analyzer.show_segment_mode;
-            // ADDED: 部位別表示モードをオンにする時、最初の有効な部位を選択
+            // 部位別表示モードをオンにする時、最初の有効な部位を選択
             if (analyzer.show_segment_mode && motion) {
                 // 現在の選択が無効な場合、最初の有効な部位を探す
                 if (!HasVoxelData(analyzer.selected_segment_index)) {
@@ -207,13 +207,13 @@ void MotionApp::Keyboard(unsigned char key, int mx, int my) {
             break;
         case '[': 
             if (motion && analyzer.show_segment_mode) {
-                // MODIFIED: 前のボクセル情報を持つ部位へ移動
+                // 前のボクセル情報を持つ部位へ移動
                 analyzer.selected_segment_index = GetNextValidSegment(analyzer.selected_segment_index, -1);
             }
             break;
         case ']': 
             if (motion && analyzer.show_segment_mode) {
-                // MODIFIED: 次のボクセル情報を持つ部位へ移動
+                // 次のボクセル情報を持つ部位へ移動
                 analyzer.selected_segment_index = GetNextValidSegment(analyzer.selected_segment_index, 1);
             }
             break;
@@ -598,7 +598,7 @@ void MotionApp::DrawText(int x, int y, const char *text, void *font)
         glutBitmapCharacter(font, *c);
 }
 
-// ADDED: ボクセル情報を持つ部位かチェック（指などの細部を除外）
+// ボクセル情報を持つ部位かチェック（指などの細部を除外）
 bool MotionApp::HasVoxelData(int segment_index)
 {
     if (!motion || !motion->body) return false;
@@ -609,7 +609,7 @@ bool MotionApp::HasVoxelData(int segment_index)
     return !IsFingerSegment(segment);
 }
 
-// ADDED: 次の有効な部位を取得（ボクセル情報を持つ部位のみ）
+// 次の有効な部位を取得（ボクセル情報を持つ部位のみ）
 int MotionApp::GetNextValidSegment(int current_segment, int direction)
 {
     if (!motion || !motion->body) return -1;
