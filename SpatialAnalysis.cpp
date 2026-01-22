@@ -216,8 +216,8 @@ SpatialAnalyzer::SpatialAnalyzer() {
     show_voxels = false;
     feature_mode = 0;
     norm_mode = 0;
-    global_max_spd = 1.0f;
-    max_accumulated_val = 1.0f;
+    max_spd_val = 1.0f;
+    max_psc_accumulated_val = 1.0f;
     max_spd_accumulated_val = 1.0f;  // NEW: 速度累積用の最大値を初期化
     
     // NEW: 部位別表示モード
@@ -599,7 +599,7 @@ void SpatialAnalyzer::DrawCTMaps(int win_width, int win_height) {
                     grid1 = &voxels1_spd;
                     grid2 = &voxels2_spd;
                     grid_diff = &voxels_spd_diff;
-                    max_value = global_max_spd;
+                    max_value = max_spd_val;
                 }
             } else {
                 // 累積ボクセルデータ
@@ -608,7 +608,7 @@ void SpatialAnalyzer::DrawCTMaps(int win_width, int win_height) {
                     grid1 = &voxels1_psc_accumulated;
                     grid2 = &voxels2_psc_accumulated;
                     grid_diff = &voxels_psc_accumulated_diff;
-                    max_value = max_accumulated_val;
+                    max_value = max_psc_accumulated_val;
                 } else {
                     // 累積最大速度
                     grid1 = &voxels1_spd_accumulated;
@@ -696,7 +696,7 @@ void SpatialAnalyzer::DrawCTMaps(int win_width, int win_height) {
                     grid1 = &voxels1_spd;
                     grid2 = &voxels2_spd;
                     grid_diff = &voxels_spd_diff;
-                    max_value = global_max_spd;
+                    max_value = max_spd_val;
                 }
             } else {
                 // 累積ボクセルデータ
@@ -705,7 +705,7 @@ void SpatialAnalyzer::DrawCTMaps(int win_width, int win_height) {
                     grid1 = &voxels1_psc_accumulated;
                     grid2 = &voxels2_psc_accumulated;
                     grid_diff = &voxels_psc_accumulated_diff;
-                    max_value = max_accumulated_val;
+                    max_value = max_psc_accumulated_val;
                 } else {
                     // 累積最大速度
                     grid1 = &voxels1_spd_accumulated;
@@ -877,14 +877,14 @@ void SpatialAnalyzer::DrawVoxels3D() {
             max_val = max_psc_val;
         } else {
             grid_to_draw = &voxels_spd_diff;
-            max_val = global_max_spd;
+            max_val = max_spd_val;
         }
     } else {
         // 動作全体の累積データ
         if (feature_mode == 0) {
             // 累積占有率
             grid_to_draw = &voxels_psc_accumulated_diff;
-            max_val = max_accumulated_val;
+            max_val = max_psc_accumulated_val;
         } else {
             // 累積最大速度
             grid_to_draw = &voxels_spd_accumulated_diff;
@@ -928,7 +928,7 @@ void SpatialAnalyzer::ClearAccumulatedVoxels() {
     voxels1_psc_accumulated.Clear();
     voxels2_psc_accumulated.Clear();
     voxels_psc_accumulated_diff.Clear();
-    max_accumulated_val = 0.0f;
+    max_psc_accumulated_val = 0.0f;
 }
 
 // NEW: 速度累積のクリア
@@ -993,17 +993,17 @@ void SpatialAnalyzer::AccumulateVoxelsAllFrames(Motion* m1, Motion* m2) {
     
     // 差分を計算し、最大値を更新
     int size = grid_resolution * grid_resolution * grid_resolution;
-    max_accumulated_val = 0.0f;
+    max_psc_accumulated_val = 0.0f;
     
     for (int i = 0; i < size; ++i) {
         float diff = abs(voxels1_psc_accumulated.data[i] - voxels2_psc_accumulated.data[i]);
         voxels_psc_accumulated_diff.data[i] = diff;
-        if (diff > max_accumulated_val) {
-            max_accumulated_val = diff;
+        if (diff > max_psc_accumulated_val) {
+            max_psc_accumulated_val = diff;
         }
     }
     
-    if (max_accumulated_val < 1e-5f) max_accumulated_val = 1.0f;
+    if (max_psc_accumulated_val < 1e-5f) max_psc_accumulated_val = 1.0f;
     
     // NEW: 差分グリッドにも基準姿勢を設定（モーション1の基準を使用）
     if (voxels1_psc_accumulated.has_reference) {
@@ -1011,7 +1011,7 @@ void SpatialAnalyzer::AccumulateVoxelsAllFrames(Motion* m1, Motion* m2) {
                                              voxels1_psc_accumulated.reference_root_ori);
     }
     
-    std::cout << "Accumulation complete. Max accumulated value: " << max_accumulated_val << std::endl;
+    std::cout << "Accumulation complete. Max accumulated value: " << max_psc_accumulated_val << std::endl;
 }
 
 // NEW: 動作全体を通した速度累積計算（最大速度を保持）
@@ -1289,12 +1289,14 @@ void SpatialAnalyzer::VoxelizeMotionSpeedBySegment(Motion* m, float time, Segmen
         float s2 = vel2.length() / dt;  // P2の速度
 
         // AABB最適化
+        //ボーンの両端点を含む軸平行バウンディングボックスの最小/最大値
         float b_min[3], b_max[3];
         for(int i=0; i<3; ++i) {
             b_min[i] = min(sa_get_axis_value(p1, i), sa_get_axis_value(p2, i)) - bone_radius;
             b_max[i] = max(sa_get_axis_value(p1, i), sa_get_axis_value(p2, i)) + bone_radius;
         }
 
+        //b_min/b_max（ワールド座標）をgrid_resolutionのボクセルインデックス範囲に変換したもの
         int idx_min[3], idx_max[3];
         for(int i=0; i<3; ++i) {
             idx_min[i] = max(0, (int)(((b_min[i] - world_bounds[i][0]) / world_range[i]) * grid_resolution));
@@ -1500,7 +1502,7 @@ bool SpatialAnalyzer::SaveVoxelCache(const char* motion1_name, const char* motio
     if (!meta_ofs) return false;
     
     meta_ofs << grid_resolution << std::endl;
-    meta_ofs << max_accumulated_val << std::endl;
+    meta_ofs << max_psc_accumulated_val << std::endl;
     meta_ofs << max_spd_accumulated_val << std::endl;  // NEW: 速度累積最大値
     for (int i = 0; i < 3; ++i) {
         meta_ofs << world_bounds[i][0] << " " << world_bounds[i][1] << std::endl;
@@ -1527,7 +1529,7 @@ bool SpatialAnalyzer::LoadVoxelCache(const char* motion1_name, const char* motio
     
     int res;
     meta_ifs >> res;
-    meta_ifs >> max_accumulated_val;
+    meta_ifs >> max_psc_accumulated_val;
     meta_ifs >> max_spd_accumulated_val;  // NEW: 速度累積最大値
     for (int i = 0; i < 3; ++i) {
         meta_ifs >> world_bounds[i][0] >> world_bounds[i][1];
