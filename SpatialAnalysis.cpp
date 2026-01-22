@@ -4,7 +4,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <iostream>
-#include <fstream>  // NEW: ファイルI/O用
+#include <fstream>  // ファイルI/O用
 
 using namespace std;
 
@@ -220,11 +220,11 @@ SpatialAnalyzer::SpatialAnalyzer() {
     max_psc_accumulated_val = 1.0f;
     max_spd_accumulated_val = 1.0f;  // 速度累積用の最大値を初期化
     
-    // NEW: 部位別表示モード
+    // 部位別表示モード
     selected_segment_index = -1;  // -1は全体表示
     show_segment_mode = false;
     
-    // NEW: スライス平面の回転パラメータ初期化
+    // スライス平面の回転パラメータ初期化
     slice_rotation_x = 0.0f;
     slice_rotation_y = 0.0f;
     slice_rotation_z = 0.0f;
@@ -246,12 +246,12 @@ void SpatialAnalyzer::ResizeGrids(int res) {
     voxels1_psc.Resize(res); voxels2_psc.Resize(res); voxels_psc_diff.Resize(res);
     voxels1_spd.Resize(res); voxels2_spd.Resize(res); voxels_spd_diff.Resize(res);
     
-    // NEW: 累積グリッドもリサイズ
+    // 累積グリッドもリサイズ
     voxels1_psc_accumulated.Resize(res);
     voxels2_psc_accumulated.Resize(res);
     voxels_psc_accumulated_diff.Resize(res);
     
-    // NEW: 速度累積グリッドもリサイズ
+    // 速度累積グリッドもリサイズ
     voxels1_spd_accumulated.Resize(res);
     voxels2_spd_accumulated.Resize(res);
     voxels_spd_accumulated_diff.Resize(res);
@@ -263,7 +263,7 @@ void SpatialAnalyzer::SetWorldBounds(float bounds[3][2]) {
         world_bounds[i][1] = bounds[i][1];
     }
     
-    // NEW: 回転スライスの中心をワールド中心に設定
+    // 回転スライスの中心をワールド中心に設定
     slice_plane_center.set(
         (world_bounds[0][0] + world_bounds[0][1]) / 2.0f,
         (world_bounds[1][0] + world_bounds[1][1]) / 2.0f,
@@ -326,7 +326,7 @@ void SpatialAnalyzer::VoxelizeMotion(Motion* m, float time, VoxelGrid& occ, Voxe
     for (int s = 0; s < m->body->num_segments; ++s) {
         const Segment* seg = m->body->segments[s];
         
-        // MODIFIED: 体節名ベースで指をスキップ（BVHファイルによる体節数の違いに対応）
+        // 体節名ベースで指をスキップ（BVHファイルによる体節数の違いに対応）
         if (IsFingerSegment(seg)) {
             continue;
         }
@@ -480,10 +480,11 @@ void SpatialAnalyzer::CalculateViewBounds(float& h_min, float& h_max, float& v_m
 
 void SpatialAnalyzer::DrawSlicePlanes() {
     // 回転スライスモードの場合は別の描画関数を使用
-	// 常に回転スライスモードを使用する
-    DrawRotatedSlicePlane();
-    return;
-    
+	if ( use_rotated_slice ) {
+        DrawRotatedSlicePlane();
+        return;
+    }
+
     int d_axis = 3 - h_axis - v_axis;
     float h_min, h_max, v_min, v_max;
     CalculateViewBounds(h_min, h_max, v_min, v_max);
@@ -762,7 +763,7 @@ void SpatialAnalyzer::DrawSingleMap(int x_pos, int y_pos, int w, int h, VoxelGri
     float h_range_view = h_max - h_min;
     float v_range_view = v_max - v_min;
     
-    // NEW: Y軸が垂直軸の場合は上下を反転（実際のワールド座標の下が画面の下になるように）
+    // Y軸が垂直軸の場合は上下を反転（実際のワールド座標の下が画面の下になるように）
     bool flip_v = (v_axis == 1);
 
     // 2D平面の各ピクセルに対してボクセル値を取得して描画
@@ -816,7 +817,7 @@ void SpatialAnalyzer::ResetView() { zoom = 1.0f; pan_center.set(0.0f, 0.0f); is_
 void SpatialAnalyzer::Pan(float dx, float dy) { pan_center.x += dx; pan_center.y += dy; is_manual_view = true; }
 void SpatialAnalyzer::Zoom(float factor) { zoom *= factor; is_manual_view = true; }
 
-// NEW: 3Dボクセルの描画
+// 3Dボクセルの描画
 void SpatialAnalyzer::DrawVoxels3D() {
     if (!show_voxels) return;
 
@@ -838,7 +839,7 @@ void SpatialAnalyzer::DrawVoxels3D() {
     VoxelGrid* grid_to_draw = nullptr;
     float max_val = 1.0f;
     
-    // NEW: 部位別表示モード
+    // 部位別表示モード
     if (show_segment_mode && selected_segment_index >= 0 && 
         selected_segment_index < segment_presence_voxels1.num_segments) {
         // 特定の部位のみ表示（差分を計算）
@@ -922,15 +923,15 @@ void SpatialAnalyzer::DrawVoxels3D() {
     glDisable(GL_BLEND);
 }
 
-// NEW: 累積ボクセルのクリア
-void SpatialAnalyzer::ClearAccumulatedVoxels() {
+// 累積ボクセルのクリア
+void SpatialAnalyzer::ClearAccumulatedPresence() {
     voxels1_psc_accumulated.Clear();
     voxels2_psc_accumulated.Clear();
     voxels_psc_accumulated_diff.Clear();
     max_psc_accumulated_val = 0.0f;
 }
 
-// NEW: 速度累積のクリア
+// 速度累積のクリア
 void SpatialAnalyzer::ClearAccumulatedSpeed() {
     voxels1_spd_accumulated.Clear();
     voxels2_spd_accumulated.Clear();
@@ -938,14 +939,14 @@ void SpatialAnalyzer::ClearAccumulatedSpeed() {
     max_spd_accumulated_val = 0.0f;
 }
 
-// NEW: 動作全体を通した累積ボクセル計算
-void SpatialAnalyzer::AccumulateVoxelsAllFrames(Motion* m1, Motion* m2) {
+// 動作全体を通した累積ボクセル計算
+void SpatialAnalyzer::AccumulatePresenceAllFrames(Motion* m1, Motion* m2) {
     if (!m1 || !m2) return;
     
     // 累積グリッドをクリア
-    ClearAccumulatedVoxels();
+    ClearAccumulatedPresence();
     
-    // NEW: 基準姿勢を保存（初期フレームの腰の位置・回転）
+    // 基準姿勢を保存（初期フレームの腰の位置・回転）
     if (m1->num_frames > 0) {
         voxels1_psc_accumulated.SetReference(m1->frames[0].root_pos, m1->frames[0].root_ori);
     }
@@ -1004,7 +1005,7 @@ void SpatialAnalyzer::AccumulateVoxelsAllFrames(Motion* m1, Motion* m2) {
     
     if (max_psc_accumulated_val < 1e-5f) max_psc_accumulated_val = 1.0f;
     
-    // NEW: 差分グリッドにも基準姿勢を設定（モーション1の基準を使用）
+    // 差分グリッドにも基準姿勢を設定（モーション1の基準を使用）
     if (voxels1_psc_accumulated.has_reference) {
         voxels_psc_accumulated_diff.SetReference(voxels1_psc_accumulated.reference_root_pos, 
                                              voxels1_psc_accumulated.reference_root_ori);
@@ -1013,7 +1014,7 @@ void SpatialAnalyzer::AccumulateVoxelsAllFrames(Motion* m1, Motion* m2) {
     std::cout << "Accumulation complete. Max accumulated value: " << max_psc_accumulated_val << std::endl;
 }
 
-// NEW: 動作全体を通した速度累積計算（最大速度を保持）
+// 動作全体を通した速度累積計算（最大速度を保持）
 // ↑モーションの全フレームに対して各ボクセルの最大速度を更新
 void SpatialAnalyzer::AccumulateSpeedAllFrames(Motion* m1, Motion* m2) {
     if (!m1 || !m2) return;
@@ -1084,8 +1085,8 @@ void SpatialAnalyzer::AccumulateSpeedAllFrames(Motion* m1, Motion* m2) {
     std::cout << "Speed accumulation complete. Max speed value: " << max_spd_accumulated_val << std::endl;
 }
 
-// NEW: 部位ごとのボクセル化
-void SpatialAnalyzer::VoxelizeMotionBySegment(Motion* m, float time, SegmentVoxelData& seg_data) {
+// 部位ごとのボクセル化
+void SpatialAnalyzer::VoxelizeMotionPresenceBySegment(Motion* m, float time, SegmentVoxelData& seg_data) {
     if (!m) return;
     
     // 現在フレームと前フレームの姿勢を取得
@@ -1113,7 +1114,7 @@ void SpatialAnalyzer::VoxelizeMotionBySegment(Motion* m, float time, SegmentVoxe
     for (int s = 0; s < m->body->num_segments; ++s) {
         const Segment* seg = m->body->segments[s];
         
-        // MODIFIED: 体節名ベースで指をスキップ（BVHファイルによる体節数の違いに対応）
+        // 体節名ベースで指をスキップ（BVHファイルによる体節数の違いに対応）
         if (IsFingerSegment(seg)) {
             continue;
         }
@@ -1210,7 +1211,7 @@ void SpatialAnalyzer::VoxelizeMotionBySegment(Motion* m, float time, SegmentVoxe
     }
 }
 
-// NEW: 部位ごとの速度ボクセル化
+// 部位ごとの速度ボクセル化
 void SpatialAnalyzer::VoxelizeMotionSpeedBySegment(Motion* m, float time, SegmentVoxelData& seg_speed_data) {
     if (!m) return;
     
@@ -1343,8 +1344,8 @@ void SpatialAnalyzer::VoxelizeMotionSpeedBySegment(Motion* m, float time, Segmen
     }
 }
 
-// NEW: 部位ごとの累積ボクセル計算
-void SpatialAnalyzer::AccumulateVoxelsBySegmentAllFrames(Motion* m1, Motion* m2) {
+// 部位ごとの累積ボクセル計算
+void SpatialAnalyzer::AccumulatePresenceBySegmentAllFrames(Motion* m1, Motion* m2) {
     if (!m1 || !m2) return;
     
     // 部位数を取得
@@ -1362,7 +1363,7 @@ void SpatialAnalyzer::AccumulateVoxelsBySegmentAllFrames(Motion* m1, Motion* m2)
         SegmentVoxelData temp_seg_data;
         temp_seg_data.Resize(num_segments, grid_resolution);
         
-        VoxelizeMotionBySegment(m1, time, temp_seg_data);
+        VoxelizeMotionPresenceBySegment(m1, time, temp_seg_data);
         
         // 累積
         for (int s = 0; s < num_segments; ++s) {
@@ -1379,7 +1380,7 @@ void SpatialAnalyzer::AccumulateVoxelsBySegmentAllFrames(Motion* m1, Motion* m2)
         SegmentVoxelData temp_seg_data;
         temp_seg_data.Resize(num_segments, grid_resolution);
         
-        VoxelizeMotionBySegment(m2, time, temp_seg_data);
+        VoxelizeMotionPresenceBySegment(m2, time, temp_seg_data);
         
         // 累積
         for (int s = 0; s < num_segments; ++s) {
@@ -1393,7 +1394,7 @@ void SpatialAnalyzer::AccumulateVoxelsBySegmentAllFrames(Motion* m1, Motion* m2)
     std::cout << "Segment-wise accumulation complete." << std::endl;
 }
 
-// NEW: 部位ごとの速度累積計算
+// 部位ごとの速度累積計算
 void SpatialAnalyzer::AccumulateSpeedBySegmentAllFrames(Motion* m1, Motion* m2) {
     if (!m1 || !m2) return;
     
@@ -1447,7 +1448,7 @@ void SpatialAnalyzer::AccumulateSpeedBySegmentAllFrames(Motion* m1, Motion* m2) 
     std::cout << "Segment-wise speed accumulation complete." << std::endl;
 }
 
-// NEW: キャッシュファイル名を生成
+// キャッシュファイル名を生成
 std::string SpatialAnalyzer::GenerateCacheFilename(const char* motion1_name, const char* motion2_name) const {
     std::string filename = "voxel_cache_";
     filename += motion1_name;
@@ -1457,7 +1458,7 @@ std::string SpatialAnalyzer::GenerateCacheFilename(const char* motion1_name, con
     return filename;
 }
 
-// NEW: ボクセルキャッシュを保存
+// ボクセルキャッシュを保存
 bool SpatialAnalyzer::SaveVoxelCache(const char* motion1_name, const char* motion2_name) {
     std::string base_filename = GenerateCacheFilename(motion1_name, motion2_name);
     
@@ -1472,7 +1473,7 @@ bool SpatialAnalyzer::SaveVoxelCache(const char* motion1_name, const char* motio
     if (!voxels2_psc_accumulated.SaveToFile(accumulated2_file.c_str())) return false;
     if (!voxels_psc_accumulated_diff.SaveToFile(accumulated_diff_file.c_str())) return false;
     
-    // NEW: 速度累積ボクセルデータを保存
+    // 速度累積ボクセルデータを保存
     std::string spd_acc1_file = base_filename + "_spd_acc1.bin";
     std::string spd_acc2_file = base_filename + "_spd_acc2.bin";
     std::string spd_acc_diff_file = base_filename + "_spd_acc_diff.bin";
@@ -1488,7 +1489,7 @@ bool SpatialAnalyzer::SaveVoxelCache(const char* motion1_name, const char* motio
     if (!segment_presence_voxels1.SaveToFile(segment1_file.c_str())) return false;
     if (!segment_presence_voxels2.SaveToFile(segment2_file.c_str())) return false;
     
-    // NEW: 部位ごとの速度ボクセルデータを保存
+    // 部位ごとの速度ボクセルデータを保存
     std::string seg_spd1_file = base_filename + "_seg_spd1.bin";
     std::string seg_spd2_file = base_filename + "_seg_spd2.bin";
     
@@ -1502,7 +1503,7 @@ bool SpatialAnalyzer::SaveVoxelCache(const char* motion1_name, const char* motio
     
     meta_ofs << grid_resolution << std::endl;
     meta_ofs << max_psc_accumulated_val << std::endl;
-    meta_ofs << max_spd_accumulated_val << std::endl;  // NEW: 速度累積最大値
+    meta_ofs << max_spd_accumulated_val << std::endl;  // 速度累積最大値
     for (int i = 0; i < 3; ++i) {
         meta_ofs << world_bounds[i][0] << " " << world_bounds[i][1] << std::endl;
     }
@@ -1512,7 +1513,7 @@ bool SpatialAnalyzer::SaveVoxelCache(const char* motion1_name, const char* motio
     return true;
 }
 
-// NEW: ボクセルキャッシュを読み込み
+// ボクセルキャッシュを読み込み
 bool SpatialAnalyzer::LoadVoxelCache(const char* motion1_name, const char* motion2_name) {
     std::string base_filename = GenerateCacheFilename(motion1_name, motion2_name);
     
@@ -1529,7 +1530,7 @@ bool SpatialAnalyzer::LoadVoxelCache(const char* motion1_name, const char* motio
     int res;
     meta_ifs >> res;
     meta_ifs >> max_psc_accumulated_val;
-    meta_ifs >> max_spd_accumulated_val;  // NEW: 速度累積最大値
+    meta_ifs >> max_spd_accumulated_val;  // 速度累積最大値
     for (int i = 0; i < 3; ++i) {
         meta_ifs >> world_bounds[i][0] >> world_bounds[i][1];
     }
@@ -1556,7 +1557,7 @@ bool SpatialAnalyzer::LoadVoxelCache(const char* motion1_name, const char* motio
         return false;
     }
     
-    // NEW: 速度累積ボクセルデータを読み込み
+    // 速度累積ボクセルデータを読み込み
     std::string spd_acc1_file = base_filename + "_spd_acc1.bin";
     std::string spd_acc2_file = base_filename + "_spd_acc2.bin";
     std::string spd_acc_diff_file = base_filename + "_spd_acc_diff.bin";
@@ -1587,7 +1588,7 @@ bool SpatialAnalyzer::LoadVoxelCache(const char* motion1_name, const char* motio
         return false;
     }
     
-    // NEW: 部位ごとの速度ボクセルデータを読み込み
+    // 部位ごとの速度ボクセルデータを読み込み
     std::string seg_spd1_file = base_filename + "_seg_spd1.bin";
     std::string seg_spd2_file = base_filename + "_seg_spd2.bin";
     
@@ -1604,7 +1605,7 @@ bool SpatialAnalyzer::LoadVoxelCache(const char* motion1_name, const char* motio
     return true;
 }
 
-// NEW: スライス平面の回転操作
+// スライス平面の回転操作
 void SpatialAnalyzer::RotateSlicePlane(float dx, float dy, float dz) {
     slice_rotation_x += dx;
     slice_rotation_y += dy;
@@ -1636,17 +1637,17 @@ void SpatialAnalyzer::SetSliceRotation(float rx, float ry, float rz) {
 }
 
 void SpatialAnalyzer::ToggleRotatedSliceMode() {
-    //use_rotated_slice = !use_rotated_slice;
-    //if (use_rotated_slice) {
-        // 回転スライスモードをオンにした時、ワールド中心を回転中心に設定
+    use_rotated_slice = !use_rotated_slice;
+    if (use_rotated_slice) {
+         //回転スライスモードをオンにした時、ワールド中心を回転中心に設定
         slice_plane_center.set(
             (world_bounds[0][0] + world_bounds[0][1]) / 2.0f,
             (world_bounds[1][0] + world_bounds[1][1]) / 2.0f,
             (world_bounds[2][0] + world_bounds[2][1]) / 2.0f
         );
         UpdateSlicePlaneVectors();
-    //}
-    //std::cout << "Rotated slice mode: " << (use_rotated_slice ? "ON" : "OFF") << std::endl;
+    }
+    std::cout << "Rotated slice mode: " << (use_rotated_slice ? "ON" : "OFF") << std::endl;
 }
 
 void SpatialAnalyzer::UpdateSlicePlaneVectors() {

@@ -161,16 +161,16 @@ public:
     void UpdateVoxels(Motion* m1, Motion* m2, float current_time);
     
     // 累積占有率ボクセル計算
-    void AccumulateVoxelsAllFrames(Motion* m1, Motion* m2);
-    void ClearAccumulatedVoxels();
+    void AccumulatePresenceAllFrames(Motion* m1, Motion* m2);
+    void ClearAccumulatedPresence();
 
     // 速度累計ボクセル計算
     void AccumulateSpeedAllFrames(Motion* m1, Motion* m2);
     void ClearAccumulatedSpeed();
 
     // 部位ごとの占有率ボクセル計算
-    void VoxelizeMotionBySegment(Motion* m, float time, SegmentVoxelData& seg_data);
-    void AccumulateVoxelsBySegmentAllFrames(Motion* m1, Motion* m2);
+    void VoxelizeMotionPresenceBySegment(Motion* m, float time, SegmentVoxelData& seg_data);
+    void AccumulatePresenceBySegmentAllFrames(Motion* m1, Motion* m2);
     
     // 部位ごとの速度ボクセル計算
     void VoxelizeMotionSpeedBySegment(Motion* m, float time, SegmentVoxelData& seg_speed_data);
