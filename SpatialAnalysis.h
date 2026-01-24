@@ -55,7 +55,7 @@ struct VoxelGrid {
     float& At(int x, int y, int z);
     float Get(int x, int y, int z) const;
     
-    // NEW: 基準姿勢の設定・取得
+    // 基準姿勢の設定・取得
     void SetReference(const Point3f& root_pos, const Matrix3f& root_ori) {
         reference_root_pos = root_pos;
         reference_root_ori = root_ori;
@@ -72,7 +72,7 @@ struct VoxelGrid {
     bool LoadFromFile(const char* filename);
 };
 
-// NEW: 部位ごとのボクセルグリッドコレクション
+// 部位ごとのボクセルグリッドコレクション
 struct SegmentVoxelData {
 	std::vector<VoxelGrid> segment_grids; // 各部位のボクセルグリッド
 	int num_segments; // 部位数
@@ -103,7 +103,7 @@ struct SegmentVoxelData {
         return dummy;
     }
     
-    // NEW: ファイル保存・読み込み
+    // ファイル保存・読み込み
     bool SaveToFile(const char* filename) const;
     bool LoadFromFile(const char* filename);
 };
@@ -139,7 +139,7 @@ public:
 	std::vector<float> slice_positions; // スライス位置 (0.0 - 1.0)
 	int active_slice_index; // アクティブなスライスインデックス
     
-    // NEW: スライス平面の回転パラメータ
+    // スライス平面の回転パラメータ
     float slice_rotation_x;  // X軸周りの回転角度（度）
     float slice_rotation_y;  // Y軸周りの回転角度（度）
     float slice_rotation_z;  // Z軸周りの回転角度（度）
@@ -167,7 +167,7 @@ public:
 	SegmentVoxelData segment_speed_voxels1; // Motion1 部位ごとの速度ボクセルデータ
 	SegmentVoxelData segment_speed_voxels2; // Motion2 部位ごとの速度ボクセルデータ
     
-    // NEW: 表示設定
+    // 表示設定
     int selected_segment_index;  // 表示する部位のインデックス (-1で全体)
     bool show_segment_mode;      // 部位別表示モードON/OFF
 
@@ -226,7 +226,7 @@ private:
 	// ボクセル化ヘルパー
 	void VoxelizeMotion(Motion* m, float time, VoxelGrid& occ, VoxelGrid& spd);
     void DrawSingleMap(int x, int y, int w, int h, VoxelGrid& grid, float max_val, const char* title, float slice_val, float h_min, float h_max, float v_min, float v_max);
-    void DrawAxes(int x, int y, int w, int h, float h_min, float h_max, float v_min, float v_max, const char* h_lbl, const char* v_lbl);
+    void DrawAxes(int x, int y, int w, int h, float h_min, float h_max, float v_min, float v_max);
     
     // 回転スライス用のヘルパー
     void DrawRotatedSlicePlane();

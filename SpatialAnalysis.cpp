@@ -272,32 +272,6 @@ void SpatialAnalyzer::SetWorldBounds(float bounds[3][2]) {
     UpdateSlicePlaneVectors();
 }
 
-// 内部用 FK (Motion クラスのメソッドを利用)
-static void ComputeFK(Motion* m, float time, vector<Point3f>& joints) {
-    if(!m) return;
-    Posture posture(m->body);
-    m->GetPosture(time, posture); // 指定時間の姿勢を取得
-    
-    // 全関節のワールド座標を計算
-    vector<Matrix4f> frames;
-    // SimpleHumanの仕様に合わせてFK計算 (ここでは簡易的に実装するか、m->body->FKがあればそれを使う)
-    // 一般的なSimpleHumanの実装を想定:
-    posture.ForwardKinematics(frames);
-    
-    joints.clear();
-    for(int i=0; i<m->body->num_joints; ++i) {
-        // Jointの位置を取得
-        // ※SimpleHumanの構造によるが、ここではsegmentsの変換行列から取得すると仮定
-        // SegmentとJointの対応が必要だが、簡易的にsegmentsの座標を使う
-        if(i < m->body->num_segments) {
-             const Matrix4f& M = frames[i];
-             joints.push_back(Point3f(M.m03, M.m13, M.m23));
-        } else {
-             joints.push_back(Point3f(0,0,0));
-        }
-    }
-}
-
 void SpatialAnalyzer::VoxelizeMotion(Motion* m, float time, VoxelGrid& occ, VoxelGrid& spd) {
     if (!m) return;
     
@@ -382,18 +356,17 @@ void SpatialAnalyzer::DrawSlicePlanes() {
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     for (size_t i = 0; i < slice_positions.size(); ++i) {
-        float slice_val = slice_positions[i];
         Point3f p[4];
 
         if (d_axis == 0) { // Xスライス
-            p[0].set(slice_val, v_min, h_min); p[1].set(slice_val, v_max, h_min);
-            p[2].set(slice_val, v_max, h_max); p[3].set(slice_val, v_min, h_max);
+            p[0].set(slice_positions[i], v_min, h_min); p[1].set(slice_positions[i], v_max, h_min);
+            p[2].set(slice_positions[i], v_max, h_max); p[3].set(slice_positions[i], v_min, h_max);
         } else if (d_axis == 1) { // Yスライス
-            p[0].set(h_min, slice_val, v_min); p[1].set(h_max, slice_val, v_min);
-            p[2].set(h_max, slice_val, v_max); p[3].set(h_min, slice_val, v_max);
+            p[0].set(h_min, slice_positions[i], v_min); p[1].set(h_max, slice_positions[i], v_min);
+            p[2].set(h_max, slice_positions[i], v_max); p[3].set(h_min, slice_positions[i], v_max);
         } else { // Zスライス
-            p[0].set(h_min, v_min, slice_val); p[1].set(h_max, v_min, slice_val);
-            p[2].set(h_max, v_max, slice_val); p[3].set(h_min, v_max, slice_val);
+            p[0].set(h_min, v_min, slice_positions[i]); p[1].set(h_max, v_min, slice_positions[i]);
+            p[2].set(h_max, v_max, slice_positions[i]); p[3].set(h_min, v_max, slice_positions[i]);
         }
 
         // 枚数線のみ描画（塗りつぶしなし）
@@ -522,8 +495,6 @@ void SpatialAnalyzer::DrawCTMaps(int win_width, int win_height) {
     // 通常モード（既存コード）
     for (int i = 0; i < num_rows; ++i) {
         int y_pos = start_y + i * (map_h + gap);
-        float slice_val = slice_positions[i];
-        
         char t1[64], t2[64], t3[64];
         
         // 部位別表示モードの場合はタイトルを変更
@@ -606,9 +577,9 @@ void SpatialAnalyzer::DrawCTMaps(int win_width, int win_height) {
         }
         
         // ボクセルデータをそのまま2Dマップに投影して描画
-        DrawSingleMap(start_x, y_pos, map_w, map_h, *grid1, max_value, t1, slice_val, h_min, h_max, v_min, v_max);
-        DrawSingleMap(start_x + map_w + gap, y_pos, map_w, map_h, *grid2, max_value, t2, slice_val, h_min, h_max, v_min, v_max);
-        DrawSingleMap(start_x + 2*(map_w + gap), y_pos, map_w, map_h, *grid_diff, max_value, t3, slice_val, h_min, h_max, v_min, v_max);
+        DrawSingleMap(start_x, y_pos, map_w, map_h, *grid1, max_value, t1, slice_positions[i], h_min, h_max, v_min, v_max);
+        DrawSingleMap(start_x + map_w + gap, y_pos, map_w, map_h, *grid2, max_value, t2, slice_positions[i], h_min, h_max, v_min, v_max);
+        DrawSingleMap(start_x + 2*(map_w + gap), y_pos, map_w, map_h, *grid_diff, max_value, t3, slice_positions[i], h_min, h_max, v_min, v_max);
     }
 
     glPopAttrib();
@@ -617,7 +588,7 @@ void SpatialAnalyzer::DrawCTMaps(int win_width, int win_height) {
 }
 
 // 座標軸の描画
-void SpatialAnalyzer::DrawAxes(int x, int y, int w, int h, float h_min, float h_max, float v_min, float v_max, const char* h_lbl, const char* v_lbl) {
+void SpatialAnalyzer::DrawAxes(int x, int y, int w, int h, float h_min, float h_max, float v_min, float v_max) {
     glColor4f(0.9f, 0.9f, 0.9f, 1.0f);
     glBegin(GL_QUADS); glVertex2i(x, y); glVertex2i(x, y+h); glVertex2i(x+w, y+h); glVertex2i(x+w, y); glEnd();
     glColor4f(0,0,0,1);
@@ -635,7 +606,7 @@ void SpatialAnalyzer::DrawAxes(int x, int y, int w, int h, float h_min, float h_
 
 // 単一ボクセルマップの描画
 void SpatialAnalyzer::DrawSingleMap(int x_pos, int y_pos, int w, int h, VoxelGrid& grid, float max_val, const char* title, float slice_val, float h_min, float h_max, float v_min, float v_max) {
-    DrawAxes(x_pos, y_pos, w, h, h_min, h_max, v_min, v_max, sa_get_axis_name(h_axis), sa_get_axis_name(v_axis));
+    DrawAxes(x_pos, y_pos, w, h, h_min, h_max, v_min, v_max);
 
     int d_axis = 3 - h_axis - v_axis;
     float world_range[3];
