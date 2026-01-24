@@ -23,6 +23,10 @@ static Color3f sa_get_heatmap_color(float value) {
 	return color; 
 }
 
+static const char* sa_get_axis_name(int axis) {
+    return (axis == 0) ? "X" : ((axis == 1) ? "Y" : "Z");
+}
+
 // --- VoxelGrid Implementation ---
 
 void VoxelGrid::Resize(int res) {
@@ -201,6 +205,7 @@ bool SegmentVoxelData::LoadFromFile(const char* filename) {
 
 SpatialAnalyzer::SpatialAnalyzer() {
     grid_resolution = 64; 
+    h_axis = 0; v_axis = 1;  // 初期はXY平面
     ResizeGrids(grid_resolution);
     
     zoom = 1.0f;
@@ -311,9 +316,74 @@ void SpatialAnalyzer::UpdateVoxels(Motion* m1, Motion* m2, float current_time) {
     if (max_psc_val < 1e-5f) max_psc_val = 1.0f;
 }
 
+
+void SpatialAnalyzer::CalculateViewBounds(float& h_min, float& h_max, float& v_min, float& v_max) {
+    float raw_h_min = world_bounds[h_axis][0];
+    float raw_h_max = world_bounds[h_axis][1];
+    float raw_v_min = world_bounds[v_axis][0];
+    float raw_v_max = world_bounds[v_axis][1];
+    
+    float h_range = raw_h_max - raw_h_min;
+    float v_range = raw_v_max - raw_v_min;
+    float max_range = max(h_range, v_range);
+    float h_center = (raw_h_min + raw_h_max) / 2.0f;
+    float v_center = (raw_v_min + raw_v_max) / 2.0f;
+
+    if (is_manual_view) {
+        h_center += pan_center.x;
+        v_center += pan_center.y;
+        max_range *= zoom;
+    }
+
+    h_min = h_center - max_range / 2.0f;
+    h_max = h_center + max_range / 2.0f;
+    v_min = v_center - max_range / 2.0f;
+    v_max = v_center + max_range / 2.0f;
+}
+
 void SpatialAnalyzer::DrawSlicePlanes() {
-    // 回転スライスモードのみ使用
-    DrawRotatedSlicePlane();
+    // 回転スライスモードの場合は別の描画関数を使用
+	if ( use_rotated_slice ) {
+        DrawRotatedSlicePlane();
+        return;
+    }
+
+    int d_axis = 3 - h_axis - v_axis;
+    float h_min, h_max, v_min, v_max;
+    CalculateViewBounds(h_min, h_max, v_min, v_max);
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    for (size_t i = 0; i < slice_positions.size(); ++i) {
+        Point3f p[4];
+
+        if (d_axis == 0) { // Xスライス
+            p[0].set(slice_positions[i], v_min, h_min); p[1].set(slice_positions[i], v_max, h_min);
+            p[2].set(slice_positions[i], v_max, h_max); p[3].set(slice_positions[i], v_min, h_max);
+        } else if (d_axis == 1) { // Yスライス
+            p[0].set(h_min, slice_positions[i], v_min); p[1].set(h_max, slice_positions[i], v_min);
+            p[2].set(h_max, slice_positions[i], v_max); p[3].set(h_min, slice_positions[i], v_max);
+        } else { // Zスライス
+            p[0].set(h_min, v_min, slice_positions[i]); p[1].set(h_max, v_min, slice_positions[i]);
+            p[2].set(h_max, v_max, slice_positions[i]); p[3].set(h_min, v_max, slice_positions[i]);
+        }
+
+        // 枚数線のみ描画（塗りつぶしなし）
+        if ((int)i == active_slice_index) {
+            glColor4f(1.0f, 1.0f, 0.0f, 0.9f);  // 黄色
+            glLineWidth(2.0f);
+        } else {
+            glColor4f(0.5f, 0.5f, 1.0f, 0.7f);  // 青
+            glLineWidth(1.0f);
+        }
+        glBegin(GL_LINE_LOOP);
+        for(int k=0; k<4; ++k) glVertex3f(p[k].x, p[k].y, p[k].z);
+        glEnd();
+    }
+    
+    glLineWidth(1.0f);
+    glDisable(GL_BLEND);
 }
 
 void SpatialAnalyzer::DrawCTMaps(int win_width, int win_height) {
@@ -336,85 +406,274 @@ void SpatialAnalyzer::DrawCTMaps(int win_width, int win_height) {
     int start_x = margin;
     int start_y = win_height - margin - (num_rows * map_h + (num_rows - 1) * gap);
 
-    // 回転スライスモードでは1つのスライス（アクティブなもの）のみ表示
-    int y_pos = start_y;
-    
-    char t1[64], t2[64], t3[64];
-    sprintf(t1, "Rotated M1");
-    sprintf(t2, "Rotated M2");
-    sprintf(t3, "Rotated Diff");
-    
-    VoxelGrid* grid1 = nullptr;
-    VoxelGrid* grid2 = nullptr;
-    VoxelGrid* grid_diff = nullptr;
-    float max_value = 1.0f;
-    
-    // 表示するボクセルグリッドを選択
-    if (show_segment_mode && selected_segment_index >= 0 && 
-        selected_segment_index < segment_presence_voxels1.num_segments) {
-        // 部位別表示モード: feature_modeに応じて占有率または速度を使用
-        if (feature_mode == 0) {
-            // 占有率
+    float h_min, h_max, v_min, v_max;
+    CalculateViewBounds(h_min, h_max, v_min, v_max);
+
+    // 回転スライスモードの場合
+    if (use_rotated_slice) {
+        // 回転スライスモードでは1つのスライス（アクティブなもの）のみ表示
+        int y_pos = start_y;
+        
+        char t1[64], t2[64], t3[64];
+        sprintf(t1, "Rotated M1");
+        sprintf(t2, "Rotated M2");
+        sprintf(t3, "Rotated Diff");
+        
+        VoxelGrid* grid1 = nullptr;
+        VoxelGrid* grid2 = nullptr;
+        VoxelGrid* grid_diff = nullptr;
+        float max_value = 1.0f;
+        
+        // 表示するボクセルグリッドを選択
+        if (show_segment_mode && selected_segment_index >= 0 && 
+            selected_segment_index < segment_presence_voxels1.num_segments) {
+            // 部位別表示モード: feature_modeに応じて占有率または速度を使用
+            if (feature_mode == 0) {
+                // 占有率
             grid1 = &segment_presence_voxels1.GetSegmentGrid(selected_segment_index);
             grid2 = &segment_presence_voxels2.GetSegmentGrid(selected_segment_index);
+            } else {
+                // 速度
+                grid1 = &segment_speed_voxels1.GetSegmentGrid(selected_segment_index);
+                grid2 = &segment_speed_voxels2.GetSegmentGrid(selected_segment_index);
+            }
+            
+            static VoxelGrid temp_diff;
+            temp_diff.Resize(grid_resolution);
+            temp_diff.Clear();
+            int size = grid_resolution * grid_resolution * grid_resolution;
+            max_value = 0.0f;
+            for (int j = 0; j < size; ++j) {
+                float diff = abs(grid1->data[j] - grid2->data[j]);
+                temp_diff.data[j] = diff;
+                if (diff > max_value) max_value = diff;
+            }
+            if (max_value < 1e-5f) max_value = 1.0f;
+            grid_diff = &temp_diff;
         } else {
-            // 速度
-            grid1 = &segment_speed_voxels1.GetSegmentGrid(selected_segment_index);
-            grid2 = &segment_speed_voxels2.GetSegmentGrid(selected_segment_index);
+            if (norm_mode == 0) {
+                if (feature_mode == 0) {
+                    grid1 = &voxels1_psc;
+                    grid2 = &voxels2_psc;
+                    grid_diff = &voxels_psc_diff;
+                    max_value = max_psc_val;
+                } else {
+                    grid1 = &voxels1_spd;
+                    grid2 = &voxels2_spd;
+                    grid_diff = &voxels_spd_diff;
+                    max_value = max_spd_val;
+                }
+            } else {
+                // 累積ボクセルデータ
+                if (feature_mode == 0) {
+                    // 累積占有率
+                    grid1 = &voxels1_psc_accumulated;
+                    grid2 = &voxels2_psc_accumulated;
+                    grid_diff = &voxels_psc_accumulated_diff;
+                    max_value = max_psc_accumulated_val;
+                } else {
+                    // 累積最大速度
+                    grid1 = &voxels1_spd_accumulated;
+                    grid2 = &voxels2_spd_accumulated;
+                    grid_diff = &voxels_spd_accumulated_diff;
+                    max_value = max_spd_accumulated_val;
+                }
+            }
         }
         
-        static VoxelGrid temp_diff;
-        temp_diff.Resize(grid_resolution);
-        temp_diff.Clear();
-        int size = grid_resolution * grid_resolution * grid_resolution;
-        max_value = 0.0f;
-        for (int j = 0; j < size; ++j) {
-            float diff = abs(grid1->data[j] - grid2->data[j]);
-            temp_diff.data[j] = diff;
-            if (diff > max_value) max_value = diff;
-        }
-        if (max_value < 1e-5f) max_value = 1.0f;
-        grid_diff = &temp_diff;
-    } else {
-        if (norm_mode == 0) {
-            if (feature_mode == 0) {
-                grid1 = &voxels1_psc;
-                grid2 = &voxels2_psc;
-                grid_diff = &voxels_psc_diff;
-                max_value = max_psc_val;
-            } else {
-                grid1 = &voxels1_spd;
-                grid2 = &voxels2_spd;
-                grid_diff = &voxels_spd_diff;
-                max_value = max_spd_val;
-            }
+        // 回転スライスマップを描画
+        DrawRotatedSliceMap(start_x, y_pos, map_w, map_h, *grid1, max_value, t1);
+        DrawRotatedSliceMap(start_x + map_w + gap, y_pos, map_w, map_h, *grid2, max_value, t2);
+        DrawRotatedSliceMap(start_x + 2*(map_w + gap), y_pos, map_w, map_h, *grid_diff, max_value, t3);
+        
+        glPopAttrib();
+        glMatrixMode(GL_PROJECTION); glPopMatrix();
+        glMatrixMode(GL_MODELVIEW); glPopMatrix();
+        return;
+    }
+
+    // 通常モード（既存コード）
+    for (int i = 0; i < num_rows; ++i) {
+        int y_pos = start_y + i * (map_h + gap);
+        char t1[64], t2[64], t3[64];
+        
+        // 部位別表示モードの場合はタイトルを変更
+        if (show_segment_mode && selected_segment_index >= 0) {
+            sprintf(t1, "S%d M1 (Seg:%d)", i+1, selected_segment_index);
+            sprintf(t2, "S%d M2 (Seg:%d)", i+1, selected_segment_index);
+            sprintf(t3, "S%d Diff (Seg:%d)", i+1, selected_segment_index);
         } else {
-            // 累積ボクセルデータ
+            sprintf(t1, "S%d M1", i+1);
+            sprintf(t2, "S%d M2", i+1);
+            sprintf(t3, "S%d Diff", i+1);
+        }
+
+        VoxelGrid* grid1 = nullptr;
+        VoxelGrid* grid2 = nullptr;
+        VoxelGrid* grid_diff = nullptr;
+        float max_value = 1.0f;
+
+        // ボクセルデータを直接使用するように修正
+        if (show_segment_mode && selected_segment_index >= 0 && 
+            selected_segment_index < segment_presence_voxels1.num_segments) {
+            // 部位別表示モード: feature_modeに応じて占有率または速度を使用
             if (feature_mode == 0) {
-                // 累積占有率
-                grid1 = &voxels1_psc_accumulated;
-                grid2 = &voxels2_psc_accumulated;
-                grid_diff = &voxels_psc_accumulated_diff;
-                max_value = max_psc_accumulated_val;
+                // 占有率
+            grid1 = &segment_presence_voxels1.GetSegmentGrid(selected_segment_index);
+            grid2 = &segment_presence_voxels2.GetSegmentGrid(selected_segment_index);
             } else {
-                // 累積最大速度
-                grid1 = &voxels1_spd_accumulated;
-                grid2 = &voxels2_spd_accumulated;
-                grid_diff = &voxels_spd_accumulated_diff;
-                max_value = max_spd_accumulated_val;
+                // 速度
+                grid1 = &segment_speed_voxels1.GetSegmentGrid(selected_segment_index);
+                grid2 = &segment_speed_voxels2.GetSegmentGrid(selected_segment_index);
+            }
+            
+            // 差分を計算
+            static VoxelGrid temp_diff;
+            temp_diff.Resize(grid_resolution);
+            temp_diff.Clear();
+            int size = grid_resolution * grid_resolution * grid_resolution;
+            max_value = 0.0f;
+            for (int j = 0; j < size; ++j) {
+                float diff = abs(grid1->data[j] - grid2->data[j]);
+                temp_diff.data[j] = diff;
+                if (diff > max_value) max_value = diff;
+            }
+            if (max_value < 1e-5f) max_value = 1.0f;
+            grid_diff = &temp_diff;
+            
+        } else {
+            // 全体表示モード: norm_modeとfeature_modeで切り替え
+            if (norm_mode == 0) {
+                // 現在フレームのボクセルデータ
+                if (feature_mode == 0) {
+                    // 占有率
+                    grid1 = &voxels1_psc;
+                    grid2 = &voxels2_psc;
+                    grid_diff = &voxels_psc_diff;
+                    max_value = max_psc_val;
+                } else {
+                    // 速度
+                    grid1 = &voxels1_spd;
+                    grid2 = &voxels2_spd;
+                    grid_diff = &voxels_spd_diff;
+                    max_value = max_spd_val;
+                }
+            } else {
+                // 累積ボクセルデータ
+                if (feature_mode == 0) {
+                    // 累積占有率
+                    grid1 = &voxels1_psc_accumulated;
+                    grid2 = &voxels2_psc_accumulated;
+                    grid_diff = &voxels_psc_accumulated_diff;
+                    max_value = max_psc_accumulated_val;
+                } else {
+                    // 累積最大速度
+                    grid1 = &voxels1_spd_accumulated;
+                    grid2 = &voxels2_spd_accumulated;
+                    grid_diff = &voxels_spd_accumulated_diff;
+                    max_value = max_spd_accumulated_val;
+                }
+            }
+        }
+        
+        // ボクセルデータをそのまま2Dマップに投影して描画
+        DrawSingleMap(start_x, y_pos, map_w, map_h, *grid1, max_value, t1, slice_positions[i], h_min, h_max, v_min, v_max);
+        DrawSingleMap(start_x + map_w + gap, y_pos, map_w, map_h, *grid2, max_value, t2, slice_positions[i], h_min, h_max, v_min, v_max);
+        DrawSingleMap(start_x + 2*(map_w + gap), y_pos, map_w, map_h, *grid_diff, max_value, t3, slice_positions[i], h_min, h_max, v_min, v_max);
+    }
+
+    glPopAttrib();
+    glMatrixMode(GL_PROJECTION); glPopMatrix();
+	glMatrixMode(GL_MODELVIEW); glPopMatrix();
+}
+
+// 座標軸の描画
+void SpatialAnalyzer::DrawAxes(int x, int y, int w, int h, float h_min, float h_max, float v_min, float v_max) {
+    glColor4f(0.9f, 0.9f, 0.9f, 1.0f);
+    glBegin(GL_QUADS); glVertex2i(x, y); glVertex2i(x, y+h); glVertex2i(x+w, y+h); glVertex2i(x+w, y); glEnd();
+    glColor4f(0,0,0,1);
+    glBegin(GL_LINE_LOOP); glVertex2i(x, y); glVertex2i(x, y+h); glVertex2i(x+w, y+h); glVertex2i(x+w, y); glEnd();
+    
+    glColor3f(0,0,0);
+    char buf[64];
+    glRasterPos2i(x, y+h+12);
+    sprintf(buf, "%.2f", h_min);
+    for(const char* c=buf; *c; c++) glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, *c);
+    glRasterPos2i(x+w-30, y+h+12);
+    sprintf(buf, "%.2f", h_max);
+    for(const char* c=buf; *c; c++) glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, *c);
+}
+
+// 単一ボクセルマップの描画
+void SpatialAnalyzer::DrawSingleMap(int x_pos, int y_pos, int w, int h, VoxelGrid& grid, float max_val, const char* title, float slice_val, float h_min, float h_max, float v_min, float v_max) {
+    DrawAxes(x_pos, y_pos, w, h, h_min, h_max, v_min, v_max);
+
+    int d_axis = 3 - h_axis - v_axis;
+    float world_range[3];
+    for(int i=0; i<3; ++i) world_range[i] = world_bounds[i][1] - world_bounds[i][0];
+    
+    // スライス位置に対応する深さ軸のインデックスを計算
+    int z_idx = (int)(((slice_val - world_bounds[d_axis][0]) / world_range[d_axis]) * grid_resolution);
+    if (z_idx < 0 || z_idx >= grid_resolution) return;
+    glBegin(GL_QUADS);
+    
+    // 2D平面での描画解像度（高速化のため粗く設定）
+    int draw_res = 64; 
+    float cell_w = (float)w / draw_res;
+    float cell_h = (float)h / draw_res;
+    
+    float h_range_view = h_max - h_min;
+    float v_range_view = v_max - v_min;
+    
+    // Y軸が垂直軸の場合は上下を反転（実際のワールド座標の下が画面の下になるように）
+    bool flip_v = (v_axis == 1);
+
+    // 2D平面の各ピクセルに対してボクセル値を取得して描画
+    for (int iy = 0; iy < draw_res; ++iy) {
+        for (int ix = 0; ix < draw_res; ++ix) {
+            // スクリーン座標 -> ワールド座標への変換
+            float wx = h_min + (ix + 0.5f) * (h_range_view / draw_res);
+            float wy = v_min + (iy + 0.5f) * (v_range_view / draw_res);
+            
+            // ワールド座標 -> ボクセルグリッドインデックスへの変換
+            int gx = (int)(((wx - world_bounds[h_axis][0]) / world_range[h_axis]) * grid_resolution);
+            int gy = (int)(((wy - world_bounds[v_axis][0]) / world_range[v_axis]) * grid_resolution);
+            
+            // 3D軸マッピング (h_axis, v_axis, d_axis -> x, y, z)
+            int idx[3];
+            idx[h_axis] = gx;
+            idx[v_axis] = gy;
+            idx[d_axis] = z_idx;
+            
+            // ボクセルグリッドから値を直接取得（これがメインの密度データ）
+            float val = grid.Get(idx[0], idx[1], idx[2]);
+
+            // 閾値以上の値を持つボクセルのみ描画
+            if (val > 0.01f) {
+                // 値を正規化してヒートマップカラーに変換
+                Color3f c = sa_get_heatmap_color(val / max_val);
+                glColor3f(c.x, c.y, c.z);
+                
+                // スクリーン座標での四角形を描画
+                float sx = x_pos + ix * cell_w;
+                // NEW: Y軸が垂直の場合は上下反転
+                float sy = flip_v ? (y_pos + (draw_res - 1 - iy) * cell_h) : (y_pos + iy * cell_h);
+                
+                glVertex2f(sx, sy);
+                glVertex2f(sx, sy+cell_h);
+                glVertex2f(sx+cell_w, sy+cell_h);
+                glVertex2f(sx+cell_w, sy);
             }
         }
     }
+    glEnd();
     
-    // 回転スライスマップを描画
-    DrawRotatedSliceMap(start_x, y_pos, map_w, map_h, *grid1, max_value, t1);
-    DrawRotatedSliceMap(start_x + map_w + gap, y_pos, map_w, map_h, *grid2, max_value, t2);
-    DrawRotatedSliceMap(start_x + 2*(map_w + gap), y_pos, map_w, map_h, *grid_diff, max_value, t3);
-    
-    glPopAttrib();
-    glMatrixMode(GL_PROJECTION); glPopMatrix();
-    glMatrixMode(GL_MODELVIEW); glPopMatrix();
+    // タイトルを描画
+    glColor3f(0,0,0);
+    glRasterPos2i(x_pos, y_pos - 5);
+    for (const char* c = title; *c != '\0'; c++) glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, *c);
 }
+
 
 void SpatialAnalyzer::ResetView() { zoom = 1.0f; pan_center.set(0.0f, 0.0f); is_manual_view = false; }
 void SpatialAnalyzer::Pan(float dx, float dy) { pan_center.x += dx; pan_center.y += dy; is_manual_view = true; }
@@ -542,7 +801,7 @@ void SpatialAnalyzer::ClearAccumulatedSpeed() {
     max_spd_accumulated_val = 0.0f;
 }
 
-// 動作全体を通った累積ボクセル計算
+// 動作全体を通した累積ボクセル計算
 void SpatialAnalyzer::AccumulatePresenceAllFrames(Motion* m1, Motion* m2) {
     if (!m1 || !m2) return;
     
@@ -617,7 +876,7 @@ void SpatialAnalyzer::AccumulatePresenceAllFrames(Motion* m1, Motion* m2) {
     std::cout << "Accumulation complete. Max accumulated value: " << max_psc_accumulated_val << std::endl;
 }
 
-// 動作全体を通った速度累積計算（最大速度を保持）
+// 動作全体を通した速度累積計算（最大速度を保持）
 // ↑モーションの全フレームに対して各ボクセルの最大速度を更新
 void SpatialAnalyzer::AccumulateSpeedAllFrames(Motion* m1, Motion* m2) {
     if (!m1 || !m2) return;
