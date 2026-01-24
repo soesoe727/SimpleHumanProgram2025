@@ -76,64 +76,22 @@ void MotionApp::Keyboard(unsigned char key, int mx, int my) {
 
     // CTスキャン操作
     switch(key) {
-        // 軸の切り替え（XY, YZ, XZ平面の順に循環）
-        case 'x': 
-            // XY平面 (h=X, v=Y, depth=Z) → YZ平面 (h=Z, v=Y, depth=X) → XZ平面 (h=X, v=Z, depth=Y) → XY平面...
-            if (analyzer.h_axis == 0 && analyzer.v_axis == 1) {
-                // XY → YZ (Z軸が横、Y軸が縦)
-                analyzer.h_axis = 2;
-                analyzer.v_axis = 1;
-            } else if (analyzer.h_axis == 2 && analyzer.v_axis == 1) {
-                // YZ → XZ
-                analyzer.h_axis = 0;
-                analyzer.v_axis = 2;
-            } else {
-                // XZ → XY
-                analyzer.h_axis = 0;
-                analyzer.v_axis = 1;
-            }
-            analyzer.ResetView(); 
-            break;
-            
-        case 'z': 
-            analyzer.projection_mode = !analyzer.projection_mode; 
-            break;
-        
-        // スライスの移動（回転スライスモードでも動作）
+        // スライスの移動（回転スライスモード用）
         case 'w': 
-            if(!analyzer.slice_positions.empty()) 
-            if (analyzer.use_rotated_slice) {
+            if(!analyzer.slice_positions.empty()) {
                 Vector3f n = analyzer.slice_plane_normal; n.normalize();
                 analyzer.slice_plane_center.x += n.x * 0.02f;
                 analyzer.slice_plane_center.y += n.y * 0.02f;
                 analyzer.slice_plane_center.z += n.z * 0.02f;
-            } else if(!analyzer.slice_positions.empty()) {
-                analyzer.slice_positions[analyzer.active_slice_index] += 0.02f; 
             }
             break;
         case 's': 
-            if(!analyzer.slice_positions.empty()) 
-            if (analyzer.use_rotated_slice) {
+            if(!analyzer.slice_positions.empty()) {
                 Vector3f n = analyzer.slice_plane_normal; n.normalize();
                 analyzer.slice_plane_center.x -= n.x * 0.02f;
                 analyzer.slice_plane_center.y -= n.y * 0.02f;
                 analyzer.slice_plane_center.z -= n.z * 0.02f;
-            } else if(!analyzer.slice_positions.empty()) {
-                analyzer.slice_positions[analyzer.active_slice_index] -= 0.02f; 
             }
-            break;
-        case 't': 
-            if(analyzer.slice_positions.size() > 1) 
-                analyzer.slice_positions[1] += 0.02f; 
-            break;
-        case 'g': 
-            if(analyzer.slice_positions.size() > 1) 
-                analyzer.slice_positions[1] -= 0.02f; 
-            break;
-        
-        // NEW: アクティブスライスの切り替え
-        case 'q':
-            analyzer.active_slice_index = (analyzer.active_slice_index + 1) % analyzer.slice_positions.size();
             break;
 
         // 特徴量・正規化モード
@@ -155,39 +113,27 @@ void MotionApp::Keyboard(unsigned char key, int mx, int my) {
             analyzer.show_voxels = !analyzer.show_voxels; 
             break;
         
-        // 回転スライスモードの切り替え
-        case 'p':
-            analyzer.ToggleRotatedSliceMode();
-            break;
-        
-        // 平面の回転操作（回転スライスモード時のみ有効）
+        // 平面の回転操作
         case '1':  // X軸周りに+5度回転
-            if (analyzer.use_rotated_slice)
-                analyzer.RotateSlicePlane(5.0f, 0.0f, 0.0f);
+            analyzer.RotateSlicePlane(5.0f, 0.0f, 0.0f);
             break;
         case '2':  // X軸周りに-5度回転
-            if (analyzer.use_rotated_slice)
-                analyzer.RotateSlicePlane(-5.0f, 0.0f, 0.0f);
+            analyzer.RotateSlicePlane(-5.0f, 0.0f, 0.0f);
             break;
         case '3':  // Y軸周りに+5度回転
-            if (analyzer.use_rotated_slice)
-                analyzer.RotateSlicePlane(0.0f, 5.0f, 0.0f);
+            analyzer.RotateSlicePlane(0.0f, 5.0f, 0.0f);
             break;
         case '4':  // Y軸周りに-5度回転
-            if (analyzer.use_rotated_slice)
-                analyzer.RotateSlicePlane(0.0f, -5.0f, 0.0f);
+            analyzer.RotateSlicePlane(0.0f, -5.0f, 0.0f);
             break;
         case '5':  // Z軸周りに+5度回転
-            if (analyzer.use_rotated_slice)
-                analyzer.RotateSlicePlane(0.0f, 0.0f, 5.0f);
+            analyzer.RotateSlicePlane(0.0f, 0.0f, 5.0f);
             break;
         case '6':  // Z軸周りに-5度回転
-            if (analyzer.use_rotated_slice)
-                analyzer.RotateSlicePlane(0.0f, 0.0f, -5.0f);
+            analyzer.RotateSlicePlane(0.0f, 0.0f, -5.0f);
             break;
         case '0':  // 回転リセット
-            if (analyzer.use_rotated_slice)
-                analyzer.ResetSliceRotation();
+            analyzer.ResetSliceRotation();
             break;
         
         // 部位別表示モード
@@ -233,11 +179,11 @@ void MotionApp::Keyboard(unsigned char key, int mx, int my) {
             analyzer.ResetView(); 
             break;
 
-        // NEW: ギズモON/OFF
+        // ギズモON/OFF
         case 'y':
             ToggleSliceGizmo();
             break;
-        // NEW: ギズモモード切り替え
+        // ギズモモード切り替え
         case 'u':
             ToggleSliceGizmoMode();
             break;
@@ -246,18 +192,20 @@ void MotionApp::Keyboard(unsigned char key, int mx, int my) {
 
 void MotionApp::Special(int key, int mx, int my)
 {
-    // パン操作
-    float bounds_w = analyzer.world_bounds[analyzer.h_axis][1] - analyzer.world_bounds[analyzer.h_axis][0];
-    float bounds_h = analyzer.world_bounds[analyzer.v_axis][1] - analyzer.world_bounds[analyzer.v_axis][0];
-    float step_x = bounds_w * 0.05f;
-    float step_y = bounds_h * 0.05f;
+    // パン操作（回転スライスモード用）
+    float world_range[3];
+    for (int i = 0; i < 3; ++i) {
+        world_range[i] = analyzer.world_bounds[i][1] - analyzer.world_bounds[i][0];
+    }
+    float max_range = max(world_range[0], max(world_range[1], world_range[2]));
+    float step = max_range * 0.05f;
 
     switch(key)
     {
-        case GLUT_KEY_LEFT:  analyzer.Pan(-step_x, 0); break;
-        case GLUT_KEY_RIGHT: analyzer.Pan(step_x, 0); break;
-        case GLUT_KEY_DOWN:  analyzer.Pan(0, -step_y); break;
-        case GLUT_KEY_UP:    analyzer.Pan(0, step_y); break;
+        case GLUT_KEY_LEFT:  analyzer.Pan(-step, 0); break;
+        case GLUT_KEY_RIGHT: analyzer.Pan(step, 0); break;
+        case GLUT_KEY_DOWN:  analyzer.Pan(0, -step); break;
+        case GLUT_KEY_UP:    analyzer.Pan(0, step); break;
     }
 }
 
@@ -378,20 +326,14 @@ void MotionApp::Display()
 
     // 4. 情報テキストの表示
     char title[512];
-    int d_axis = 3 - analyzer.h_axis - analyzer.v_axis;
-    const char* slice_mode_str = analyzer.projection_mode ? "Projection" : "Slice";
     const char* feature_mode_str = (analyzer.feature_mode == 0) ? "Occupancy" : "Speed";
     const char* norm_mode_str = (analyzer.norm_mode == 0) ? "CurrentFrame" : "Accumulated";
     const char* planes_on_str = (analyzer.show_planes) ? "ON" : "OFF";
     const char* maps_on_str = (analyzer.show_maps) ? "ON" : "OFF";
     const char* voxels_on_str = (analyzer.show_voxels) ? "ON" : "OFF";
     const char* segment_mode_str = (analyzer.show_segment_mode) ? "ON" : "OFF";
-    const char* rotated_slice_str = (analyzer.use_rotated_slice) ? "ON" : "OFF";
-    const char* gizmo_str = (use_slice_gizmo && analyzer.use_rotated_slice) ? "ON" : "OFF";
+    const char* gizmo_str = (use_slice_gizmo) ? "ON" : "OFF";
     const char* gizmo_mode_str = (slice_gizmo.GetMode() == GIZMO_TRANSLATE) ? "Move" : "Rotate";
-    
-    float s1 = (analyzer.slice_positions.size() > 0) ? analyzer.slice_positions[0] : 0.0f;
-    float s2 = (analyzer.slice_positions.size() > 1) ? analyzer.slice_positions[1] : 0.0f;
 
     // 部位情報を追加
     char segment_info[128] = "All";
@@ -402,15 +344,12 @@ void MotionApp::Display()
     }
     
     // 回転情報
-    char rotation_info[64] = "";
-    if (analyzer.use_rotated_slice) {
-        sprintf(rotation_info, " | Rot:X%.0f Y%.0f Z%.0f", 
-                analyzer.slice_rotation_x, analyzer.slice_rotation_y, analyzer.slice_rotation_z);
-    }
+    char rotation_info[64];
+    sprintf(rotation_info, "Rot:X%.0f Y%.0f Z%.0f", 
+            analyzer.slice_rotation_x, analyzer.slice_rotation_y, analyzer.slice_rotation_z);
 
-    sprintf(title, "CT-Scan | H:%c V:%c | RotSlice:%s%s | Gizmo:%s(%s) | Feature:%s | Data:%s | Seg:%s | Planes:%s | Maps:%s | Voxels:%s",
-        'X' + analyzer.h_axis, 'X' + analyzer.v_axis, 
-        rotated_slice_str, rotation_info, gizmo_str, gizmo_mode_str,
+    sprintf(title, "CT-Scan | %s | Gizmo:%s(%s) | Feature:%s | Data:%s | Seg:%s | Planes:%s | Maps:%s | Voxels:%s",
+        rotation_info, gizmo_str, gizmo_mode_str,
         feature_mode_str, norm_mode_str, segment_info,
         planes_on_str, maps_on_str, voxels_on_str);
     
@@ -683,25 +622,10 @@ Point3f MotionApp::GetSliceGizmoPosition() const
     Point3f pos = analyzer.slice_plane_center;
 
     // 回転スライスモード: スライス中心 + パン
-    if (analyzer.use_rotated_slice) {
-        pos.x += analyzer.slice_plane_u.x * analyzer.pan_center.x + analyzer.slice_plane_v.x * analyzer.pan_center.y;
-        pos.y += analyzer.slice_plane_u.y * analyzer.pan_center.x + analyzer.slice_plane_v.y * analyzer.pan_center.y;
-        pos.z += analyzer.slice_plane_u.z * analyzer.pan_center.x + analyzer.slice_plane_v.z * analyzer.pan_center.y;
-        return pos;
-    }
-
-    // 非回転モード: アクティブスライスの位置を使用
-    if (!analyzer.slice_positions.empty()) {
-        int depth_axis = 3 - analyzer.h_axis - analyzer.v_axis;
-        float depth = analyzer.slice_positions[analyzer.active_slice_index];
-        pos.x = (analyzer.world_bounds[0][0] + analyzer.world_bounds[0][1]) * 0.5f;
-        pos.y = (analyzer.world_bounds[1][0] + analyzer.world_bounds[1][1]) * 0.5f;
-        pos.z = (analyzer.world_bounds[2][0] + analyzer.world_bounds[2][1]) * 0.5f;
-        if (depth_axis == 0) pos.x = depth;
-        if (depth_axis == 1) pos.y = depth;
-        if (depth_axis == 2) pos.z = depth;
-    }
-
+    pos.x += analyzer.slice_plane_u.x * analyzer.pan_center.x + analyzer.slice_plane_v.x * analyzer.pan_center.y;
+    pos.y += analyzer.slice_plane_u.y * analyzer.pan_center.x + analyzer.slice_plane_v.y * analyzer.pan_center.y;
+    pos.z += analyzer.slice_plane_u.z * analyzer.pan_center.x + analyzer.slice_plane_v.z * analyzer.pan_center.y;
+    
     return pos;
 }
 

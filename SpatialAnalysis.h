@@ -134,8 +134,6 @@ public:
     float max_spd_accumulated_val; // 速度累計用の最大値
 
     // --- ビュー/スライス設定 ---
-	int h_axis, v_axis; // 水平・垂直軸 (0:X, 1:Y, 2:Z)
-	bool projection_mode; // 投影モードフラグ
 	std::vector<float> slice_positions; // スライス位置 (0.0 - 1.0)
 	int active_slice_index; // アクティブなスライスインデックス
     
