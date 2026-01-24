@@ -14,6 +14,27 @@ struct SpatialPoint2f {
     void set(float _x, float _y) { x = _x; y = _y; }
 };
 
+// ボーン情報を格納する構造体（ボクセル化処理の共通化用）
+struct BoneData {
+    Point3f p1, p2;           // 現在フレームの両端点
+    Point3f p1_prev, p2_prev; // 前フレームの両端点
+    float speed1, speed2;     // 両端の速度
+    int segment_index;        // セグメントインデックス
+    bool valid;               // 有効なボーンかどうか
+    
+    BoneData() : speed1(0), speed2(0), segment_index(-1), valid(false) {}
+};
+
+// フレームデータを格納する構造体（FK計算結果の共通化用）
+struct FrameData {
+    std::vector<Matrix4f> curr_frames;     // 現在フレームの変換行列
+    std::vector<Matrix4f> prev_frames;     // 前フレームの変換行列
+    std::vector<Point3f> curr_joint_pos;   // 現在フレームの関節位置
+    std::vector<Point3f> prev_joint_pos;   // 前フレームの関節位置
+    float dt;                              // フレーム間隔
+    
+    FrameData() : dt(0) {}
+};
 
 struct VoxelGrid {
     int resolution;
@@ -211,4 +232,13 @@ private:
     void DrawRotatedSlicePlane();
     void DrawRotatedSliceMap(int x, int y, int w, int h, VoxelGrid& grid, float max_val, const char* title);
     float SampleVoxelAtWorldPos(VoxelGrid& grid, const Point3f& world_pos);
+    
+    // 共通ボクセル化ヘルパー関数
+    void ComputeFrameData(Motion* m, float time, FrameData& frame_data);
+    void ExtractBoneData(Motion* m, const FrameData& frame_data, std::vector<BoneData>& bones);
+    void ComputeAABB(const Point3f& p1, const Point3f& p2, float radius, 
+                     int idx_min[3], int idx_max[3], const float world_range[3]);
+    void WriteToVoxelGrid(const BoneData& bone, float bone_radius, 
+                          const float world_range[3],
+                          VoxelGrid* occ_grid, VoxelGrid* spd_grid);
 };

@@ -727,6 +727,7 @@ void SpatialAnalyzer::DrawCTMaps(int win_width, int win_height) {
 	glMatrixMode(GL_MODELVIEW); glPopMatrix();
 }
 
+// 座標軸の描画
 void SpatialAnalyzer::DrawAxes(int x, int y, int w, int h, float h_min, float h_max, float v_min, float v_max, const char* h_lbl, const char* v_lbl) {
     glColor4f(0.9f, 0.9f, 0.9f, 1.0f);
     glBegin(GL_QUADS); glVertex2i(x, y); glVertex2i(x, y+h); glVertex2i(x+w, y+h); glVertex2i(x+w, y); glEnd();
@@ -743,6 +744,7 @@ void SpatialAnalyzer::DrawAxes(int x, int y, int w, int h, float h_min, float h_
     for(const char* c=buf; *c; c++) glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, *c);
 }
 
+// 単一ボクセルマップの描画
 void SpatialAnalyzer::DrawSingleMap(int x_pos, int y_pos, int w, int h, VoxelGrid& grid, float max_val, const char* title, float slice_val, float h_min, float h_max, float v_min, float v_max) {
     DrawAxes(x_pos, y_pos, w, h, h_min, h_max, v_min, v_max, sa_get_axis_name(h_axis), sa_get_axis_name(v_axis));
 
@@ -1876,4 +1878,153 @@ void SpatialAnalyzer::DrawRotatedSliceMap(int x_pos, int y_pos, int w, int h, Vo
     sprintf(rot_info, "Rot: X=%.0f Y=%.0f Z=%.0f", slice_rotation_x, slice_rotation_y, slice_rotation_z);
     glRasterPos2i(x_pos, y_pos + h + 22);
     for (const char* c = rot_info; *c != '\0'; c++) glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, *c);
+}
+
+// === 共通ボクセル化ヘルパー関数（将来のリファクタリング用） ===
+
+// フレームデータを計算（FK計算を1箇所に集約）
+void SpatialAnalyzer::ComputeFrameData(Motion* m, float time, FrameData& frame_data) {
+    if (!m) return;
+    
+    Posture curr_pose(m->body);
+    Posture prev_pose(m->body);
+    
+    frame_data.dt = m->interval;
+    float prev_time = time - frame_data.dt;
+    if (prev_time < 0) prev_time = 0;
+
+    m->GetPosture(time, curr_pose);
+    m->GetPosture(prev_time, prev_pose);
+
+    curr_pose.ForwardKinematics(frame_data.curr_frames, frame_data.curr_joint_pos);
+    prev_pose.ForwardKinematics(frame_data.prev_frames, frame_data.prev_joint_pos);
+}
+
+// 全ボーンのデータを抽出
+void SpatialAnalyzer::ExtractBoneData(Motion* m, const FrameData& frame_data, vector<BoneData>& bones) {
+    bones.clear();
+    bones.reserve(m->body->num_segments);
+    
+    for (int s = 0; s < m->body->num_segments; ++s) {
+        const Segment* seg = m->body->segments[s];
+        BoneData bone;
+        bone.segment_index = s;
+        bone.valid = false;
+        
+        // 指をスキップ
+        if (IsFingerSegment(seg)) {
+            bones.push_back(bone);
+            continue;
+        }
+
+        if (seg->num_joints == 1) {
+            bone.p1 = Point3f(frame_data.curr_frames[s].m03, 
+                              frame_data.curr_frames[s].m13, 
+                              frame_data.curr_frames[s].m23);
+            bone.p1_prev = Point3f(frame_data.prev_frames[s].m03, 
+                                   frame_data.prev_frames[s].m13, 
+                                   frame_data.prev_frames[s].m23);
+            
+            if (seg->has_site) {
+                Matrix3f R_curr(frame_data.curr_frames[s].m00, frame_data.curr_frames[s].m01, frame_data.curr_frames[s].m02, 
+                                frame_data.curr_frames[s].m10, frame_data.curr_frames[s].m11, frame_data.curr_frames[s].m12, 
+                                frame_data.curr_frames[s].m20, frame_data.curr_frames[s].m21, frame_data.curr_frames[s].m22);
+                Point3f offset = seg->site_position;
+                R_curr.transform(&offset);
+                bone.p2 = bone.p1 + offset;
+
+                Matrix3f R_prev(frame_data.prev_frames[s].m00, frame_data.prev_frames[s].m01, frame_data.prev_frames[s].m02, 
+                                frame_data.prev_frames[s].m10, frame_data.prev_frames[s].m11, frame_data.prev_frames[s].m12, 
+                                frame_data.prev_frames[s].m20, frame_data.prev_frames[s].m21, frame_data.prev_frames[s].m22);
+                Point3f offset_prev = seg->site_position;
+                R_prev.transform(&offset_prev);
+                bone.p2_prev = bone.p1_prev + offset_prev;
+                bone.valid = true;
+            }
+        } else if (seg->num_joints >= 2) {
+            Joint* root_joint = seg->joints[0];
+            Joint* end_joint = seg->joints[1];
+            
+            bone.p1 = frame_data.curr_joint_pos[root_joint->index];
+            bone.p2 = frame_data.curr_joint_pos[end_joint->index];
+            bone.p1_prev = frame_data.prev_joint_pos[root_joint->index];
+            bone.p2_prev = frame_data.prev_joint_pos[end_joint->index];
+            bone.valid = true;
+        }
+        
+        if (bone.valid) {
+            // 速度を計算
+            Vector3f vel1 = bone.p1 - bone.p1_prev;
+            Vector3f vel2 = bone.p2 - bone.p2_prev;
+            bone.speed1 = vel1.length() / frame_data.dt;
+            bone.speed2 = vel2.length() / frame_data.dt;
+        }
+        
+        bones.push_back(bone);
+    }
+}
+
+// AABB計算（共通化）
+void SpatialAnalyzer::ComputeAABB(const Point3f& p1, const Point3f& p2, float radius, 
+                                   int idx_min[3], int idx_max[3], const float world_range[3]) {
+    float b_min[3], b_max[3];
+    for (int i = 0; i < 3; ++i) {
+        b_min[i] = min(sa_get_axis_value(p1, i), sa_get_axis_value(p2, i)) - radius;
+        b_max[i] = max(sa_get_axis_value(p1, i), sa_get_axis_value(p2, i)) + radius;
+        
+        idx_min[i] = max(0, (int)(((b_min[i] - world_bounds[i][0]) / world_range[i]) * grid_resolution));
+        idx_max[i] = min(grid_resolution - 1, (int)(((b_max[i] - world_bounds[i][0]) / world_range[i]) * grid_resolution));
+    }
+}
+
+// ボクセルグリッドへの書き込み（占有率と速度を同時に処理）
+void SpatialAnalyzer::WriteToVoxelGrid(const BoneData& bone, float bone_radius, 
+                                        const float world_range[3],
+                                        VoxelGrid* occ_grid, VoxelGrid* spd_grid) {
+    if (!bone.valid) return;
+    
+    int idx_min[3], idx_max[3];
+    ComputeAABB(bone.p1, bone.p2, bone_radius, idx_min, idx_max, world_range);
+    
+    Point3f bone_vec = bone.p2 - bone.p1;
+    float bone_len_sq = bone_vec.x*bone_vec.x + bone_vec.y*bone_vec.y + bone_vec.z*bone_vec.z;
+    if (bone_len_sq < 1e-6f) return;
+    
+    float sigma_sq = 2.0f * (bone_radius/2.0f) * (bone_radius/2.0f);
+    float radius_sq = bone_radius * bone_radius;
+
+    for (int z = idx_min[2]; z <= idx_max[2]; ++z) {
+        for (int y = idx_min[1]; y <= idx_max[1]; ++y) {
+            for (int x = idx_min[0]; x <= idx_max[0]; ++x) {
+                float wc[3];
+                wc[0] = world_bounds[0][0] + (x + 0.5f) * (world_range[0] / grid_resolution);
+                wc[1] = world_bounds[1][0] + (y + 0.5f) * (world_range[1] / grid_resolution);
+                wc[2] = world_bounds[2][0] + (z + 0.5f) * (world_range[2] / grid_resolution);
+
+                Point3f voxel_center(wc[0], wc[1], wc[2]);
+                Point3f v_to_p1 = voxel_center - bone.p1;
+                float t = (v_to_p1.x*bone_vec.x + v_to_p1.y*bone_vec.y + v_to_p1.z*bone_vec.z) / bone_len_sq;
+                float k_clamped = max(0.0f, min(1.0f, t));
+                Point3f closest = bone.p1 + bone_vec * k_clamped;
+                
+                float dist_sq = (voxel_center.x-closest.x)*(voxel_center.x-closest.x) + 
+                                (voxel_center.y-closest.y)*(voxel_center.y-closest.y) + 
+                                (voxel_center.z-closest.z)*(voxel_center.z-closest.z);
+
+                if (dist_sq < radius_sq) {
+                    float presence = exp(-dist_sq / sigma_sq);
+                    
+                    if (occ_grid) {
+                        occ_grid->At(x, y, z) += presence;
+                    }
+                    
+                    if (spd_grid) {
+                        float s_interp = (1.0f - k_clamped) * bone.speed1 + k_clamped * bone.speed2;
+                        float& current_spd = spd_grid->At(x, y, z);
+                        if (s_interp > current_spd) current_spd = s_interp;
+                    }
+                }
+            }
+        }
+    }
 }
