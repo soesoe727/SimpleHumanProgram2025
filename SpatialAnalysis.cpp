@@ -301,132 +301,21 @@ static void ComputeFK(Motion* m, float time, vector<Point3f>& joints) {
 void SpatialAnalyzer::VoxelizeMotion(Motion* m, float time, VoxelGrid& occ, VoxelGrid& spd) {
     if (!m) return;
     
-    // 現在フレームと前フレームの姿勢を取得
-    Posture curr_pose(m->body);
-    Posture prev_pose(m->body);
+    // ヘルパー関数でフレームデータを計算
+    FrameData frame_data;
+    ComputeFrameData(m, time, frame_data);
     
-    float dt = m->interval;
-    float prev_time = time - dt;
-    if(prev_time < 0) prev_time = 0;
-
-    m->GetPosture(time, curr_pose);
-    m->GetPosture(prev_time, prev_pose);
-
-    // 順運動学計算（関節位置も取得）
-    vector<Matrix4f> curr_frames, prev_frames;
-    vector<Point3f> curr_joint_pos, prev_joint_pos;
-    curr_pose.ForwardKinematics(curr_frames, curr_joint_pos);
-    prev_pose.ForwardKinematics(prev_frames, prev_joint_pos);
+    // ヘルパー関数で全ボーンのデータを抽出
+    vector<BoneData> bones;
+    ExtractBoneData(m, frame_data, bones);
 
     float bone_radius = 0.08f;
     float world_range[3];
     for(int i=0; i<3; ++i) world_range[i] = world_bounds[i][1] - world_bounds[i][0];
 
-    // 各セグメント（ボーン）について計算
-    for (int s = 0; s < m->body->num_segments; ++s) {
-        const Segment* seg = m->body->segments[s];
-        
-        // 体節名ベースで指をスキップ（BVHファイルによる体節数の違いに対応）
-        if (IsFingerSegment(seg)) {
-            continue;
-        }
-
-        Point3f p1, p2, p1_prev, p2_prev;
-        
-        // セグメントの接続関節数に応じて位置を取得
-        if (seg->num_joints == 1) {
-            // 末端セグメント：セグメントの原点から末端位置（site）まで
-            p1 = Point3f(curr_frames[s].m03, curr_frames[s].m13, curr_frames[s].m23);
-            p1_prev = Point3f(prev_frames[s].m03, prev_frames[s].m13, prev_frames[s].m23);
-            
-            if (seg->has_site) {
-                // site_positionをワールド座標に変換
-                Matrix3f R_curr(curr_frames[s].m00, curr_frames[s].m01, curr_frames[s].m02, 
-                                curr_frames[s].m10, curr_frames[s].m11, curr_frames[s].m12, 
-                                curr_frames[s].m20, curr_frames[s].m21, curr_frames[s].m22);
-                Point3f offset = seg->site_position;
-                R_curr.transform(&offset);
-                p2 = p1 + offset;
-
-                Matrix3f R_prev(prev_frames[s].m00, prev_frames[s].m01, prev_frames[s].m02, 
-                                prev_frames[s].m10, prev_frames[s].m11, prev_frames[s].m12, 
-                                prev_frames[s].m20, prev_frames[s].m21, prev_frames[s].m22);
-                Point3f offset_prev = seg->site_position;
-                R_prev.transform(&offset_prev);
-                p2_prev = p1_prev + offset_prev;
-            } else {
-                // siteがない場合はスキップ
-                continue;
-            }
-
-        } else if (seg->num_joints >= 2) {
-            // 通常のボーン：親関節から子関節へ
-            // seg->joints[0] がルート側、seg->joints[1] が末端側
-            Joint* root_joint = seg->joints[0];
-            Joint* end_joint = seg->joints[1];
-            
-            // 関節位置を取得
-            p1 = curr_joint_pos[root_joint->index];
-            p2 = curr_joint_pos[end_joint->index];
-            
-            p1_prev = prev_joint_pos[root_joint->index];
-            p2_prev = prev_joint_pos[end_joint->index];
-        } else {
-            continue;
-        }
-
-        Vector3f vel1 = p1 - p1_prev;
-        Vector3f vel2 = p2 - p2_prev;
-        float s1 = vel1.length() / dt;  // P1の速度
-        float s2 = vel2.length() / dt;  // P2の速度
-
-        // ボクセルへの書き込み (AABB最適化付き)
-        float b_min[3], b_max[3];
-        for(int i=0; i<3; ++i) {
-            b_min[i] = min(sa_get_axis_value(p1, i), sa_get_axis_value(p2, i)) - bone_radius;
-            b_max[i] = max(sa_get_axis_value(p1, i), sa_get_axis_value(p2, i)) + bone_radius;
-        }
-
-        int idx_min[3], idx_max[3];
-        for(int i=0; i<3; ++i) {
-            idx_min[i] = max(0, (int)(((b_min[i] - world_bounds[i][0]) / world_range[i]) * grid_resolution));
-            idx_max[i] = min(grid_resolution - 1, (int)(((b_max[i] - world_bounds[i][0]) / world_range[i]) * grid_resolution));
-        }
-
-        for (int z = idx_min[2]; z <= idx_max[2]; ++z) {
-            for (int y = idx_min[1]; y <= idx_max[1]; ++y) {
-                for (int x = idx_min[0]; x <= idx_max[0]; ++x) {
-                    float wc[3];
-                    wc[0] = world_bounds[0][0] + (x + 0.5f) * (world_range[0] / grid_resolution);
-                    wc[1] = world_bounds[1][0] + (y + 0.5f) * (world_range[1] / grid_resolution);
-                    wc[2] = world_bounds[2][0] + (z + 0.5f) * (world_range[2] / grid_resolution);
-
-                    Point3f voxel_center(wc[0], wc[1], wc[2]);
-                    Point3f bone_vec = p2 - p1;
-                    float bone_len_sq = bone_vec.x*bone_vec.x + bone_vec.y*bone_vec.y + bone_vec.z*bone_vec.z;
-                    if(bone_len_sq < 1e-6) continue;
-                    
-                    Point3f v_to_p1 = voxel_center - p1;
-                    float t = (v_to_p1.x*bone_vec.x + v_to_p1.y*bone_vec.y + v_to_p1.z*bone_vec.z) / bone_len_sq;
-                    float k_clamped = max(0.0f, min(1.0f, t));
-                    Point3f closest = p1 + bone_vec * k_clamped;
-                    
-                    float dist_sq = (voxel_center.x-closest.x)*(voxel_center.x-closest.x) + 
-                                    (voxel_center.y-closest.y)*(voxel_center.y-closest.y) + 
-                                    (voxel_center.z-closest.z)*(voxel_center.z-closest.z);
-
-                    if (dist_sq < bone_radius * bone_radius) {
-                        float presence = exp(-dist_sq / (2.0f * (bone_radius/2.0f)*(bone_radius/2.0f)));
-                        occ.At(x, y, z) += presence;
-                        
-                        // 速度を線形補間: s_interp = (1-k)*s1 + k*s2
-                        float s_interp = (1.0f - k_clamped) * s1 + k_clamped * s2;
-                        float& current_spd = spd.At(x, y, z);
-                        if(s_interp > current_spd) current_spd = s_interp;
-                    }
-                }
-            }
-        }
+    // 各ボーンについてボクセル化
+    for (const BoneData& bone : bones) {
+        WriteToVoxelGrid(bone, bone_radius, world_range, &occ, &spd);
     }
 }
 
@@ -1087,129 +976,28 @@ void SpatialAnalyzer::AccumulateSpeedAllFrames(Motion* m1, Motion* m2) {
     std::cout << "Speed accumulation complete. Max speed value: " << max_spd_accumulated_val << std::endl;
 }
 
-// 部位ごとのボクセル化
+// 部位ごとの占有率ボクセル化
 void SpatialAnalyzer::VoxelizeMotionPresenceBySegment(Motion* m, float time, SegmentVoxelData& seg_data) {
     if (!m) return;
     
-    // 現在フレームと前フレームの姿勢を取得
-    Posture curr_pose(m->body);
-    Posture prev_pose(m->body);
+    // ヘルパー関数でフレームデータを計算
+    FrameData frame_data;
+    ComputeFrameData(m, time, frame_data);
     
-    float dt = m->interval;
-    float prev_time = time - dt;
-    if(prev_time < 0) prev_time = 0;
-
-    m->GetPosture(time, curr_pose);
-    m->GetPosture(prev_time, prev_pose);
-
-    // 順運動学計算（関節位置も取得）
-    vector<Matrix4f> curr_frames, prev_frames;
-    vector<Point3f> curr_joint_pos, prev_joint_pos;
-    curr_pose.ForwardKinematics(curr_frames, curr_joint_pos);
-    prev_pose.ForwardKinematics(prev_frames, prev_joint_pos);
+    // ヘルパー関数で全ボーンのデータを抽出
+    vector<BoneData> bones;
+    ExtractBoneData(m, frame_data, bones);
 
     float bone_radius = 0.08f;
     float world_range[3];
     for(int i=0; i<3; ++i) world_range[i] = world_bounds[i][1] - world_bounds[i][0];
 
-    // 各セグメント（ボーン）について個別に計算
-    for (int s = 0; s < m->body->num_segments; ++s) {
-        const Segment* seg = m->body->segments[s];
+    // 各ボーンについて、対応するセグメントのグリッドに書き込み
+    for (const BoneData& bone : bones) {
+        if (!bone.valid) continue;
         
-        // 体節名ベースで指をスキップ（BVHファイルによる体節数の違いに対応）
-        if (IsFingerSegment(seg)) {
-            continue;
-        }
-
-        Point3f p1, p2, p1_prev, p2_prev;
-        
-        // セグメントの接続関節数に応じて位置を取得
-        if (seg->num_joints == 1) {
-            // 末端セグメント：セグメントの原点から末端位置（site）まで
-            p1 = Point3f(curr_frames[s].m03, curr_frames[s].m13, curr_frames[s].m23);
-            p1_prev = Point3f(prev_frames[s].m03, prev_frames[s].m13, prev_frames[s].m23);
-            
-            if (seg->has_site) {
-                // site_positionをワールド座標に変換
-                Matrix3f R_curr(curr_frames[s].m00, curr_frames[s].m01, curr_frames[s].m02, 
-                                curr_frames[s].m10, curr_frames[s].m11, curr_frames[s].m12, 
-                                curr_frames[s].m20, curr_frames[s].m21, curr_frames[s].m22);
-                Point3f offset = seg->site_position;
-                R_curr.transform(&offset);
-                p2 = p1 + offset;
-
-                Matrix3f R_prev(prev_frames[s].m00, prev_frames[s].m01, prev_frames[s].m02, 
-                                prev_frames[s].m10, prev_frames[s].m11, prev_frames[s].m12, 
-                                prev_frames[s].m20, prev_frames[s].m21, prev_frames[s].m22);
-                Point3f offset_prev = seg->site_position;
-                R_prev.transform(&offset_prev);
-                p2_prev = p1_prev + offset_prev;
-            } else {
-                // siteがない場合はスキップ
-                continue;
-            }
-
-        } else if (seg->num_joints >= 2) {
-            // 通常のボーン：親関節から子関節へ
-            // seg->joints[0] がルート側、seg->joints[1] が末端側
-            Joint* root_joint = seg->joints[0];
-            Joint* end_joint = seg->joints[1];
-            
-            // 関節位置を取得
-            p1 = curr_joint_pos[root_joint->index];
-            p2 = curr_joint_pos[end_joint->index];
-            
-            p1_prev = prev_joint_pos[root_joint->index];
-            p2_prev = prev_joint_pos[end_joint->index];
-        } else {
-            continue;
-        }
-
-        // AABB最適化
-        float b_min[3], b_max[3];
-        for(int i=0; i<3; ++i) {
-            b_min[i] = min(sa_get_axis_value(p1, i), sa_get_axis_value(p2, i)) - bone_radius;
-            b_max[i] = max(sa_get_axis_value(p1, i), sa_get_axis_value(p2, i)) + bone_radius;
-        }
-
-        int idx_min[3], idx_max[3];
-        for(int i=0; i<3; ++i) {
-            idx_min[i] = max(0, (int)(((b_min[i] - world_bounds[i][0]) / world_range[i]) * grid_resolution));
-            idx_max[i] = min(grid_resolution - 1, (int)(((b_max[i] - world_bounds[i][0]) / world_range[i]) * grid_resolution));
-        }
-
-        // このセグメント専用のグリッドに書き込み
-        VoxelGrid& seg_grid = seg_data.GetSegmentGrid(s);
-
-        for (int z = idx_min[2]; z <= idx_max[2]; ++z) {
-            for (int y = idx_min[1]; y <= idx_max[1]; ++y) {
-                for (int x = idx_min[0]; x <= idx_max[0]; ++x) {
-                    float wc[3];
-                    wc[0] = world_bounds[0][0] + (x + 0.5f) * (world_range[0] / grid_resolution);
-                    wc[1] = world_bounds[1][0] + (y + 0.5f) * (world_range[1] / grid_resolution);
-                    wc[2] = world_bounds[2][0] + (z + 0.5f) * (world_range[2] / grid_resolution);
-
-                    Point3f voxel_center(wc[0], wc[1], wc[2]);
-                    Point3f bone_vec = p2 - p1;
-                    float bone_len_sq = bone_vec.x*bone_vec.x + bone_vec.y*bone_vec.y + bone_vec.z*bone_vec.z;
-                    if(bone_len_sq < 1e-6) continue;
-                    
-                    Point3f v_to_p1 = voxel_center - p1;
-                    float t = (v_to_p1.x*bone_vec.x + v_to_p1.y*bone_vec.y + v_to_p1.z*bone_vec.z) / bone_len_sq;
-                    float k_clamped = max(0.0f, min(1.0f, t));
-                    Point3f closest = p1 + bone_vec * k_clamped;
-                    
-                    float dist_sq = (voxel_center.x-closest.x)*(voxel_center.x-closest.x) + 
-                                    (voxel_center.y-closest.y)*(voxel_center.y-closest.y) + 
-                                    (voxel_center.z-closest.z)*(voxel_center.z-closest.z);
-
-                    if (dist_sq < bone_radius * bone_radius) {
-                        float presence = exp(-dist_sq / (2.0f * (bone_radius/2.0f)*(bone_radius/2.0f)));
-                        seg_grid.At(x, y, z) += presence;
-                    }
-                }
-            }
-        }
+        VoxelGrid& seg_grid = seg_data.GetSegmentGrid(bone.segment_index);
+        WriteToVoxelGrid(bone, bone_radius, world_range, &seg_grid, nullptr);
     }
 }
 
@@ -1217,132 +1005,24 @@ void SpatialAnalyzer::VoxelizeMotionPresenceBySegment(Motion* m, float time, Seg
 void SpatialAnalyzer::VoxelizeMotionSpeedBySegment(Motion* m, float time, SegmentVoxelData& seg_speed_data) {
     if (!m) return;
     
-    // 現在フレームと前フレームの姿勢を取得
-    Posture curr_pose(m->body);
-    Posture prev_pose(m->body);
+    // ヘルパー関数でフレームデータを計算
+    FrameData frame_data;
+    ComputeFrameData(m, time, frame_data);
     
-    float dt = m->interval;
-    float prev_time = time - dt;
-    if(prev_time < 0) prev_time = 0;
-
-    m->GetPosture(time, curr_pose);
-    m->GetPosture(prev_time, prev_pose);
-
-    // 順運動学計算（関節位置も取得）
-    vector<Matrix4f> curr_frames, prev_frames;
-    vector<Point3f> curr_joint_pos, prev_joint_pos;
-    curr_pose.ForwardKinematics(curr_frames, curr_joint_pos);
-    prev_pose.ForwardKinematics(prev_frames, prev_joint_pos);
+    // ヘルパー関数で全ボーンのデータを抽出
+    vector<BoneData> bones;
+    ExtractBoneData(m, frame_data, bones);
 
     float bone_radius = 0.08f;
     float world_range[3];
     for(int i=0; i<3; ++i) world_range[i] = world_bounds[i][1] - world_bounds[i][0];
 
-    // 各セグメント（ボーン）について個別に速度計算
-    for (int s = 0; s < m->body->num_segments; ++s) {
-        const Segment* seg = m->body->segments[s];
+    // 各ボーンについて、対応するセグメントの速度グリッドに書き込み
+    for (const BoneData& bone : bones) {
+        if (!bone.valid) continue;
         
-        // 体節名ベースで指をスキップ
-        if (IsFingerSegment(seg)) {
-            continue;
-        }
-
-        Point3f p1, p2, p1_prev, p2_prev;
-        // セグメントの接続関節数に応じて位置を取得
-        if (seg->num_joints == 1) {
-            p1 = Point3f(curr_frames[s].m03, curr_frames[s].m13, curr_frames[s].m23);
-            p1_prev = Point3f(prev_frames[s].m03, prev_frames[s].m13, prev_frames[s].m23);
-            
-            if (seg->has_site) {
-                Matrix3f R_curr(curr_frames[s].m00, curr_frames[s].m01, curr_frames[s].m02, 
-                                curr_frames[s].m10, curr_frames[s].m11, curr_frames[s].m12, 
-                                curr_frames[s].m20, curr_frames[s].m21, curr_frames[s].m22);
-                Point3f offset = seg->site_position;
-                R_curr.transform(&offset);
-                p2 = p1 + offset;
-
-                Matrix3f R_prev(prev_frames[s].m00, prev_frames[s].m01, prev_frames[s].m02, 
-                                prev_frames[s].m10, prev_frames[s].m11, prev_frames[s].m12, 
-                                prev_frames[s].m20, prev_frames[s].m21, prev_frames[s].m22);
-                Point3f offset_prev = seg->site_position;
-                R_prev.transform(&offset_prev);
-                p2_prev = p1_prev + offset_prev;
-            } else {
-                continue;
-            }
-
-        } else if (seg->num_joints >= 2) {
-            Joint* root_joint = seg->joints[0];
-            Joint* end_joint = seg->joints[1];
-            
-            p1 = curr_joint_pos[root_joint->index];
-            p2 = curr_joint_pos[end_joint->index];
-            
-            p1_prev = prev_joint_pos[root_joint->index];
-            p2_prev = prev_joint_pos[end_joint->index];
-        } else {
-            continue;
-        }
-
-        // 両端の関節速度を計算
-        Vector3f vel1 = p1 - p1_prev;
-        Vector3f vel2 = p2 - p2_prev;
-        float s1 = vel1.length() / dt;  // P1の速度
-        float s2 = vel2.length() / dt;  // P2の速度
-
-        // AABB最適化
-        //ボーンの両端点を含む軸平行バウンディングボックスの最小/最大値
-        float b_min[3], b_max[3];
-        for(int i=0; i<3; ++i) {
-            b_min[i] = min(sa_get_axis_value(p1, i), sa_get_axis_value(p2, i)) - bone_radius;
-            b_max[i] = max(sa_get_axis_value(p1, i), sa_get_axis_value(p2, i)) + bone_radius;
-        }
-
-        //b_min/b_max（ワールド座標）をgrid_resolutionのボクセルインデックス範囲に変換したもの
-        int idx_min[3], idx_max[3];
-        for(int i=0; i<3; ++i) {
-            idx_min[i] = max(0, (int)(((b_min[i] - world_bounds[i][0]) / world_range[i]) * grid_resolution));
-            idx_max[i] = min(grid_resolution - 1, (int)(((b_max[i] - world_bounds[i][0]) / world_range[i]) * grid_resolution));
-        }
-
-        // このセグメント専用の速度グリッドに書き込み
-        VoxelGrid& seg_spd_grid = seg_speed_data.GetSegmentGrid(s);
-
-        for (int z = idx_min[2]; z <= idx_max[2]; ++z) {
-            for (int y = idx_min[1]; y <= idx_max[1]; ++y) {
-                for (int x = idx_min[0]; x <= idx_max[0]; ++x) {
-                    float wc[3];
-                    wc[0] = world_bounds[0][0] + (x + 0.5f) * (world_range[0] / grid_resolution);
-                    wc[1] = world_bounds[1][0] + (y + 0.5f) * (world_range[1] / grid_resolution);
-                    wc[2] = world_bounds[2][0] + (z + 0.5f) * (world_range[2] / grid_resolution);
-
-                    Point3f voxel_center(wc[0], wc[1], wc[2]);
-                    Point3f bone_vec = p2 - p1;
-                    float bone_len_sq = bone_vec.x*bone_vec.x + bone_vec.y*bone_vec.y + bone_vec.z*bone_vec.z;
-                    if(bone_len_sq < 1e-6) continue;
-                    
-                    Point3f v_to_p1 = voxel_center - p1;
-                    float t = (v_to_p1.x*bone_vec.x + v_to_p1.y*bone_vec.y + v_to_p1.z*bone_vec.z) / bone_len_sq;
-                    float k_clamped = max(0.0f, min(1.0f, t));
-                    Point3f closest = p1 + bone_vec * k_clamped;
-                    
-                    float dist_sq = (voxel_center.x-closest.x)*(voxel_center.x-closest.x) + 
-                                    (voxel_center.y-closest.y)*(voxel_center.y-closest.y) + 
-                                    (voxel_center.z-closest.z)*(voxel_center.z-closest.z);
-
-                    if (dist_sq < bone_radius * bone_radius) {
-                        // 速度を線形補間
-                        float s_interp = (1.0f - k_clamped) * s1 + k_clamped * s2;
-                        
-                        // 最大値を保持
-                        float& current_spd = seg_spd_grid.At(x, y, z);
-                        if (s_interp > current_spd) {
-                            current_spd = s_interp;
-                        }
-                    }
-                }
-            }
-        }
+        VoxelGrid& seg_spd_grid = seg_speed_data.GetSegmentGrid(bone.segment_index);
+        WriteToVoxelGrid(bone, bone_radius, world_range, nullptr, &seg_spd_grid);
     }
 }
 
@@ -1926,6 +1606,7 @@ void SpatialAnalyzer::ExtractBoneData(Motion* m, const FrameData& frame_data, ve
                                    frame_data.prev_frames[s].m23);
             
             if (seg->has_site) {
+                // site_positionをワールド座標に変換
                 Matrix3f R_curr(frame_data.curr_frames[s].m00, frame_data.curr_frames[s].m01, frame_data.curr_frames[s].m02, 
                                 frame_data.curr_frames[s].m10, frame_data.curr_frames[s].m11, frame_data.curr_frames[s].m12, 
                                 frame_data.curr_frames[s].m20, frame_data.curr_frames[s].m21, frame_data.curr_frames[s].m22);
