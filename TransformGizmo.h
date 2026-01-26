@@ -34,8 +34,9 @@ public:
     // ドラッグによる変換の計算
     void StartDrag(const Point3f& position, int mouse_x, int mouse_y, 
                    int win_width, int win_height);
+    // out_rotation: ローカル座標系での回転行列（4x4）
     void UpdateDrag(int mouse_x, int mouse_y, int win_width, int win_height,
-                    Point3f& out_translation, Matrix3f& out_rotation);
+                    Point3f& out_translation, Matrix4f& out_rotation);
     
     // 設定
     void SetMode(GizmoMode mode) { m_mode = mode; }

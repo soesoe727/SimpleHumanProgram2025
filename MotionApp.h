@@ -17,10 +17,10 @@ protected:
     float animation_time;
     float animation_speed;
 
-    // --- 空間解析機能（ボクセル・CTスキャン）---
+    // 空間解析機能（ボクセル・CTスキャン）
     SpatialAnalyzer analyzer;
 
-    // --- スライス用トランスフォームギズモ ---
+    // スライス用トランスフォームギズモ
     TransformGizmo slice_gizmo;
     bool use_slice_gizmo;
     bool gizmo_dragging;
@@ -51,18 +51,19 @@ protected:
     void UpdateVoxelDataWrapper();
     void CalculateWorldBounds(); 
 
-    // ADDED: ボクセル情報を持つ部位かチェック（指などの細部を除外）
+    // ボクセル情報を持つ部位かチェック（指などの細部を除外）
     bool HasVoxelData(int segment_index);
-    // ADDED: 次の有効な部位を取得
+    // 次の有効な部位を取得
     int GetNextValidSegment(int current_segment, int direction);
 
-    // --- ギズモ補助 ---
+    // ギズモ補助
     void ToggleSliceGizmo();
     void ToggleSliceGizmoMode();
     float ComputeGizmoScale() const;
     Matrix3f GetSliceGizmoOrientation() const;
     Point3f GetSliceGizmoPosition() const;
-    void ApplySliceGizmoDelta(const Point3f& translation, const Matrix3f& rotation);
+    // ギズモのデルタ適用（Matrix4fベース）
+    void ApplySliceGizmoDelta(const Point3f& translation, const Matrix4f& local_rotation);
     void SyncGizmoToSliceState();
 
     // ユーティリティ

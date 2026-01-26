@@ -246,23 +246,25 @@ void TransformGizmo::StartDrag(const Point3f& position, int mouse_x, int mouse_y
 }
 
 void TransformGizmo::UpdateDrag(int mouse_x, int mouse_y, int win_width, int win_height,
-                                Point3f& out_translation, Matrix3f& out_rotation) {
+                                Point3f& out_translation, Matrix4f& out_rotation) {
     int delta_x = mouse_x - m_last_mouse_x;
     int delta_y = mouse_y - m_last_mouse_y;
     m_last_mouse_x = mouse_x;
     m_last_mouse_y = mouse_y;
     
+    out_translation.set(0, 0, 0);
+    out_rotation.setIdentity();
+    
     if (m_mode == GIZMO_TRANSLATE) {
         GLdouble modelview[16];
         glGetDoublev(GL_MODELVIEW_MATRIX, modelview);
         
-        Vector3f camera_right(modelview[0], modelview[4], modelview[8]);
+        Vector3f camera_right((float)modelview[0], (float)modelview[4], (float)modelview[8]);
         camera_right.normalize();
-        Vector3f camera_up(modelview[1], modelview[5], modelview[9]);
+        Vector3f camera_up((float)modelview[1], (float)modelview[5], (float)modelview[9]);
         camera_up.normalize();
         
         float sensitivity = 0.005f;
-        Vector3f translation(0, 0, 0);
         
         Vector3f axis_dir(0, 0, 0);
         if (m_selected_axis == GIZMO_X) axis_dir.set(1, 0, 0);
@@ -275,60 +277,36 @@ void TransformGizmo::UpdateDrag(int mouse_x, int mouse_y, int win_width, int win
         float move_x = delta_x * camera_right.dot(axis_dir);
         float move_y = -delta_y * camera_up.dot(axis_dir);
         float total_move = (move_x + move_y) * sensitivity;
-        translation.x = axis_dir.x * total_move;
-        translation.y = axis_dir.y * total_move;
-        translation.z = axis_dir.z * total_move;
         
-        out_translation.set(translation.x, translation.y, translation.z);
-        out_rotation.setIdentity();
+        out_translation.set(axis_dir.x * total_move, axis_dir.y * total_move, axis_dir.z * total_move);
         
     } else {
-        Point3f ray_origin;
-        Vector3f ray_dir;
-        ScreenToWorldRay(mouse_x, mouse_y, win_width, win_height, ray_origin, ray_dir);
-        
-        Point3f current_pos;
-        if (!RayIntersectPlane(ray_origin, ray_dir, m_drag_start_pos, m_drag_plane_normal, current_pos)) {
-            out_translation.set(0, 0, 0);
-            out_rotation.setIdentity();
+        // 回転モード：シンプルなマウス移動ベースの回転
+        if (delta_x == 0 && delta_y == 0) {
             return;
         }
         
-        Vector3f v1 = m_drag_start_world_pos - m_drag_start_pos;
-        Vector3f v2 = current_pos - m_drag_start_pos;
-        v1.normalize();
-        v2.normalize();
+        // 回転感度
+        float sensitivity = 0.01f;
+        float angle = (float)(delta_x + delta_y) * sensitivity;
         
-        float dot_product = v1.dot(v2);
-        if (dot_product > 1.0f) dot_product = 1.0f;
-        if (dot_product < -1.0f) dot_product = -1.0f;
-        float angle = acos(dot_product);
+        // ローカル座標系での回転行列を作成
+        float c = cosf(angle);
+        float s = sinf(angle);
         
-        Vector3f cross;
-        cross.cross(v1, v2);
-        if (cross.dot(m_drag_plane_normal) < 0) {
-            angle = -angle;
+        if (m_selected_axis == GIZMO_X) {
+            // X軸周りの回転（ローカル座標系）
+            out_rotation.m11 = c;  out_rotation.m12 = -s;
+            out_rotation.m21 = s;  out_rotation.m22 = c;
+        } else if (m_selected_axis == GIZMO_Y) {
+            // Y軸周りの回転（ローカル座標系）
+            out_rotation.m00 = c;  out_rotation.m02 = s;
+            out_rotation.m20 = -s; out_rotation.m22 = c;
+        } else if (m_selected_axis == GIZMO_Z) {
+            // Z軸周りの回転（ローカル座標系）
+            out_rotation.m00 = c;  out_rotation.m01 = -s;
+            out_rotation.m10 = s;  out_rotation.m11 = c;
         }
-        angle *= 0.5f;
-        
-        Vector3f axis_world;
-        if (m_selected_axis == GIZMO_X) axis_world.set(1, 0, 0);
-        else if (m_selected_axis == GIZMO_Y) axis_world.set(0, 1, 0);
-        else axis_world.set(0, 0, 1);
-        m_active_orientation.transform(&axis_world);
-        axis_world.normalize();
-
-        // Rodrigues' rotation formula to build rotation matrix around axis_world
-        float c = cos(angle);
-        float s = sin(angle);
-        float t = 1.0f - c;
-        float x = axis_world.x, y = axis_world.y, z = axis_world.z;
-        out_rotation.m00 = t*x*x + c;      out_rotation.m01 = t*x*y - s*z;  out_rotation.m02 = t*x*z + s*y;
-        out_rotation.m10 = t*x*y + s*z;    out_rotation.m11 = t*y*y + c;    out_rotation.m12 = t*y*z - s*x;
-        out_rotation.m20 = t*x*z - s*y;    out_rotation.m21 = t*y*z + s*x;  out_rotation.m22 = t*z*z + c;
-
-        out_translation.set(0, 0, 0);
-        m_drag_start_world_pos = current_pos;
     }
 }
 

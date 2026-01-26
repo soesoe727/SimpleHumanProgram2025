@@ -137,14 +137,18 @@ public:
 	std::vector<float> slice_positions; // スライス位置 (0.0 - 1.0)
 	int active_slice_index; // アクティブなスライスインデックス
     
-    // スライス平面の回転パラメータ
-    float slice_rotation_x;  // X軸周りの回転角度（度）
-    float slice_rotation_y;  // Y軸周りの回転角度（度）
-    float slice_rotation_z;  // Z軸周りの回転角度（度）
-    Point3f slice_plane_center;  // 回転中心
-    Point3f slice_plane_normal;  // 平面の法線ベクトル
-    Point3f slice_plane_u;       // 平面上のU方向ベクトル
-    Point3f slice_plane_v;       // 平面上のV方向ベクトル
+    // スライス平面の変換行列（ローカル座標系→ワールド座標系）
+    // 列0: U方向（平面上の横方向）
+    // 列1: V方向（平面上の縦方向）
+    // 列2: 法線方向
+    // 列3: 平面中心位置
+    Matrix4f slice_plane_transform;
+    
+    // 表示用オイラー角（読み取り専用、逆算値）
+    float slice_rotation_x;
+    float slice_rotation_y;
+    float slice_rotation_z;
+    
     bool use_rotated_slice;      // 回転スライスモードを使用するか
 
     // --- インタラクティブ操作用 ---
@@ -210,12 +214,22 @@ public:
     void Pan(float dx, float dy);
     void Zoom(float factor);
     
-    // スライス平面の回転操作
+    // スライス平面の変換行列操作
+    void SetSlicePlaneTransform(const Matrix4f& transform);
+    Matrix4f GetSlicePlaneTransform() const;
+    void ApplySlicePlaneRotation(const Matrix4f& local_rotation);  // ローカル座標系での回転適用
+    void ApplySlicePlaneTranslation(const Point3f& world_translation);  // ワールド座標系での平行移動
+    
+    // スライス平面のアクセサ
+    Point3f GetSlicePlaneCenter() const;
+    Vector3f GetSlicePlaneU() const;
+    Vector3f GetSlicePlaneV() const;
+    Vector3f GetSlicePlaneNormal() const;
+    
+    // スライス平面の回転操作（キーボード用）
     void RotateSlicePlane(float dx, float dy, float dz);
-	void ResetSliceRotation(); // 回転をリセット
-	void SetSliceRotation(float rx, float ry, float rz); // 回転を設定
-    void UpdateSlicePlaneVectors();  // 回転後の平面ベクトルを更新
-    void ToggleRotatedSliceMode();   // 回転スライスモードの切り替え
+    void ResetSliceRotation();
+    void ToggleRotatedSliceMode();
     
 private:
 	// ボクセル化ヘルパー
@@ -225,6 +239,9 @@ private:
     void DrawRotatedSlicePlane();
     void DrawRotatedSliceMap(int x, int y, int w, int h, VoxelGrid& grid, float max_val, const char* title);
     float SampleVoxelAtWorldPos(VoxelGrid& grid, const Point3f& world_pos);
+    
+    // オイラー角を変換行列から逆算（表示用）
+    void UpdateEulerAnglesFromTransform();
     
     // 共通ボクセル化ヘルパー関数
     void ComputeFrameData(Motion* m, float time, FrameData& frame_data);
