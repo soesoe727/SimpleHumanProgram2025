@@ -216,15 +216,10 @@ public:
 	void SetSliceRotation(float rx, float ry, float rz); // 回転を設定
     void UpdateSlicePlaneVectors();  // 回転後の平面ベクトルを更新
     void ToggleRotatedSliceMode();   // 回転スライスモードの切り替え
-
-    // ヘルパー
-    void CalculateViewBounds(float& h_min, float& h_max, float& v_min, float& v_max);
     
 private:
 	// ボクセル化ヘルパー
 	void VoxelizeMotion(Motion* m, float time, VoxelGrid& occ, VoxelGrid& spd);
-    void DrawSingleMap(int x, int y, int w, int h, VoxelGrid& grid, float max_val, const char* title, float slice_val, float h_min, float h_max, float v_min, float v_max);
-    void DrawAxes(int x, int y, int w, int h, float h_min, float h_max, float v_min, float v_max);
     
     // 回転スライス用のヘルパー
     void DrawRotatedSlicePlane();
