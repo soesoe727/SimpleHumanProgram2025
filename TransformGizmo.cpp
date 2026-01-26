@@ -281,29 +281,30 @@ void TransformGizmo::UpdateDrag(int mouse_x, int mouse_y, int win_width, int win
         out_translation.set(axis_dir.x * total_move, axis_dir.y * total_move, axis_dir.z * total_move);
         
     } else {
-        // 回転モード：シンプルなマウス移動ベースの回転
-        if (delta_x == 0 && delta_y == 0) {
+        // 回転モード：横方向ドラッグのみで回転（右ドラッグ=正回転）
+        if (delta_x == 0) {
             return;
         }
         
-        // 回転感度
+        // 回転感度（横方向ドラッグのみ使用）
         float sensitivity = 0.01f;
-        float angle = (float)(delta_x + delta_y) * sensitivity;
+        float angle = (float)delta_x * sensitivity;
         
         // ローカル座標系での回転行列を作成
+        // 右にドラッグ → 正の回転（反時計回り）で統一
         float c = cosf(angle);
         float s = sinf(angle);
         
         if (m_selected_axis == GIZMO_X) {
-            // X軸周りの回転（ローカル座標系）
+            // X軸周りの回転（YZ平面での回転）
             out_rotation.m11 = c;  out_rotation.m12 = -s;
             out_rotation.m21 = s;  out_rotation.m22 = c;
         } else if (m_selected_axis == GIZMO_Y) {
-            // Y軸周りの回転（ローカル座標系）
+            // Y軸周りの回転（XZ平面での回転）
             out_rotation.m00 = c;  out_rotation.m02 = s;
             out_rotation.m20 = -s; out_rotation.m22 = c;
         } else if (m_selected_axis == GIZMO_Z) {
-            // Z軸周りの回転（ローカル座標系）
+            // Z軸周りの回転（XY平面での回転）
             out_rotation.m00 = c;  out_rotation.m01 = -s;
             out_rotation.m10 = s;  out_rotation.m11 = c;
         }
