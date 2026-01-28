@@ -96,7 +96,7 @@ void MotionApp::Keyboard(unsigned char key, int mx, int my) {
 
         // 特徴量・正規化モード
         case 'f': 
-            analyzer.feature_mode = (analyzer.feature_mode + 1) % 2; 
+            analyzer.feature_mode = (analyzer.feature_mode + 1) % 3; 
             break;
         case 'n': 
             analyzer.norm_mode = (analyzer.norm_mode + 1) % 2; 
@@ -283,7 +283,7 @@ void MotionApp::Display()
         DrawPostureShadow(*curr_posture, shadow_dir, shadow_color); 
     }
     if (curr_posture2) {
-        // MODIFIED: 部位別表示モードの場合は選択的描画
+        // 部位別表示モードの場合は選択的描画
         if (analyzer.show_segment_mode && analyzer.selected_segment_index >= 0) {
             // 選択部位のみ青色、他は灰色
             Color3f highlight_color(0.0f, 0.0f, 1.0f);  // 青
@@ -326,7 +326,14 @@ void MotionApp::Display()
 
     // 4. 情報テキストの表示
     char title[512];
-    const char* feature_mode_str = (analyzer.feature_mode == 0) ? "Occupancy" : "Speed";
+    const char* feature_mode_str;
+    if (analyzer.feature_mode == 0) {
+        feature_mode_str = "Occupancy";
+    } else if (analyzer.feature_mode == 1) {
+        feature_mode_str = "Speed";
+    } else {
+        feature_mode_str = "Jerk";
+    }
     const char* norm_mode_str = (analyzer.norm_mode == 0) ? "CurrentFrame" : "Accumulated";
     const char* planes_on_str = (analyzer.show_planes) ? "ON" : "OFF";
     const char* maps_on_str = (analyzer.show_maps) ? "ON" : "OFF";

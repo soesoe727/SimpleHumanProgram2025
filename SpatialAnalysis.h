@@ -18,19 +18,27 @@ struct SpatialPoint2f {
 struct BoneData {
     Point3f p1, p2;           // 現在フレームの両端点
     Point3f p1_prev, p2_prev; // 前フレームの両端点
+    Point3f p1_prev2, p2_prev2; // 2フレーム前の両端点（加速度計算用）
+	Point3f p1_prev3, p2_prev3; // 2フレーム前の両端点（ジャーク計算用）
     float speed1, speed2;     // 両端の速度
+    float accel1, accel2;     // 両端の加速度
+	float jerk1, jerk2;       // 両端のジャーク
     int segment_index;        // セグメントインデックス
     bool valid;               // 有効なボーンかどうか
     
-    BoneData() : speed1(0), speed2(0), segment_index(-1), valid(false) {}
+    BoneData() : speed1(0), speed2(0), accel1(0), accel2(0), jerk1(0), jerk2(0), segment_index(-1), valid(false) {}
 };
 
 // フレームデータを格納する構造体（FK計算結果の共通化用）
 struct FrameData {
     std::vector<Matrix4f> curr_frames;     // 現在フレームの変換行列
     std::vector<Matrix4f> prev_frames;     // 前フレームの変換行列
+    std::vector<Matrix4f> prev2_frames;    // 2フレーム前の変換行列（加速度計算用）
+	std::vector<Matrix4f> prev3_frames;    // 3フレーム前の変換行列（ジャーク計算用）
     std::vector<Point3f> curr_joint_pos;   // 現在フレームの関節位置
     std::vector<Point3f> prev_joint_pos;   // 前フレームの関節位置
+    std::vector<Point3f> prev2_joint_pos;  // 2フレーム前の関節位置（加速度計算用）
+	std::vector<Point3f> prev3_joint_pos;  // 3フレーム前の関節位置（ジャーク計算用）
     float dt;                              // フレーム間隔
     
     FrameData() : dt(0) {}
@@ -121,23 +129,33 @@ public:
     // 瞬間表示用速度ボクセルデータ
     VoxelGrid voxels1_spd, voxels2_spd, voxels_spd_diff;
     
+    // 瞬間表示用ジャークボクセルデータ
+    VoxelGrid voxels1_jrk, voxels2_jrk, voxels_jrk_diff;
+    
     // 占有率累積ボクセル（動作全体を通した占有率累積値）
     VoxelGrid voxels1_psc_accumulated, voxels2_psc_accumulated, voxels_psc_accumulated_diff;
 
     // 速度累計ボクセル（動作全体を通した最大速度）
     VoxelGrid voxels1_spd_accumulated, voxels2_spd_accumulated, voxels_spd_accumulated_diff;
 
+    // ジャーク累計ボクセル（動作全体を通した最大ジャーク）
+    VoxelGrid voxels1_jrk_accumulated, voxels2_jrk_accumulated, voxels_jrk_accumulated_diff;
+
     // 部位ごとのボクセルデータ
 	SegmentVoxelData segment_presence_voxels1; // Motion1 部位ごとの占有率ボクセルデータ
 	SegmentVoxelData segment_presence_voxels2; // Motion2 部位ごとの占有率ボクセルデータ
 	SegmentVoxelData segment_speed_voxels1; // Motion1 部位ごとの速度ボクセルデータ
 	SegmentVoxelData segment_speed_voxels2; // Motion2 部位ごとの速度ボクセルデータ
+	SegmentVoxelData segment_jerk_voxels1; // Motion1 部位ごとのジャークボクセルデータ
+	SegmentVoxelData segment_jerk_voxels2; // Motion2 部位ごとのジャークボクセルデータ
     
 	float max_psc_val; // 全体の最大占有率
 	float max_spd_val; // 全体の最大速度
+	float max_jrk_val; // 全体の最大ジャーク
     
     float max_psc_accumulated_val; // 占有率累積用の最大値
     float max_spd_accumulated_val; // 速度累計用の最大値
+    float max_jrk_accumulated_val; // ジャーク累計用の最大値
 
     // --- ビュー/スライス設定 ---
 	std::vector<float> slice_positions; // スライス位置 (0.0 - 1.0)
@@ -181,14 +199,14 @@ public:
     
     // ボクセル計算
     void UpdateVoxels(Motion* m1, Motion* m2, float current_time);
-	void VoxelizeMotion(Motion* m, float time, VoxelGrid& occ, VoxelGrid& spd);
+	void VoxelizeMotion(Motion* m, float time, VoxelGrid& occ, VoxelGrid& spd, VoxelGrid& jrk);
 
     // 総合累積ボクセル計算（全体＋部位ごとを同時に計算）
     void AccumulateAllFrames(Motion* m1, Motion* m2);
     void ClearAccumulatedData();
 
-    // 部位ごとの占有率・速度ボクセル計算（1フレーム分）
-    void VoxelizeMotionBySegment(Motion* m, float time, SegmentVoxelData& seg_presence_data, SegmentVoxelData& seg_speed_data);
+    // 部位ごとの占有率・速度・ジャークボクセル計算（1フレーム分）
+    void VoxelizeMotionBySegment(Motion* m, float time, SegmentVoxelData& seg_presence_data, SegmentVoxelData& seg_speed_data, SegmentVoxelData& seg_jerk_data);
     
     // ボクセルキャッシュ（ファイル保存・読み込み）
     bool SaveVoxelCache(const char* motion1_name, const char* motion2_name);
@@ -236,7 +254,6 @@ private:
     void ExtractBoneData(Motion* m, const FrameData& frame_data, std::vector<BoneData>& bones);
     void ComputeAABB(const Point3f& p1, const Point3f& p2, float radius, 
                      int idx_min[3], int idx_max[3], const float world_range[3]);
-    void WriteToVoxelGrid(const BoneData& bone, float bone_radius, 
-                          const float world_range[3],
-                          VoxelGrid* occ_grid, VoxelGrid* spd_grid);
+    void WriteToVoxelGrid(const BoneData& bone, float bone_radius, const float world_range[3],
+                          VoxelGrid* occ_grid, VoxelGrid* spd_grid, VoxelGrid* jrk_grid = nullptr);
 };
