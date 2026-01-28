@@ -126,7 +126,14 @@ public:
 
     // 速度累計ボクセル（動作全体を通した最大速度）
     VoxelGrid voxels1_spd_accumulated, voxels2_spd_accumulated, voxels_spd_accumulated_diff;
-    
+
+    // 部位ごとのボクセルデータ
+	SegmentVoxelData segment_presence_voxels1; // Motion1 部位ごとの占有率ボクセルデータ
+	SegmentVoxelData segment_presence_voxels2; // Motion2 部位ごとの占有率ボクセルデータ
+	SegmentVoxelData segment_speed_voxels1; // Motion1 部位ごとの速度ボクセルデータ
+	SegmentVoxelData segment_speed_voxels2; // Motion2 部位ごとの速度ボクセルデータ
+
+
 	float max_psc_val; // 全体の最大占有率
 	float max_spd_val; // 全体の最大速度
     
@@ -135,19 +142,16 @@ public:
 
     // --- ビュー/スライス設定 ---
 	std::vector<float> slice_positions; // スライス位置 (0.0 - 1.0)
-	    
-    // スライス平面の変換行列（ローカル座標系→ワールド座標系）
-    // 列0: U方向（平面上の横方向）
-    // 列1: V方向（平面上の縦方向）
-    // 列2: 法線方向
-    // 列3: 平面中心位置
-    Matrix4f slice_plane_transform;
+	int active_slice_index; // アクティブなスライスインデックス
     
-    // 表示用オイラー角（読み取り専用、逆算値）
-    float slice_rotation_x;
-    float slice_rotation_y;
-    float slice_rotation_z;
-    
+    // スライス平面の回転パラメータ
+    float slice_rotation_x;  // X軸周りの回転角度（度）
+    float slice_rotation_y;  // Y軸周りの回転角度（度）
+    float slice_rotation_z;  // Z軸周りの回転角度（度）
+    Point3f slice_plane_center;  // 回転中心
+    Point3f slice_plane_normal;  // 平面の法線ベクトル
+    Point3f slice_plane_u;       // 平面上のU方向ベクトル
+    Point3f slice_plane_v;       // 平面上のV方向ベクトル
     bool use_rotated_slice;      // 回転スライスモードを使用するか
 
     // --- インタラクティブ操作用 ---
@@ -162,12 +166,6 @@ public:
 	int feature_mode; // 0: 占有率, 1: 速度
 	int norm_mode; // 0: 瞬間表示, 1: 累積表示
 
-    // 部位ごとのボクセルデータ
-	SegmentVoxelData segment_presence_voxels1; // Motion1 部位ごとの占有率ボクセルデータ
-	SegmentVoxelData segment_presence_voxels2; // Motion2 部位ごとの占有率ボクセルデータ
-	SegmentVoxelData segment_speed_voxels1; // Motion1 部位ごとの速度ボクセルデータ
-	SegmentVoxelData segment_speed_voxels2; // Motion2 部位ごとの速度ボクセルデータ
-    
     // 表示設定
     int selected_segment_index;  // 表示する部位のインデックス (-1で全体)
     bool show_segment_mode;      // 部位別表示モードON/OFF
@@ -181,6 +179,7 @@ public:
     
     // ボクセル計算
     void UpdateVoxels(Motion* m1, Motion* m2, float current_time);
+    void VoxelizeMotion(Motion* m, float time, VoxelGrid& occ, VoxelGrid& spd);
     
     // 累積占有率ボクセル計算
     void AccumulatePresenceAllFrames(Motion* m1, Motion* m2);
@@ -190,6 +189,10 @@ public:
     void AccumulateSpeedAllFrames(Motion* m1, Motion* m2);
     void ClearAccumulatedSpeed();
 
+	// 総合累積ボクセル計算
+    void AccumulateAllFrames(Motion* m1, Motion* m2);
+    void ClearAccumulatedData();
+
     // 部位ごとの占有率ボクセル計算
     void VoxelizeMotionPresenceBySegment(Motion* m, float time, SegmentVoxelData& seg_data);
     void AccumulatePresenceBySegmentAllFrames(Motion* m1, Motion* m2);
@@ -197,6 +200,10 @@ public:
     // 部位ごとの速度ボクセル計算
     void VoxelizeMotionSpeedBySegment(Motion* m, float time, SegmentVoxelData& seg_speed_data);
     void AccumulateSpeedBySegmentAllFrames(Motion* m1, Motion* m2);
+
+	// 部位ごとの占有率・速度ボクセル計算（同時）
+    void VoxelizeMotionBySegment(Motion* m, float time, SegmentVoxelData& seg_presence_data, SegmentVoxelData& seg_speed_data);
+    void AccumulateBySegmentAllFrames(Motion* m1, Motion* m2);
     
     // ボクセルキャッシュ（ファイル保存・読み込み）
     bool SaveVoxelCache(const char* motion1_name, const char* motion2_name);
@@ -213,34 +220,21 @@ public:
     void Pan(float dx, float dy);
     void Zoom(float factor);
     
-    // スライス平面の変換行列操作
-    void SetSlicePlaneTransform(const Matrix4f& transform);
-    Matrix4f GetSlicePlaneTransform() const;
-    void ApplySlicePlaneRotation(const Matrix4f& local_rotation);  // ローカル座標系での回転適用
-    void ApplySlicePlaneTranslation(const Point3f& world_translation);  // ワールド座標系での平行移動
-    
-    // スライス平面のアクセサ
-    Point3f GetSlicePlaneCenter() const;
-    Vector3f GetSlicePlaneU() const;
-    Vector3f GetSlicePlaneV() const;
-    Vector3f GetSlicePlaneNormal() const;
-    
-    // スライス平面の回転操作（キーボード用）
+    // スライス平面の回転操作
     void RotateSlicePlane(float dx, float dy, float dz);
-    void ResetSliceRotation();
-    void ToggleRotatedSliceMode();
+	void ResetSliceRotation(); // 回転をリセット
+	void SetSliceRotation(float rx, float ry, float rz); // 回転を設定
+    void UpdateSlicePlaneVectors();  // 回転後の平面ベクトルを更新
+    void ToggleRotatedSliceMode();   // 回転スライスモードの切り替え
+
+    // ヘルパー
+    void CalculateViewBounds(float& h_min, float& h_max, float& v_min, float& v_max);
     
-private:
-	// ボクセル化ヘルパー
-	void VoxelizeMotion(Motion* m, float time, VoxelGrid& occ, VoxelGrid& spd);
-    
+private:    
     // 回転スライス用のヘルパー
     void DrawRotatedSlicePlane();
     void DrawRotatedSliceMap(int x, int y, int w, int h, VoxelGrid& grid, float max_val, const char* title);
     float SampleVoxelAtWorldPos(VoxelGrid& grid, const Point3f& world_pos);
-    
-    // オイラー角を変換行列から逆算（表示用）
-    void UpdateEulerAnglesFromTransform();
     
     // 共通ボクセル化ヘルパー関数
     void ComputeFrameData(Motion* m, float time, FrameData& frame_data);

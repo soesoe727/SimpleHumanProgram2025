@@ -79,18 +79,18 @@ void MotionApp::Keyboard(unsigned char key, int mx, int my) {
         // スライスの移動（回転スライスモード用）
         case 'w': 
             if(!analyzer.slice_positions.empty()) {
-                Vector3f n = analyzer.GetSlicePlaneNormal(); 
-                n.normalize();
-                Point3f translation(n.x * 0.02f, n.y * 0.02f, n.z * 0.02f);
-                analyzer.ApplySlicePlaneTranslation(translation);
+                Vector3f n = analyzer.slice_plane_normal; n.normalize();
+                analyzer.slice_plane_center.x += n.x * 0.02f;
+                analyzer.slice_plane_center.y += n.y * 0.02f;
+                analyzer.slice_plane_center.z += n.z * 0.02f;
             }
             break;
         case 's': 
             if(!analyzer.slice_positions.empty()) {
-                Vector3f n = analyzer.GetSlicePlaneNormal(); 
-                n.normalize();
-                Point3f translation(-n.x * 0.02f, -n.y * 0.02f, -n.z * 0.02f);
-                analyzer.ApplySlicePlaneTranslation(translation);
+                Vector3f n = analyzer.slice_plane_normal; n.normalize();
+                analyzer.slice_plane_center.x -= n.x * 0.02f;
+                analyzer.slice_plane_center.y -= n.y * 0.02f;
+                analyzer.slice_plane_center.z -= n.z * 0.02f;
             }
             break;
 
@@ -237,9 +237,9 @@ void MotionApp::MouseDrag(int mx, int my)
 {
     if (use_slice_gizmo && gizmo_dragging && slice_gizmo.GetSelectedAxis() != GIZMO_NONE) {
         Point3f translation;
-        Matrix4f local_rotation;
-        slice_gizmo.UpdateDrag(mx, my, win_width, win_height, translation, local_rotation);
-        ApplySliceGizmoDelta(translation, local_rotation);
+        Matrix3f rotation;
+        slice_gizmo.UpdateDrag(mx, my, win_width, win_height, translation, rotation);
+        ApplySliceGizmoDelta(translation, rotation);
     }
 
     GLUTBaseApp::MouseDrag(mx, my);
@@ -549,7 +549,7 @@ bool MotionApp::HasVoxelData(int segment_index)
     if (!motion || !motion->body) return false;
     if (segment_index < 0 || segment_index >= motion->body->num_segments) return false;
     
-    // 体節名ベースで指かどうか判定（BVHファイルによる体節数の違いに対応）
+    // MODIFIED: 体節名ベースで指かどうか判定（BVHファイルによる体節数の違いに対応）
     const Segment* segment = motion->body->segments[segment_index];
     return !IsFingerSegment(segment);
 }
@@ -603,9 +603,9 @@ void MotionApp::ToggleSliceGizmoMode()
 Matrix3f MotionApp::GetSliceGizmoOrientation() const
 {
     Matrix3f ori;
-    Vector3f u = analyzer.GetSlicePlaneU();
-    Vector3f v = analyzer.GetSlicePlaneV();
-    Vector3f n = analyzer.GetSlicePlaneNormal();
+    Vector3f u = analyzer.slice_plane_u;
+    Vector3f v = analyzer.slice_plane_v;
+    Vector3f n = analyzer.slice_plane_normal;
 
     if (u.length() < 1e-4f || v.length() < 1e-4f || n.length() < 1e-4f) {
         ori.setIdentity();
@@ -625,14 +625,12 @@ Matrix3f MotionApp::GetSliceGizmoOrientation() const
 
 Point3f MotionApp::GetSliceGizmoPosition() const
 {
-    Point3f pos = analyzer.GetSlicePlaneCenter();
-    Vector3f slice_u = analyzer.GetSlicePlaneU();
-    Vector3f slice_v = analyzer.GetSlicePlaneV();
+    Point3f pos = analyzer.slice_plane_center;
 
     // 回転スライスモード: スライス中心 + パン
-    pos.x += slice_u.x * analyzer.pan_center.x + slice_v.x * analyzer.pan_center.y;
-    pos.y += slice_u.y * analyzer.pan_center.x + slice_v.y * analyzer.pan_center.y;
-    pos.z += slice_u.z * analyzer.pan_center.x + slice_v.z * analyzer.pan_center.y;
+    pos.x += analyzer.slice_plane_u.x * analyzer.pan_center.x + analyzer.slice_plane_v.x * analyzer.pan_center.y;
+    pos.y += analyzer.slice_plane_u.y * analyzer.pan_center.x + analyzer.slice_plane_v.y * analyzer.pan_center.y;
+    pos.z += analyzer.slice_plane_u.z * analyzer.pan_center.x + analyzer.slice_plane_v.z * analyzer.pan_center.y;
     
     return pos;
 }
@@ -667,21 +665,35 @@ static float ExtractAxisAngleDeg(const Matrix3f& rot, GizmoAxis axis)
     return angle_rad * 180.0f / kPi;
 }
 
-void MotionApp::ApplySliceGizmoDelta(const Point3f& translation, const Matrix4f& local_rotation)
+void MotionApp::ApplySliceGizmoDelta(const Point3f& translation, const Matrix3f& rotation)
 {
-    // 平行移動をワールド座標系で適用
-    if (fabsf(translation.x) > 1e-6f || fabsf(translation.y) > 1e-6f || fabsf(translation.z) > 1e-6f) {
-        analyzer.ApplySlicePlaneTranslation(translation);
+    // 平行移動
+    analyzer.slice_plane_center.x += translation.x;
+    analyzer.slice_plane_center.y += translation.y;
+    analyzer.slice_plane_center.z += translation.z;
+
+    // 回転（回転ギズモのみ）
+    if (slice_gizmo.GetMode() == GIZMO_ROTATE) {
+        Vector3f u = analyzer.slice_plane_u;
+        Vector3f v = analyzer.slice_plane_v;
+        Vector3f n = analyzer.slice_plane_normal;
+        rotation.transform(&u);
+        rotation.transform(&v);
+        rotation.transform(&n);
+        u.normalize();
+        v.normalize();
+        n.normalize();
+        analyzer.slice_plane_u = u;
+        analyzer.slice_plane_v = v;
+        analyzer.slice_plane_normal = n;
+
+        float delta_deg = ExtractAxisAngleDeg(rotation, slice_gizmo.GetSelectedAxis());
+        if (slice_gizmo.GetSelectedAxis() == GIZMO_X) analyzer.slice_rotation_x += delta_deg;
+        if (slice_gizmo.GetSelectedAxis() == GIZMO_Y) analyzer.slice_rotation_y += delta_deg;
+        if (slice_gizmo.GetSelectedAxis() == GIZMO_Z) analyzer.slice_rotation_z += delta_deg;
     }
 
-    // 回転をローカル座標系で適用
-    if (slice_gizmo.GetMode() == GIZMO_ROTATE) {
-        // 回転行列が単位行列でない場合のみ適用
-        float trace = local_rotation.m00 + local_rotation.m11 + local_rotation.m22;
-        if (fabsf(trace - 3.0f) > 0.0001f) {
-            analyzer.ApplySlicePlaneRotation(local_rotation);
-        }
-    }
+    analyzer.UpdateSlicePlaneVectors();
 }
 
 void MotionApp::SyncGizmoToSliceState()
