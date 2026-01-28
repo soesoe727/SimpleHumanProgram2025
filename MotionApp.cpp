@@ -10,10 +10,10 @@ using namespace std;
 
 static const float kPi = 3.14159265358979323846f;
 
-// ADDED: インスタンスを保持する static ポインタ
+// インスタンスを保持する static ポインタ
 static MotionApp* g_app_instance = NULL;
 
-// ADDED: 'Special'関数を呼び出すための静的ラッパー
+// 'Special'関数を呼び出すための静的ラッパー
 static void SpecialKeyWrapper(int key, int x, int y)
 {
     if (g_app_instance) {
