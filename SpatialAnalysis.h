@@ -126,6 +126,12 @@ public:
 
     // 速度累計ボクセル（動作全体を通した最大速度）
     VoxelGrid voxels1_spd_accumulated, voxels2_spd_accumulated, voxels_spd_accumulated_diff;
+
+    // 部位ごとのボクセルデータ
+	SegmentVoxelData segment_presence_voxels1; // Motion1 部位ごとの占有率ボクセルデータ
+	SegmentVoxelData segment_presence_voxels2; // Motion2 部位ごとの占有率ボクセルデータ
+	SegmentVoxelData segment_speed_voxels1; // Motion1 部位ごとの速度ボクセルデータ
+	SegmentVoxelData segment_speed_voxels2; // Motion2 部位ごとの速度ボクセルデータ
     
 	float max_psc_val; // 全体の最大占有率
 	float max_spd_val; // 全体の最大速度
@@ -161,12 +167,6 @@ public:
     bool show_voxels;  // 3Dボクセル表示フラグ
 	int feature_mode; // 0: 占有率, 1: 速度
 	int norm_mode; // 0: 瞬間表示, 1: 累積表示
-
-    // 部位ごとのボクセルデータ
-	SegmentVoxelData segment_presence_voxels1; // Motion1 部位ごとの占有率ボクセルデータ
-	SegmentVoxelData segment_presence_voxels2; // Motion2 部位ごとの占有率ボクセルデータ
-	SegmentVoxelData segment_speed_voxels1; // Motion1 部位ごとの速度ボクセルデータ
-	SegmentVoxelData segment_speed_voxels2; // Motion2 部位ごとの速度ボクセルデータ
     
     // 表示設定
     int selected_segment_index;  // 表示する部位のインデックス (-1で全体)
@@ -190,6 +190,10 @@ public:
     void AccumulateSpeedAllFrames(Motion* m1, Motion* m2);
     void ClearAccumulatedSpeed();
 
+    // 総合累積ボクセル計算
+    void AccumulateAllFrames(Motion* m1, Motion* m2);
+    void ClearAccumulatedData();
+
     // 部位ごとの占有率ボクセル計算
     void VoxelizeMotionPresenceBySegment(Motion* m, float time, SegmentVoxelData& seg_data);
     void AccumulatePresenceBySegmentAllFrames(Motion* m1, Motion* m2);
@@ -197,6 +201,10 @@ public:
     // 部位ごとの速度ボクセル計算
     void VoxelizeMotionSpeedBySegment(Motion* m, float time, SegmentVoxelData& seg_speed_data);
     void AccumulateSpeedBySegmentAllFrames(Motion* m1, Motion* m2);
+
+    // 部位ごとの占有率・速度ボクセル計算（同時）
+    void VoxelizeMotionBySegment(Motion* m, float time, SegmentVoxelData& seg_presence_data, SegmentVoxelData& seg_speed_data);
+    void AccumulateBySegmentAllFrames(Motion* m1, Motion* m2);
     
     // ボクセルキャッシュ（ファイル保存・読み込み）
     bool SaveVoxelCache(const char* motion1_name, const char* motion2_name);
