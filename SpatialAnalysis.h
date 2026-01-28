@@ -181,26 +181,11 @@ public:
     
     // ボクセル計算
     void UpdateVoxels(Motion* m1, Motion* m2, float current_time);
-    
-    // 累積占有率ボクセル計算
-    void AccumulatePresenceAllFrames(Motion* m1, Motion* m2);
-    void ClearAccumulatedPresence();
-
-    // 速度累計ボクセル計算
-    void AccumulateSpeedAllFrames(Motion* m1, Motion* m2);
-    void ClearAccumulatedSpeed();
+	void VoxelizeMotion(Motion* m, float time, VoxelGrid& occ, VoxelGrid& spd);
 
     // 総合累積ボクセル計算
     void AccumulateAllFrames(Motion* m1, Motion* m2);
     void ClearAccumulatedData();
-
-    // 部位ごとの占有率ボクセル計算
-    void VoxelizeMotionPresenceBySegment(Motion* m, float time, SegmentVoxelData& seg_data);
-    void AccumulatePresenceBySegmentAllFrames(Motion* m1, Motion* m2);
-    
-    // 部位ごとの速度ボクセル計算
-    void VoxelizeMotionSpeedBySegment(Motion* m, float time, SegmentVoxelData& seg_speed_data);
-    void AccumulateSpeedBySegmentAllFrames(Motion* m1, Motion* m2);
 
     // 部位ごとの占有率・速度ボクセル計算（同時）
     void VoxelizeMotionBySegment(Motion* m, float time, SegmentVoxelData& seg_presence_data, SegmentVoxelData& seg_speed_data);
@@ -239,9 +224,6 @@ public:
     void ToggleRotatedSliceMode();
     
 private:
-	// ボクセル化ヘルパー
-	void VoxelizeMotion(Motion* m, float time, VoxelGrid& occ, VoxelGrid& spd);
-    
     // 回転スライス用のヘルパー
     void DrawRotatedSlicePlane();
     void DrawRotatedSliceMap(int x, int y, int w, int h, VoxelGrid& grid, float max_val, const char* title);
