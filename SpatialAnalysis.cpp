@@ -530,23 +530,32 @@ void SpatialAnalyzer::DrawVoxels3D() {
     glDisable(GL_BLEND);
 }
 
-// 動作全体を通った累積ボクセル計算（占有率と速度の両方）
+// 動作全体を通った累積ボクセル計算（占有率と速度の両方 + 部位ごと）
 void SpatialAnalyzer::AccumulateAllFrames(Motion* m1, Motion* m2)
 {
     if (!m1 || !m2) return;
     
+    // 部位数を取得
+    int num_segments = m1->body->num_segments;
+    int size = grid_resolution * grid_resolution * grid_resolution;
+    
+    // === グリッドの初期化 ===
     // 累積グリッドをクリア
     ClearAccumulatedData();
-
-	// 累積グリッドをリサイズ
-	voxels1_psc_accumulated.Resize(grid_resolution);
-	voxels2_psc_accumulated.Resize(grid_resolution);
-	voxels_psc_accumulated_diff.Resize(grid_resolution);
-
-    // 速度累積グリッドをリサイズ
+    
+    // 全体の累積グリッドをリサイズ
+    voxels1_psc_accumulated.Resize(grid_resolution);
+    voxels2_psc_accumulated.Resize(grid_resolution);
+    voxels_psc_accumulated_diff.Resize(grid_resolution);
     voxels1_spd_accumulated.Resize(grid_resolution);
     voxels2_spd_accumulated.Resize(grid_resolution);
     voxels_spd_accumulated_diff.Resize(grid_resolution);
+    
+    // 部位ごとのグリッドをリサイズ
+    segment_presence_voxels1.Resize(num_segments, grid_resolution);
+    segment_presence_voxels2.Resize(num_segments, grid_resolution);
+    segment_speed_voxels1.Resize(num_segments, grid_resolution);
+    segment_speed_voxels2.Resize(num_segments, grid_resolution);
     
     // 基準姿勢を保存（初期フレームの腰の位置・回転）
     if (m1->num_frames > 0) {
@@ -556,61 +565,84 @@ void SpatialAnalyzer::AccumulateAllFrames(Motion* m1, Motion* m2)
         voxels2_psc_accumulated.SetReference(m2->frames[0].root_pos, m2->frames[0].root_ori);
     }
     
-    // 両方のモーションの全フレームを処理
-    int max_frames = max(m1->num_frames, m2->num_frames);
-    std::cout << "Accumulating voxels for " << max_frames << " frames..." << std::endl;
+    std::cout << "Accumulating voxels (integrated) for " << num_segments << " segments..." << std::endl;
     
-    // モーション1の全フレームを累積
+    // === モーション1の全フレームを処理 ===
     for (int f = 0; f < m1->num_frames; ++f) {
         float time = f * m1->interval;
-        VoxelGrid temp_occ, temp_spd;
-        temp_occ.Resize(grid_resolution);
-        temp_spd.Resize(grid_resolution);
+        SegmentVoxelData temp_seg_psc, temp_seg_spd;
+        temp_seg_psc.Resize(num_segments, grid_resolution);
+        temp_seg_spd.Resize(num_segments, grid_resolution);
         
-        VoxelizeMotion(m1, time, temp_occ, temp_spd);
+        // 部位ごとにボクセル化
+        VoxelizeMotionBySegment(m1, time, temp_seg_psc, temp_seg_spd);
         
-        // 累積グリッドに加算
-        int size = grid_resolution * grid_resolution * grid_resolution;
-        for (int i = 0; i < size; ++i) {
-            voxels1_psc_accumulated.data[i] += temp_occ.data[i];
-            if (temp_spd.data[i] > voxels1_spd_accumulated.data[i]) {
-                voxels1_spd_accumulated.data[i] = temp_spd.data[i];
+        // 部位ごとに累積 ＋ 全体に加算
+        for (int s = 0; s < num_segments; ++s) {
+            for (int i = 0; i < size; ++i) {
+                float psc_val = temp_seg_psc.segment_grids[s].data[i];
+                float spd_val = temp_seg_spd.segment_grids[s].data[i];
+                
+                // 部位ごとの占有率累積
+                segment_presence_voxels1.segment_grids[s].data[i] += psc_val;
+                // 部位ごとの速度（最大値保持）
+                if (spd_val > segment_speed_voxels1.segment_grids[s].data[i]) {
+                    segment_speed_voxels1.segment_grids[s].data[i] = spd_val;
+                }
+                
+                // 全体への加算
+                voxels1_psc_accumulated.data[i] += psc_val;
+                if (spd_val > voxels1_spd_accumulated.data[i]) {
+                    voxels1_spd_accumulated.data[i] = spd_val;
+                }
             }
         }
     }
     
-    // モーション2の全フレームを累積
+    // === モーション2の全フレームを処理 ===
     for (int f = 0; f < m2->num_frames; ++f) {
         float time = f * m2->interval;
-        VoxelGrid temp_occ, temp_spd;
-        temp_occ.Resize(grid_resolution);
-        temp_spd.Resize(grid_resolution);
+        SegmentVoxelData temp_seg_psc, temp_seg_spd;
+        temp_seg_psc.Resize(num_segments, grid_resolution);
+        temp_seg_spd.Resize(num_segments, grid_resolution);
         
-        VoxelizeMotion(m2, time, temp_occ, temp_spd);
+        // 部位ごとにボクセル化
+        VoxelizeMotionBySegment(m2, time, temp_seg_psc, temp_seg_spd);
         
-        // 累積グリッドに加算
-        int size = grid_resolution * grid_resolution * grid_resolution;
-        for (int i = 0; i < size; ++i) {
-            voxels2_psc_accumulated.data[i] += temp_occ.data[i];
-            if (temp_spd.data[i] > voxels2_spd_accumulated.data[i]) {
-                voxels2_spd_accumulated.data[i] = temp_spd.data[i];
+        // 部位ごとに累積 ＋ 全体に加算
+        for (int s = 0; s < num_segments; ++s) {
+            for (int i = 0; i < size; ++i) {
+                float psc_val = temp_seg_psc.segment_grids[s].data[i];
+                float spd_val = temp_seg_spd.segment_grids[s].data[i];
+                
+                // 部位ごとの占有率累積
+                segment_presence_voxels2.segment_grids[s].data[i] += psc_val;
+                // 部位ごとの速度（最大値保持）
+                if (spd_val > segment_speed_voxels2.segment_grids[s].data[i]) {
+                    segment_speed_voxels2.segment_grids[s].data[i] = spd_val;
+                }
+                
+                // 全体への加算
+                voxels2_psc_accumulated.data[i] += psc_val;
+                if (spd_val > voxels2_spd_accumulated.data[i]) {
+                    voxels2_spd_accumulated.data[i] = spd_val;
+                }
             }
         }
     }
     
-    // 差分を計算し、最大値を更新
-    int size = grid_resolution * grid_resolution * grid_resolution;
-    
+    // === 差分計算と最大値更新 ===
     for (int i = 0; i < size; ++i) {
+        // 占有率差分
         float diff_psc = abs(voxels1_psc_accumulated.data[i] - voxels2_psc_accumulated.data[i]);
         voxels_psc_accumulated_diff.data[i] = diff_psc;
         if (diff_psc > max_psc_accumulated_val) {
             max_psc_accumulated_val = diff_psc;
         }
-
+        
+        // 速度差分
         float diff_spd = abs(voxels1_spd_accumulated.data[i] - voxels2_spd_accumulated.data[i]);
         voxels_spd_accumulated_diff.data[i] = diff_spd;
-        // 最大速度値も記録
         float max_spd = max(voxels1_spd_accumulated.data[i], voxels2_spd_accumulated.data[i]);
         if (max_spd > max_spd_accumulated_val) {
             max_spd_accumulated_val = max_spd;
@@ -622,11 +654,14 @@ void SpatialAnalyzer::AccumulateAllFrames(Motion* m1, Motion* m2)
     
     // 差分グリッドにも基準姿勢を設定（モーション1の基準を使用）
     if (voxels1_psc_accumulated.has_reference) {
-        voxels_psc_accumulated_diff.SetReference(voxels1_psc_accumulated.reference_root_pos, 
-                                             voxels1_psc_accumulated.reference_root_ori);
+        voxels_psc_accumulated_diff.SetReference(
+            voxels1_psc_accumulated.reference_root_pos, 
+            voxels1_psc_accumulated.reference_root_ori);
     }
     
-    std::cout << "Accumulation complete. Max accumulated value: " << max_psc_accumulated_val << std::endl;
+    std::cout << "Integrated accumulation complete." << std::endl;
+    std::cout << "  Max presence diff: " << max_psc_accumulated_val << std::endl;
+    std::cout << "  Max speed: " << max_spd_accumulated_val << std::endl;
 }
 
 // 占有率・速度累積グリッドのクリア
@@ -670,70 +705,6 @@ void SpatialAnalyzer::VoxelizeMotionBySegment(Motion* m, float time, SegmentVoxe
         VoxelGrid& seg_spd_grid = seg_speed_data.GetSegmentGrid(bone.segment_index);
         WriteToVoxelGrid(bone, bone_radius, world_range, &seg_pres_grid, &seg_spd_grid);
 	}
-}
-
-// 部位ごとの占有率・速度累積計算
-void SpatialAnalyzer::AccumulateBySegmentAllFrames(Motion* m1, Motion* m2)
-{
-    if (!m1 || !m2) return;
-    
-    // 部位数を取得
-    int num_segments = m1->body->num_segments;
-    
-    // 部位ごとに占有率グリッドをリサイズ
-    segment_presence_voxels1.Resize(num_segments, grid_resolution);
-    segment_presence_voxels2.Resize(num_segments, grid_resolution);
-    // 部位ごとの速度グリッドをリサイズ
-    segment_speed_voxels1.Resize(num_segments, grid_resolution);
-    segment_speed_voxels2.Resize(num_segments, grid_resolution);
-    
-    std::cout << "Accumulating by segment for " << num_segments << " segments..." << std::endl;
-    
-    // モーション1の全フレームを部位ごとに計算
-    for (int f = 0; f < m1->num_frames; ++f) {
-        float time = f * m1->interval;
-        SegmentVoxelData temp_seg_psc;
-        SegmentVoxelData temp_seg_spd;
-        temp_seg_psc.Resize(num_segments, grid_resolution);
-        temp_seg_spd.Resize(num_segments, grid_resolution);
-        
-        VoxelizeMotionBySegment(m1, time, temp_seg_psc, temp_seg_spd);
-        
-		// 各ボクセルで保持・累積
-        for (int s = 0; s < num_segments; ++s) {
-            int size = grid_resolution * grid_resolution * grid_resolution;
-            for (int i = 0; i < size; ++i) {
-                if (temp_seg_spd.segment_grids[s].data[i] > segment_speed_voxels1.segment_grids[s].data[i]) {
-                    segment_speed_voxels1.segment_grids[s].data[i] = temp_seg_spd.segment_grids[s].data[i];
-                }
-                segment_presence_voxels1.segment_grids[s].data[i] += temp_seg_psc.segment_grids[s].data[i];
-            }
-        }
-    }
-    
-    // モーション2の全フレームを部位ごとに計算
-    for (int f = 0; f < m2->num_frames; ++f) {
-        float time = f * m2->interval;
-        SegmentVoxelData temp_seg_psc;
-        SegmentVoxelData temp_seg_spd;
-        temp_seg_psc.Resize(num_segments, grid_resolution);
-        temp_seg_spd.Resize(num_segments, grid_resolution);
-        
-        VoxelizeMotionBySegment(m2, time, temp_seg_psc, temp_seg_spd);
-        
-		// 各ボクセルで保持・累積
-        for (int s = 0; s < num_segments; ++s) {
-            int size = grid_resolution * grid_resolution * grid_resolution;
-            for (int i = 0; i < size; ++i) {
-                if (temp_seg_spd.segment_grids[s].data[i] > segment_speed_voxels2.segment_grids[s].data[i]) {
-                    segment_speed_voxels2.segment_grids[s].data[i] = temp_seg_spd.segment_grids[s].data[i];
-                }
-                segment_presence_voxels2.segment_grids[s].data[i] += temp_seg_psc.segment_grids[s].data[i];
-            }
-        }
-    }
-    
-    std::cout << "Segment-wise accumulation complete." << std::endl;
 }
 
 // キャッシュファイル名を生成

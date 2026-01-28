@@ -504,23 +504,8 @@ void MotionApp::PrepareAllData() {
     bool cache_loaded = analyzer.LoadVoxelCache(motion->name.c_str(), motion2->name.c_str());
     
     if (!cache_loaded) {
-        //std::cout << "Cache not found. Calculating accumulated voxels for entire motion..." << std::endl;
-        //analyzer.AccumulatePresenceAllFrames(motion, motion2);
-        
-        //std::cout << "Calculating accumulated speed for entire motion..." << std::endl;
-        //analyzer.AccumulateSpeedAllFrames(motion, motion2);
-
-        std::cout << "Cache not found. Calculating accumulated voxels for entire motion..." << std::endl;
+        std::cout << "Cache not found. Calculating accumulated voxels (integrated)..." << std::endl;
         analyzer.AccumulateAllFrames(motion, motion2);
-        
-        //std::cout << "Calculating accumulated voxels by segment..." << std::endl;
-        //analyzer.AccumulatePresenceBySegmentAllFrames(motion, motion2);
-        
-        //std::cout << "Calculating accumulated speed by segment..." << std::endl;
-        //analyzer.AccumulateSpeedBySegmentAllFrames(motion, motion2);
-
-        std::cout << "Calculating accumulated data by segment..." << std::endl;
-        analyzer.AccumulateBySegmentAllFrames(motion, motion2);
         
         std::cout << "Saving voxel cache..." << std::endl;
         analyzer.SaveVoxelCache(motion->name.c_str(), motion2->name.c_str());

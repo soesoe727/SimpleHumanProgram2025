@@ -183,13 +183,12 @@ public:
     void UpdateVoxels(Motion* m1, Motion* m2, float current_time);
 	void VoxelizeMotion(Motion* m, float time, VoxelGrid& occ, VoxelGrid& spd);
 
-    // 総合累積ボクセル計算
+    // 総合累積ボクセル計算（全体＋部位ごとを同時に計算）
     void AccumulateAllFrames(Motion* m1, Motion* m2);
     void ClearAccumulatedData();
 
-    // 部位ごとの占有率・速度ボクセル計算（同時）
+    // 部位ごとの占有率・速度ボクセル計算（1フレーム分）
     void VoxelizeMotionBySegment(Motion* m, float time, SegmentVoxelData& seg_presence_data, SegmentVoxelData& seg_speed_data);
-    void AccumulateBySegmentAllFrames(Motion* m1, Motion* m2);
     
     // ボクセルキャッシュ（ファイル保存・読み込み）
     bool SaveVoxelCache(const char* motion1_name, const char* motion2_name);
