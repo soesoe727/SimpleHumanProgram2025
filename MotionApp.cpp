@@ -70,8 +70,13 @@ void MotionApp::Keyboard(unsigned char key, int mx, int my) {
     
     // Šî–{‘€ì
     switch (key) {
-        case ' ': on_animation = !on_animation; break;
-        case 'l': {OpenNewBVH(); OpenNewBVH2();} break;
+        case ' ': 
+            on_animation = !on_animation;
+            break;
+        case 'l': 
+            OpenNewBVH();
+            OpenNewBVH2();
+            break;
     }
 
     // CTƒXƒLƒƒƒ“‘€ì

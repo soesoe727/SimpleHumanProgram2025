@@ -1318,9 +1318,11 @@ void SpatialAnalyzer::ComputeFrameData(Motion* m, float time, FrameData& frame_d
     prev_pose.ForwardKinematics(frame_data.prev_frames, frame_data.prev_joint_pos);
     prev2_pose.ForwardKinematics(frame_data.prev2_frames, frame_data.prev2_joint_pos);
 	prev3_pose.ForwardKinematics(frame_data.prev3_frames, frame_data.prev3_joint_pos);
+
+    frame_data.curr_root_pos.set(curr_pose.root_pos);
 }
 
-// 全ボーンのデータを抽出（加速度計算を追加）
+// 全ボーンのデータを抽出
 void SpatialAnalyzer::ExtractBoneData(Motion* m, const FrameData& frame_data, vector<BoneData>& bones) {
     bones.clear();
     bones.reserve(m->body->num_segments);
@@ -1403,14 +1405,13 @@ void SpatialAnalyzer::ExtractBoneData(Motion* m, const FrameData& frame_data, ve
             // 速度を計算
             Vector3f spd1_curr = bone.p1 - bone.p1_prev;
             Vector3f spd2_curr = bone.p2 - bone.p2_prev;
+
             bone.speed1 = spd1_curr.length() / frame_data.dt;
             bone.speed2 = spd2_curr.length() / frame_data.dt;
             
             // 加速度を計算（前フレームの速度との差）
             Vector3f spd1_prev = bone.p1_prev - bone.p1_prev2;
             Vector3f spd2_prev = bone.p2_prev - bone.p2_prev2;
-			Vector3f spd1_prev2 = bone.p1_prev2 - bone.p1_prev3;
-			Vector3f spd2_prev2 = bone.p2_prev2 - bone.p2_prev3;
             
             Vector3f accel1_curr = spd1_curr - spd1_prev;
             Vector3f accel2_curr = spd2_curr - spd2_prev;
@@ -1419,10 +1420,15 @@ void SpatialAnalyzer::ExtractBoneData(Motion* m, const FrameData& frame_data, ve
             bone.accel2 = accel2_curr.length() / frame_data.dt;
 
 			// ジャークを計算（加速度の時間微分）
-			Vector3f accel1_prev = spd1_prev - spd1_prev2;
+			Vector3f spd1_prev2 = bone.p1_prev2 - bone.p1_prev3;
+            Vector3f spd2_prev2 = bone.p2_prev2 - bone.p2_prev3;
+
+            Vector3f accel1_prev = spd1_prev - spd1_prev2;
 			Vector3f accel2_prev = spd2_prev - spd2_prev2;
+
 			Vector3f jerk1_curr = accel1_curr - accel1_prev;
 			Vector3f jerk2_curr = accel2_curr - accel2_prev;
+
 			bone.jerk1 = jerk1_curr.length() / frame_data.dt;
 			bone.jerk2 = jerk2_curr.length() / frame_data.dt;
         }
