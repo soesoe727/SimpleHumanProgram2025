@@ -17,9 +17,29 @@ static float sa_get_axis_value(const Point3f& p, int axis_index) {
 }
 
 static Color3f sa_get_heatmap_color(float value) { 
-	Color3f color; value = max(0.0f, min(1.0f, value));
-	if (value < 0.5f) color.set(0.0f, value * 2.0f, 1.0f - (value * 2.0f)); 
-	else color.set((value - 0.5f) * 2.0f, 1.0f - ((value - 0.5f) * 2.0f), 0.0f); 
+	Color3f color;
+	value = max(0.0f, min(1.0f, value));
+	
+	// HSV: H=0(赤)～240(青), S=100%, V=100%
+	// value=0 → H=240(青), value=1 → H=0(赤)
+	float hue = 240.0f * (1.0f - value);  // 0～240の範囲
+	
+	// HSV to RGB変換 (S=1, V=1)
+	float h = hue / 60.0f;
+	int i = (int)h;
+	float f = h - i;
+	float q = 1.0f - f;
+	float t = f;
+	
+	switch (i) {
+		case 0:  color.set(1.0f, t, 0.0f); break;     // 赤→黄
+		case 1:  color.set(q, 1.0f, 0.0f); break;     // 黄→緑
+		case 2:  color.set(0.0f, 1.0f, t); break;     // 緑→シアン
+		case 3:  color.set(0.0f, q, 1.0f); break;     // シアン→青
+		case 4:  color.set(t, 0.0f, 1.0f); break;     // 青→マゼンタ（240以下なのでここには来ない）
+		default: color.set(0.0f, 0.0f, 1.0f); break;  // 青
+	}
+	
 	return color; 
 }
 
@@ -1479,9 +1499,7 @@ void SpatialAnalyzer::WriteToVoxelGrid(const BoneData& bone, float bone_radius, 
                 float k_clamped = max(0.0f, min(1.0f, t));
                 Point3f closest = bone.p1 + bone_vec * k_clamped;
                 
-                float dist_sq = (voxel_center.x-closest.x)*(voxel_center.x-closest.x) + 
-                                (voxel_center.y-closest.y)*(voxel_center.y-closest.y) + 
-                                (voxel_center.z-closest.z)*(voxel_center.z-closest.z);
+				float dist_sq = pow(voxel_center.x - closest.x, 2.0) + pow(voxel_center.y - closest.y, 2.0) + pow(voxel_center.z - closest.z, 2.0);
 
                 if (dist_sq < radius_sq) {
                     float presence = exp(-dist_sq / sigma_sq);
@@ -1497,8 +1515,6 @@ void SpatialAnalyzer::WriteToVoxelGrid(const BoneData& bone, float bone_radius, 
                     }
                     
                     if (jrk_grid) {
-                        // ジャークは加速度の時間微分（速度の2次微分）
-                        // 現在フレームの加速度を補間して格納（最大値保持）
                         float j_interp = (1.0f - k_clamped) * bone.jerk1 + k_clamped * bone.jerk2;
                         float& current_jrk = jrk_grid->At(x, y, z);
                         if (j_interp > current_jrk) current_jrk = j_interp;

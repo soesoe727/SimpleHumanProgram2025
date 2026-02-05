@@ -272,7 +272,7 @@ void MotionApp::Display()
     
     // 1. 3Dモデルの描画
     if (curr_posture) {
-        // MODIFIED: 部位別表示モードの場合は選択的描画
+        // 部位別表示モードの場合は選択的描画
         if (analyzer.show_segment_mode && analyzer.selected_segment_index >= 0) {
             // 選択部位のみ赤色、他は灰色
             Color3f highlight_color(1.0f, 0.0f, 0.0f);  // 赤
