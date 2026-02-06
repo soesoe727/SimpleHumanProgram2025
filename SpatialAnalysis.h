@@ -49,7 +49,7 @@ struct VoxelGrid {
     int resolution;
 	std::vector<float> data; //data数=resolution^3
     
-    // NEW: 基準姿勢情報（腰の位置・回転）
+    // 基準姿勢情報（腰の位置・回転）
     Point3f reference_root_pos;
     Matrix3f reference_root_ori;
     bool has_reference;
@@ -225,8 +225,6 @@ public:
     void Zoom(float factor);
     
     // スライス平面の変換行列操作
-    void SetSlicePlaneTransform(const Matrix4f& transform);
-    Matrix4f GetSlicePlaneTransform() const;
     void ApplySlicePlaneRotation(const Matrix4f& local_rotation);  // ローカル座標系での回転適用
     void ApplySlicePlaneTranslation(const Point3f& world_translation);  // ワールド座標系での平行移動
     

@@ -1230,15 +1230,6 @@ float SpatialAnalyzer::SampleVoxelAtWorldPos(VoxelGrid& grid, const Point3f& wor
 
 // === スライス平面の変換行列ベース操作 ===
 
-void SpatialAnalyzer::SetSlicePlaneTransform(const Matrix4f& transform) {
-    slice_plane_transform = transform;
-    UpdateEulerAnglesFromTransform();
-}
-
-Matrix4f SpatialAnalyzer::GetSlicePlaneTransform() const {
-    return slice_plane_transform;
-}
-
 Point3f SpatialAnalyzer::GetSlicePlaneCenter() const {
     return Point3f(slice_plane_transform.m03, 
                    slice_plane_transform.m13, 
