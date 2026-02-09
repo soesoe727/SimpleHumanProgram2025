@@ -623,14 +623,6 @@ Matrix3f MotionApp::GetSliceGizmoOrientation() const
 Point3f MotionApp::GetSliceGizmoPosition() const
 {
     Point3f pos = analyzer.GetSlicePlaneCenter();
-    Vector3f slice_u = analyzer.GetSlicePlaneU();
-    Vector3f slice_v = analyzer.GetSlicePlaneV();
-
-    // 回転スライスモード: スライス中心 + パン
-    pos.x += slice_u.x * analyzer.pan_center.x + slice_v.x * analyzer.pan_center.y;
-    pos.y += slice_u.y * analyzer.pan_center.x + slice_v.y * analyzer.pan_center.y;
-    pos.z += slice_u.z * analyzer.pan_center.x + slice_v.z * analyzer.pan_center.y;
-    
     return pos;
 }
 
