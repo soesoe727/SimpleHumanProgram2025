@@ -45,14 +45,8 @@
     <ClCompile Include="SimpleHumanSampleMain.cpp">
       <Filter>ソース ファイル\よく使うもの</Filter>
     </ClCompile>
-    <ClCompile Include="SimpleHumanGLUT.cpp">
-      <Filter>ソース ファイル\よく使うもの</Filter>
-    </ClCompile>
     <ClCompile Include="SimpleHuman.cpp">
       <Filter>ソース ファイル\よく使うもの</Filter>
-    </ClCompile>
-    <ClCompile Include="CNavigationModel.cpp">
-      <Filter>ソース ファイル\SpaceMouse</Filter>
     </ClCompile>
     <ClCompile Include="CSpaceMouseController.cpp">
       <Filter>ソース ファイル\SpaceMouse</Filter>
@@ -116,6 +110,12 @@
     </ClCompile>
     <ClCompile Include="Timeline.cpp">
       <Filter>ソース ファイル\SimpleHuman</Filter>
+    </ClCompile>
+    <ClCompile Include="CNavigationModel.cpp">
+      <Filter>ソース ファイル\SpaceMouse</Filter>
+    </ClCompile>
+    <ClCompile Include="SimpleHumanGLUT.cpp">
+      <Filter>ソース ファイル</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

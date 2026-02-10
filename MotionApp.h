@@ -25,6 +25,9 @@ protected:
     bool use_slice_gizmo;
     bool gizmo_dragging;
 
+    // SpaceMouse用：スライス平面操作の有効/無効
+    bool use_spacemouse_slice;
+
 public:
     MotionApp();
     virtual ~MotionApp();
@@ -37,6 +40,9 @@ public:
     virtual void MouseDrag(int mx, int my) override;
     virtual void MouseMotion(int mx, int my) override;
     virtual void Animation(float delta) override;
+
+    // SpaceMouse入力処理（スライス平面に適用）
+    virtual void ProcessSpaceMouseInput() override;
     
 protected:
     void LoadBVH(const char *file_name);

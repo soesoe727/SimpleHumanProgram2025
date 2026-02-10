@@ -1,46 +1,53 @@
-ï»¿/**
-***  ã‚­ãƒ£ãƒ©ã‚¯ã‚¿ã‚¢ãƒ‹ãƒ¡ãƒ¼ã‚·ãƒ§ãƒ³ã®ãŸã‚ã®äººä½“ãƒ¢ãƒ‡ãƒ«ã®è¡¨ç¾ãƒ»åŸºæœ¬å‡¦ç† ãƒ©ã‚¤ãƒ–ãƒ©ãƒªãƒ»ã‚µãƒ³ãƒ—ãƒ«ãƒ—ãƒ­ã‚°ãƒ©ãƒ 
+/**
+***  ƒLƒƒƒ‰ƒNƒ^ƒAƒjƒ[ƒVƒ‡ƒ“‚Ì‚½‚ß‚Ìl‘Ìƒ‚ƒfƒ‹‚Ì•\Œ»EŠî–{ˆ— ƒ‰ƒCƒuƒ‰ƒŠEƒTƒ“ƒvƒ‹ƒvƒƒOƒ‰ƒ€
 ***  Copyright (c) 2015-, Masaki OSHITA (www.oshita-lab.org)
 ***  Released under the MIT license http://opensource.org/licenses/mit-license.php
 **/
 
 /**
-***  GLUTãƒ•ãƒ¬ãƒ¼ãƒ ãƒ¯ãƒ¼ã‚¯ ï¼‹ ã‚¢ãƒ—ãƒªã‚±ãƒ¼ã‚·ãƒ§ãƒ³åŸºåº•ã‚¯ãƒ©ã‚¹
+***  GLUTƒtƒŒ[ƒ€ƒ[ƒN { ƒAƒvƒŠƒP[ƒVƒ‡ƒ“Šî’êƒNƒ‰ƒX
 **/
 
 
-// ãƒ˜ãƒƒãƒ€ãƒ•ã‚¡ã‚¤ãƒ«ã®ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰
+// ƒwƒbƒ_ƒtƒ@ƒCƒ‹‚ÌƒCƒ“ƒNƒ‹[ƒh
 #include "SimpleHumanGLUT.h"
+#include <cmath>
+
+// SpaceMouseƒwƒ‹ƒp[‚ğg—p
+#ifdef USE_SPACEMOUSE
+#include "SpaceMouseGLUTHelper.hpp"
+using namespace SpaceMouseHelper;
+#endif
 
 
 
 ///////////////////////////////////////////////////////////////////////////////
 //
-//  è¤‡æ•°ã‚¢ãƒ—ãƒªã‚±ãƒ¼ã‚·ãƒ§ãƒ³ã®ç®¡ç†ãƒ»åˆ‡æ›¿ã®ãŸã‚ã®å¤‰æ•°ãƒ»é–¢æ•°
+//  •¡”ƒAƒvƒŠƒP[ƒVƒ‡ƒ“‚ÌŠÇ—EØ‘Ö‚Ì‚½‚ß‚Ì•Ï”EŠÖ”
 //
 
-// ç¾åœ¨å®Ÿè¡Œä¸­ã®ã‚¢ãƒ—ãƒªã‚±ãƒ¼ã‚·ãƒ§ãƒ³
+// Œ»İÀs’†‚ÌƒAƒvƒŠƒP[ƒVƒ‡ƒ“
 class GLUTBaseApp *    app = NULL;
 
-// å…¨ã‚¢ãƒ—ãƒªã‚±ãƒ¼ã‚·ãƒ§ãƒ³ã®ãƒªã‚¹ãƒˆ
+// ‘SƒAƒvƒŠƒP[ƒVƒ‡ƒ“‚ÌƒŠƒXƒg
 vector< class GLUTBaseApp * >    applications;
 
-// ã‚½ãƒ•ãƒˆã‚¦ã‚§ã‚¢èª¬æ˜
+// ƒ\ƒtƒgƒEƒFƒAà–¾
 const char *    software_description = "Human Animation Sample\nCopyright (c) 2015-, Masaki OSHITA (www.oshita-lab.org)";
 
-// å®Ÿè¡Œã‚¢ãƒ—ãƒªã‚±ãƒ¼ã‚·ãƒ§ãƒ³ã®åˆ‡æ›¿é–¢æ•°ï¼ˆãƒ—ãƒ­ãƒˆã‚¿ã‚¤ãƒ—å®£è¨€ï¼‰
+// ÀsƒAƒvƒŠƒP[ƒVƒ‡ƒ“‚ÌØ‘ÖŠÖ”iƒvƒƒgƒ^ƒCƒvéŒ¾j
 void  ChangeApp( int app_no );
 
 
 
 ///////////////////////////////////////////////////////////////////////////////
 //
-//  ã‚¢ãƒ—ãƒªã‚±ãƒ¼ã‚·ãƒ§ãƒ³åŸºåº•ã‚¯ãƒ©ã‚¹
+//  ƒAƒvƒŠƒP[ƒVƒ‡ƒ“Šî’êƒNƒ‰ƒX
 //
 
 
 //
-//  ã‚³ãƒ³ã‚¹ãƒˆãƒ©ã‚¯ã‚¿
+//  ƒRƒ“ƒXƒgƒ‰ƒNƒ^
 //
 GLUTBaseApp::GLUTBaseApp()
 {
@@ -54,7 +61,7 @@ GLUTBaseApp::GLUTBaseApp()
 
 
 //
-//   åˆæœŸåŒ–
+//   ‰Šú‰»
 //
 void  GLUTBaseApp::Initialize()
 {
@@ -74,26 +81,33 @@ void  GLUTBaseApp::Initialize()
 	light_pos.set( 0.0f, 10.0f, 0.0f, 1.0f );
 	shadow_dir.set( 0.0f, 1.0f, 0.0f );
 	shadow_color.set( 0.2f, 0.2f, 0.2f, 0.5f );
+
+	// SpaceMouse•ÏŠ·s—ñ‚ğ’PˆÊs—ñ‚Å‰Šú‰»
+	spacemouse_transform.setIdentity();
+	spacemouse_has_input = false;
 }
 
 
 //
-//   é–‹å§‹ãƒ»ãƒªã‚»ãƒƒãƒˆ
+//   ŠJnEƒŠƒZƒbƒg
 //
 void  GLUTBaseApp::Start()
 {
+	// SpaceMouse•ÏŠ·s—ñ‚ğƒŠƒZƒbƒg
+	spacemouse_transform.setIdentity();
+	spacemouse_has_input = false;
 }
 
 
 //
-//  ç”»é¢æç”»
+//  ‰æ–Ê•`‰æ
 //
 void  GLUTBaseApp::Display()
 {
-	// ç”»é¢ã‚’ã‚¯ãƒªã‚¢
+	// ‰æ–Ê‚ğƒNƒŠƒA
 	glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT );
 
-	// å¤‰æ›è¡Œåˆ—ã‚’è¨­å®šï¼ˆãƒ¢ãƒ‡ãƒ«åº§æ¨™ç³»â†’ã‚«ãƒ¡ãƒ©åº§æ¨™ç³»ï¼‰
+	// •ÏŠ·s—ñ‚ğİ’èiƒ‚ƒfƒ‹À•WŒn¨ƒJƒƒ‰À•WŒnj
 	glMatrixMode( GL_MODELVIEW );
 	glLoadIdentity();
 	glTranslatef( 0.0, 0.0, -camera_distance );
@@ -101,114 +115,114 @@ void  GLUTBaseApp::Display()
 	glRotatef( -camera_yaw, 0.0, 1.0, 0.0 );
 	glTranslatef( -view_center.x, -0.5, -view_center.z );
 
-	// å…‰æºä½ç½®ã‚’å†è¨­å®š
+	// ŒõŒ¹ˆÊ’u‚ğÄİ’è
 	float  light0_position[] = { light_pos.x, light_pos.y, light_pos.z, light_pos.w };
 	glLightfv( GL_LIGHT0, GL_POSITION, light0_position );
 
-	// æ ¼å­æ¨¡æ§˜ã®åºŠã‚’æç”»
+	// Šiq–Í—l‚Ì°‚ğ•`‰æ
 	DrawFloor( 1.0f, 50, 50, 1.0f, 1.0f, 1.0f, 1.0f, 0.8f, 0.8f );
 }
 
 
 //
-//  ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã‚µã‚¤ã‚ºå¤‰æ›´
+//  ƒEƒBƒ“ƒhƒEƒTƒCƒY•ÏX
 //
 void  GLUTBaseApp::Reshape( int w, int h )
 {
-	// ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã®ã‚µã‚¤ã‚ºã‚’è¨˜éŒ²
+	// ƒEƒBƒ“ƒhƒE‚ÌƒTƒCƒY‚ğ‹L˜^
 	win_width = w;
 	win_height = h;
 
-	// è¦–ç‚¹ã®æ›´æ–°ãƒ•ãƒ©ã‚°ã‚’è¨­å®š
+	// ‹“_‚ÌXVƒtƒ‰ƒO‚ğİ’è
 	is_view_updated = true;
 }
 
 
 //
-//  ãƒã‚¦ã‚¹ã‚¯ãƒªãƒƒã‚¯
+//  ƒ}ƒEƒXƒNƒŠƒbƒN
 //
 void  GLUTBaseApp::MouseClick( int button, int state, int mx, int my )
 {
-	// å·¦ãƒœã‚¿ãƒ³ãŒæŠ¼ã•ã‚ŒãŸã‚‰ãƒ‰ãƒ©ãƒƒã‚°é–‹å§‹
+	// ¶ƒ{ƒ^ƒ“‚ª‰Ÿ‚³‚ê‚½‚çƒhƒ‰ƒbƒOŠJn
 	if ( ( button == GLUT_LEFT_BUTTON ) && ( state == GLUT_DOWN ) )
 		drag_mouse_l = true;
-	// å·¦ãƒœã‚¿ãƒ³ãŒé›¢ã•ã‚ŒãŸã‚‰ãƒ‰ãƒ©ãƒƒã‚°çµ‚äº†
+	// ¶ƒ{ƒ^ƒ“‚ª—£‚³‚ê‚½‚çƒhƒ‰ƒbƒOI—¹
 	else if ( ( button == GLUT_LEFT_BUTTON ) && ( state == GLUT_UP ) )
 		drag_mouse_l = false;
 
-	// å³ãƒœã‚¿ãƒ³ãŒæŠ¼ã•ã‚ŒãŸã‚‰ãƒ‰ãƒ©ãƒƒã‚°é–‹å§‹
+	// ‰Eƒ{ƒ^ƒ“‚ª‰Ÿ‚³‚ê‚½‚çƒhƒ‰ƒbƒOŠJn
 	if ( ( button == GLUT_RIGHT_BUTTON ) && ( state == GLUT_DOWN ) )
 		drag_mouse_r = true;
-	// å³ãƒœã‚¿ãƒ³ãŒé›¢ã•ã‚ŒãŸã‚‰ãƒ‰ãƒ©ãƒƒã‚°çµ‚äº†
+	// ‰Eƒ{ƒ^ƒ“‚ª—£‚³‚ê‚½‚çƒhƒ‰ƒbƒOI—¹
 	else if ( ( button == GLUT_RIGHT_BUTTON ) && ( state == GLUT_UP ) )
 		drag_mouse_r = false;
 
-	// ä¸­ãƒœã‚¿ãƒ³ãŒæŠ¼ã•ã‚ŒãŸã‚‰ãƒ‰ãƒ©ãƒƒã‚°é–‹å§‹
+	// ’†ƒ{ƒ^ƒ“‚ª‰Ÿ‚³‚ê‚½‚çƒhƒ‰ƒbƒOŠJn
 	if ( ( button == GLUT_MIDDLE_BUTTON ) && ( state == GLUT_DOWN ) )
 		drag_mouse_m = true;
-	// ä¸­ãƒœã‚¿ãƒ³ãŒé›¢ã•ã‚ŒãŸã‚‰ãƒ‰ãƒ©ãƒƒã‚°çµ‚äº†
+	// ’†ƒ{ƒ^ƒ“‚ª—£‚³‚ê‚½‚çƒhƒ‰ƒbƒOI—¹
 	else if ( ( button == GLUT_MIDDLE_BUTTON ) && ( state == GLUT_UP ) )
 		drag_mouse_m = false;
 
-	// ç¾åœ¨ã®ãƒã‚¦ã‚¹åº§æ¨™ã‚’è¨˜éŒ²
+	// Œ»İ‚Ìƒ}ƒEƒXÀ•W‚ğ‹L˜^
 	last_mouse_x = mx;
 	last_mouse_y = my;
 }
 
 
 //
-//   ãƒã‚¦ã‚¹ãƒ‰ãƒ©ãƒƒã‚°
+//   ƒ}ƒEƒXƒhƒ‰ƒbƒO
 //
 void  GLUTBaseApp::MouseDrag( int mx, int my )
 {
-	// SHIFTã‚­ãƒ¼ã®æŠ¼ä¸‹çŠ¶æ…‹ã‚’å–å¾—
+	// SHIFTƒL[‚Ì‰Ÿ‰ºó‘Ô‚ğæ“¾
 	int  mod = glutGetModifiers();
 
-	// å³ãƒœã‚¿ãƒ³ã®ãƒ‰ãƒ©ãƒƒã‚°ä¸­ã¯è¦–ç‚¹ã‚’å›è»¢ã™ã‚‹
+	// ‰Eƒ{ƒ^ƒ“‚Ìƒhƒ‰ƒbƒO’†‚Í‹“_‚ğ‰ñ“]‚·‚é
 	if ( drag_mouse_r && !( mod & GLUT_ACTIVE_SHIFT ) )
 	{
-		// å‰å›ã®ãƒã‚¦ã‚¹åº§æ¨™ã¨ä»Šå›ã®ãƒã‚¦ã‚¹åº§æ¨™ã®å·®ã«å¿œã˜ã¦è¦–ç‚¹ã‚’å›è»¢
+		// ‘O‰ñ‚Ìƒ}ƒEƒXÀ•W‚Æ¡‰ñ‚Ìƒ}ƒEƒXÀ•W‚Ì·‚É‰‚¶‚Ä‹“_‚ğ‰ñ“]
 
-		// ãƒã‚¦ã‚¹ã®æ¨ªç§»å‹•ã«å¿œã˜ã¦ï¼¹è»¸ã‚’ä¸­å¿ƒã«å›è»¢
+		// ƒ}ƒEƒX‚Ì‰¡ˆÚ“®‚É‰‚¶‚Ä‚x²‚ğ’†S‚É‰ñ“]
 		camera_yaw -= ( mx - last_mouse_x ) * 1.0;
 		if ( camera_yaw < 0.0 )
 			camera_yaw += 360.0;
 		else if ( camera_yaw > 360.0 )
 			camera_yaw -= 360.0;
 
-		// ãƒã‚¦ã‚¹ã®ç¸¦ç§»å‹•ã«å¿œã˜ã¦ï¼¸è»¸ã‚’ä¸­å¿ƒã«å›è»¢
+		// ƒ}ƒEƒX‚ÌcˆÚ“®‚É‰‚¶‚Ä‚w²‚ğ’†S‚É‰ñ“]
 		camera_pitch -= ( my - last_mouse_y ) * 1.0;
 		if ( camera_pitch < -90.0 )
 			camera_pitch = -90.0;
 		else if ( camera_pitch > 90.0 )
 			camera_pitch = 90.0;
 
-		// è¦–ç‚¹ã®æ›´æ–°ãƒ•ãƒ©ã‚°ã‚’è¨­å®š
+		// ‹“_‚ÌXVƒtƒ‰ƒO‚ğİ’è
 		is_view_updated = true;
 	}
 
-	// SHIFTã‚­ãƒ¼ ï¼‹ å³ãƒœã‚¿ãƒ³ã®ãƒ‰ãƒ©ãƒƒã‚°ä¸­ã¯è¦–ç‚¹ã¨ã‚«ãƒ¡ãƒ©ã®è·é›¢ã‚’å¤‰æ›´ã™ã‚‹
+	// SHIFTƒL[ { ‰Eƒ{ƒ^ƒ“‚Ìƒhƒ‰ƒbƒO’†‚Í‹“_‚ÆƒJƒƒ‰‚Ì‹——£‚ğ•ÏX‚·‚é
 	if ( drag_mouse_r && ( mod & GLUT_ACTIVE_SHIFT ) )
 	{
-		// å‰å›ã®ãƒã‚¦ã‚¹åº§æ¨™ã¨ä»Šå›ã®ãƒã‚¦ã‚¹åº§æ¨™ã®å·®ã«å¿œã˜ã¦è¦–ç‚¹ã‚’å›è»¢
+		// ‘O‰ñ‚Ìƒ}ƒEƒXÀ•W‚Æ¡‰ñ‚Ìƒ}ƒEƒXÀ•W‚Ì·‚É‰‚¶‚Ä‹“_‚ğ‰ñ“]
 
-		// ãƒã‚¦ã‚¹ã®ç¸¦ç§»å‹•ã«å¿œã˜ã¦è·é›¢ã‚’ç§»å‹•
+		// ƒ}ƒEƒX‚ÌcˆÚ“®‚É‰‚¶‚Ä‹——£‚ğˆÚ“®
 		camera_distance += ( my - last_mouse_y ) * 0.2;
 		if ( camera_distance < 2.0 )
 			camera_distance = 2.0;
 
-		// è¦–ç‚¹ã®æ›´æ–°ãƒ•ãƒ©ã‚°ã‚’è¨­å®š
+		// ‹“_‚ÌXVƒtƒ‰ƒO‚ğİ’è
 		is_view_updated = true;
 	}
 
-	// ä»Šå›ã®ãƒã‚¦ã‚¹åº§æ¨™ã‚’è¨˜éŒ²
+	// ¡‰ñ‚Ìƒ}ƒEƒXÀ•W‚ğ‹L˜^
 	last_mouse_x = mx;
 	last_mouse_y = my;
 }
 
 
 //
-//  ãƒã‚¦ã‚¹ç§»å‹•
+//  ƒ}ƒEƒXˆÚ“®
 //
 void  GLUTBaseApp::MouseMotion( int mx, int my )
 {
@@ -216,7 +230,7 @@ void  GLUTBaseApp::MouseMotion( int mx, int my )
 
 
 //
-//  ã‚­ãƒ¼ãƒœãƒ¼ãƒ‰ã®ã‚­ãƒ¼æŠ¼ä¸‹
+//  ƒL[ƒ{[ƒh‚ÌƒL[‰Ÿ‰º
 //
 void  GLUTBaseApp::Keyboard( unsigned char key, int mx, int my )
 {
@@ -224,7 +238,7 @@ void  GLUTBaseApp::Keyboard( unsigned char key, int mx, int my )
 
 
 //
-//  ã‚­ãƒ¼ãƒœãƒ¼ãƒ‰ã®ç‰¹æ®Šã‚­ãƒ¼æŠ¼ä¸‹
+//  ƒL[ƒ{[ƒh‚Ì“ÁêƒL[‰Ÿ‰º
 //
 void  GLUTBaseApp::KeyboardSpecial( unsigned char key, int mx, int my )
 {
@@ -232,7 +246,7 @@ void  GLUTBaseApp::KeyboardSpecial( unsigned char key, int mx, int my )
 
 
 //
-//  ã‚¢ãƒ‹ãƒ¡ãƒ¼ã‚·ãƒ§ãƒ³å‡¦ç†
+//  ƒAƒjƒ[ƒVƒ‡ƒ“ˆ—
 //
 void  GLUTBaseApp::Animation( float delta )
 {
@@ -240,12 +254,22 @@ void  GLUTBaseApp::Animation( float delta )
 
 
 //
-//  ä»¥ä¸‹ã€è£œåŠ©å‡¦ç†
+//  SpaceMouse“ü—Íˆ—i”h¶ƒNƒ‰ƒX‚ÅƒI[ƒo[ƒ‰ƒCƒh‰Â”\j
+//
+void  GLUTBaseApp::ProcessSpaceMouseInput()
+{
+	// ƒfƒtƒHƒ‹ƒg‚Å‚Í‰½‚à‚µ‚È‚¢
+	// ”h¶ƒNƒ‰ƒX‚Åspacemouse_transform‚ğg—p‚µ‚Ä“Æ©‚Ìˆ—‚ğÀ‘•‰Â”\
+}
+
+
+//
+//  ˆÈ‰ºA•â•ˆ—
 //
 
 
 //
-//  æ ¼å­æ¨¡æ§˜ã®åºŠã‚’æç”»
+//  Šiq–Í—l‚Ì°‚ğ•`‰æ
 //
 void  GLUTBaseApp::DrawFloor( float tile_size, int num_x, int num_z, float r0, float g0, float b0, float r1, float g1, float b1 )
 {
@@ -280,7 +304,7 @@ void  GLUTBaseApp::DrawFloor( float tile_size, int num_x, int num_z, float r0, f
 
 
 //
-//  æ–‡å­—æƒ…å ±ã‚’æç”»
+//  •¶šî•ñ‚ğ•`‰æ
 //
 void  GLUTBaseApp::DrawTextInformation( int line_no, const char * message, Color3f color )
 {
@@ -288,28 +312,28 @@ void  GLUTBaseApp::DrawTextInformation( int line_no, const char * message, Color
 	if ( message == NULL )
 		return;
 
-	// å°„å½±è¡Œåˆ—ã‚’åˆæœŸåŒ–ï¼ˆåˆæœŸåŒ–ã®å‰ã«ç¾åœ¨ã®è¡Œåˆ—ã‚’é€€é¿ï¼‰
+	// Ë‰es—ñ‚ğ‰Šú‰»i‰Šú‰»‚Ì‘O‚ÉŒ»İ‚Ìs—ñ‚ğ‘Ş”ğj
 	glMatrixMode( GL_PROJECTION );
 	glPushMatrix();
 	glLoadIdentity();
 	gluOrtho2D( 0.0, win_width, win_height, 0.0 );
 
-	// ãƒ¢ãƒ‡ãƒ«ãƒ“ãƒ¥ãƒ¼è¡Œåˆ—ã‚’åˆæœŸåŒ–ï¼ˆåˆæœŸåŒ–ã®å‰ã«ç¾åœ¨ã®è¡Œåˆ—ã‚’é€€é¿ï¼‰
+	// ƒ‚ƒfƒ‹ƒrƒ…[s—ñ‚ğ‰Šú‰»i‰Šú‰»‚Ì‘O‚ÉŒ»İ‚Ìs—ñ‚ğ‘Ş”ğj
 	glMatrixMode( GL_MODELVIEW );
 	glPushMatrix();
 	glLoadIdentity();
 
-	// ï¼ºãƒãƒƒãƒ•ã‚¡ãƒ»ãƒ©ã‚¤ãƒ†ã‚£ãƒ³ã‚°ã¯ã‚ªãƒ•ã«ã™ã‚‹
+	// ‚yƒoƒbƒtƒ@Eƒ‰ƒCƒeƒBƒ“ƒO‚ÍƒIƒt‚É‚·‚é
 	glDisable( GL_DEPTH_TEST );
 	glDisable( GL_LIGHTING );
 
-	// ãƒ¡ãƒƒã‚»ãƒ¼ã‚¸ã®æç”»
+	// ƒƒbƒZ[ƒW‚Ì•`‰æ
 	glColor3f( color.x, color.y, color.z );
 	glRasterPos2i( 16, 28 + 24 * line_no );
 	for ( i = 0; message[i] != '\0'; i++ )
 		glutBitmapCharacter( GLUT_BITMAP_HELVETICA_18, message[i] );
 
-	// è¨­å®šã‚’å…¨ã¦å¾©å…ƒ
+	// İ’è‚ğ‘S‚Ä•œŒ³
 	glEnable( GL_DEPTH_TEST );
 	glEnable( GL_LIGHTING );
 	glMatrixMode( GL_PROJECTION );
@@ -322,94 +346,139 @@ void  GLUTBaseApp::DrawTextInformation( int line_no, const char * message, Color
 
 ///////////////////////////////////////////////////////////////////////////////
 //
-//  GLUTãƒ•ãƒ¬ãƒ¼ãƒ ãƒ¯ãƒ¼ã‚¯ï¼ˆã‚¤ãƒ™ãƒ³ãƒˆå‡¦ç†ã€åˆæœŸåŒ–ãƒ»ãƒ¡ã‚¤ãƒ³å‡¦ç†ï¼‰
+//  SpaceMouse“ü—Íˆ—
+//
+
+#ifdef USE_SPACEMOUSE
+//
+// SpaceMouse‚©‚ç•ÏŠ·s—ñ‚ğæ“¾‚µ‚ÄƒAƒvƒŠƒP[ƒVƒ‡ƒ“‚É“n‚·
+//
+void  UpdateSpaceMouseTransform()
+{
+	if (app == NULL)
+		return;
+
+	// SpaceMouse‚Ìó‘Ô‚ğXVinavlib‚©‚çƒCƒxƒ“ƒg‚ğƒ|[ƒŠƒ“ƒOj
+	CSpaceMouseGLUT::GetInstance().Update();
+
+	// SpaceMouse‚©‚ç•ÏŠ·s—ñ‚ğæ“¾
+	Matrix4f transform;
+	CSpaceMouseGLUT::GetInstance().GetTransformMatrix(transform);
+
+	// •ÏŠ·s—ñ‚ª’PˆÊs—ñ‚Å‚È‚¯‚ê‚Î“ü—Í‚ª‚ ‚Á‚½‚Æ‚İ‚È‚·
+	bool has_input = false;
+	const float epsilon = 0.0001f;
+	if (fabs(transform.m03) > epsilon || fabs(transform.m13) > epsilon || fabs(transform.m23) > epsilon) {
+		has_input = true;
+	}
+	// ‰ñ“]¬•ª‚àƒ`ƒFƒbƒNi‘ÎŠp¬•ª‚ª1‚Å‚È‚¢A‚Ü‚½‚Í”ñ‘ÎŠp¬•ª‚ª0‚Å‚È‚¢j
+	float trace = transform.m00 + transform.m11 + transform.m22;
+	if (fabs(trace - 3.0f) > epsilon) {
+		has_input = true;
+	}
+
+	if (has_input) {
+		app->GetSpaceMouseTransform() = transform;
+		// ƒAƒvƒŠƒP[ƒVƒ‡ƒ“‚ÌSpaceMouse“ü—Íˆ—‚ğŒÄ‚Ño‚·
+		app->ProcessSpaceMouseInput();
+		// SpaceMouse‚Ì•ÏŠ·‚ğƒŠƒZƒbƒgi—İÏ‚ğ–h‚®j
+		CSpaceMouseGLUT::GetInstance().Reset();
+	}
+}
+#endif
+
+
+
+///////////////////////////////////////////////////////////////////////////////
+//
+//  GLUTƒtƒŒ[ƒ€ƒ[ƒNiƒCƒxƒ“ƒgˆ—A‰Šú‰»EƒƒCƒ“ˆ—j
 //
 
 
 //
-//  ç”»é¢æç”»æ™‚ã«å‘¼ã°ã‚Œã‚‹ã‚³ãƒ¼ãƒ«ãƒãƒƒã‚¯é–¢æ•°
+//  ‰æ–Ê•`‰æ‚ÉŒÄ‚Î‚ê‚éƒR[ƒ‹ƒoƒbƒNŠÖ”
 //
 void  DisplayCallback( void )
 {
-	// ã‚¢ãƒ—ãƒªã‚±ãƒ¼ã‚·ãƒ§ãƒ³ã®æç”»å‡¦ç†
+	// ƒAƒvƒŠƒP[ƒVƒ‡ƒ“‚Ì•`‰æˆ—
 	if ( app )
 		app->Display();
 
-	// ãƒãƒƒã‚¯ãƒãƒƒãƒ•ã‚¡ã«æç”»ã—ãŸç”»é¢ã‚’ãƒ•ãƒ­ãƒ³ãƒˆãƒãƒƒãƒ•ã‚¡ã«è¡¨ç¤º
+	// ƒoƒbƒNƒoƒbƒtƒ@‚É•`‰æ‚µ‚½‰æ–Ê‚ğƒtƒƒ“ƒgƒoƒbƒtƒ@‚É•\¦
 	glutSwapBuffers();
 }
 
 
 //
-//  ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã‚µã‚¤ã‚ºå¤‰æ›´æ™‚ã«å‘¼ã°ã‚Œã‚‹ã‚³ãƒ¼ãƒ«ãƒãƒƒã‚¯é–¢æ•°
+//  ƒEƒBƒ“ƒhƒEƒTƒCƒY•ÏX‚ÉŒÄ‚Î‚ê‚éƒR[ƒ‹ƒoƒbƒNŠÖ”
 //
 void  ReshapeCallback( int w, int h )
 {
-	// ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦å†…ã®æç”»ã‚’è¡Œã†ç¯„å›²ã‚’è¨­å®šï¼ˆã“ã“ã§ã¯ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦å…¨ä½“ã«æç”»ï¼‰
+	// ƒEƒBƒ“ƒhƒE“à‚Ì•`‰æ‚ğs‚¤”ÍˆÍ‚ğİ’èi‚±‚±‚Å‚ÍƒEƒBƒ“ƒhƒE‘S‘Ì‚É•`‰æj
 	glViewport(0, 0, w, h);
 	
-	// ã‚«ãƒ¡ãƒ©åº§æ¨™ç³»â†’ã‚¹ã‚¯ãƒªãƒ¼ãƒ³åº§æ¨™ç³»ã¸ã®å¤‰æ›è¡Œåˆ—ã‚’è¨­å®š
+	// ƒJƒƒ‰À•WŒn¨ƒXƒNƒŠ[ƒ“À•WŒn‚Ö‚Ì•ÏŠ·s—ñ‚ğİ’è
 	glMatrixMode( GL_PROJECTION );
 	glLoadIdentity();
 	gluPerspective( 45, (double)w/h, 1, 500 );
 
-	// ã‚¢ãƒ—ãƒªã‚±ãƒ¼ã‚·ãƒ§ãƒ³ã®ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã‚µã‚¤ã‚ºå¤‰æ›´
+	// ƒAƒvƒŠƒP[ƒVƒ‡ƒ“‚ÌƒEƒBƒ“ƒhƒEƒTƒCƒY•ÏX
 	if ( app )
 		app->Reshape( w, h );
 }
 
 
 //
-//  ãƒã‚¦ã‚¹ã‚¯ãƒªãƒƒã‚¯æ™‚ã«å‘¼ã°ã‚Œã‚‹ã‚³ãƒ¼ãƒ«ãƒãƒƒã‚¯é–¢æ•°
+//  ƒ}ƒEƒXƒNƒŠƒbƒN‚ÉŒÄ‚Î‚ê‚éƒR[ƒ‹ƒoƒbƒNŠÖ”
 //
 void  MouseClickCallback( int button, int state, int mx, int my )
 {
-	// ã‚¢ãƒ—ãƒªã‚±ãƒ¼ã‚·ãƒ§ãƒ³ã®ãƒã‚¦ã‚¹ã‚¯ãƒªãƒƒã‚¯
+	// ƒAƒvƒŠƒP[ƒVƒ‡ƒ“‚Ìƒ}ƒEƒXƒNƒŠƒbƒN
 	if ( app )
 		app->MouseClick( button, state, mx, my );
 
-	// å†æç”»
+	// Ä•`‰æ
 	glutPostRedisplay();
 }
 
 
 //
-// ãƒã‚¦ã‚¹ãƒ‰ãƒ©ãƒƒã‚°æ™‚ã«å‘¼ã°ã‚Œã‚‹ã‚³ãƒ¼ãƒ«ãƒãƒƒã‚¯é–¢æ•°
+// ƒ}ƒEƒXƒhƒ‰ƒbƒO‚ÉŒÄ‚Î‚ê‚éƒR[ƒ‹ƒoƒbƒNŠÖ”
 //
 void  MouseDragCallback( int mx, int my )
 {
-	// ã‚¢ãƒ—ãƒªã‚±ãƒ¼ã‚·ãƒ§ãƒ³ã®ãƒã‚¦ã‚¹ãƒ‰ãƒ©ãƒƒã‚°
+	// ƒAƒvƒŠƒP[ƒVƒ‡ƒ“‚Ìƒ}ƒEƒXƒhƒ‰ƒbƒO
 	if ( app )
 		app->MouseDrag( mx, my );
 
-	// å†æç”»
+	// Ä•`‰æ
 	glutPostRedisplay();
 }
 
 
 //
-// ãƒã‚¦ã‚¹ç§»å‹•æ™‚ã«å‘¼ã°ã‚Œã‚‹ã‚³ãƒ¼ãƒ«ãƒãƒƒã‚¯é–¢æ•°
+// ƒ}ƒEƒXˆÚ“®‚ÉŒÄ‚Î‚ê‚éƒR[ƒ‹ƒoƒbƒNŠÖ”
 //
 void  MouseMotionCallback( int mx, int my )
 {
-	// ã‚¢ãƒ—ãƒªã‚±ãƒ¼ã‚·ãƒ§ãƒ³ã®ãƒã‚¦ã‚¹ãƒ‰ãƒ©ãƒƒã‚°
+	// ƒAƒvƒŠƒP[ƒVƒ‡ƒ“‚Ìƒ}ƒEƒXƒhƒ‰ƒbƒO
 	if ( app )
 		app->MouseMotion( mx, my );
 
-	// å†æç”»
+	// Ä•`‰æ
 	glutPostRedisplay();
 }
 
 
 //
-//  ã‚­ãƒ¼ãƒœãƒ¼ãƒ‰ã®ã‚­ãƒ¼ãŒæŠ¼ã•ã‚ŒãŸã¨ãã«å‘¼ã°ã‚Œã‚‹ã‚³ãƒ¼ãƒ«ãƒãƒƒã‚¯é–¢æ•°
+//  ƒL[ƒ{[ƒh‚ÌƒL[‚ª‰Ÿ‚³‚ê‚½‚Æ‚«‚ÉŒÄ‚Î‚ê‚éƒR[ƒ‹ƒoƒbƒNŠÖ”
 //
 void  KeyboardCallback( unsigned char key, int mx, int my )
 {
-	// m ã‚­ãƒ¼ã§ãƒ¢ãƒ¼ãƒ‰ã®åˆ‡ã‚Šæ›¿ãˆ
+	// m ƒL[‚Åƒ‚[ƒh‚ÌØ‚è‘Ö‚¦
 	if ( ( key == 'm' ) && app && ( applications.size() > 1 ) )
 	{
-		// æ¬¡ã®ã‚¢ãƒ—ãƒªã‚±ãƒ¼ã‚·ãƒ§ãƒ³ã‚’é¸æŠ
+		// Ÿ‚ÌƒAƒvƒŠƒP[ƒVƒ‡ƒ“‚ğ‘I‘ğ
 		int  app_no = 0;
 		for ( int i = 0; i < applications.size(); i++ )
 		{
@@ -421,52 +490,61 @@ void  KeyboardCallback( unsigned char key, int mx, int my )
 		}
 		app_no = ( app_no + 1 ) % applications.size();
 
-		// å®Ÿè¡Œã‚¢ãƒ—ãƒªã‚±ãƒ¼ã‚·ãƒ§ãƒ³ã®åˆ‡æ›¿
+		// ÀsƒAƒvƒŠƒP[ƒVƒ‡ƒ“‚ÌØ‘Ö
 		ChangeApp( app_no );
 	}
 
-	// r ã‚­ãƒ¼ã§ã‚¢ãƒ—ãƒªã‚±ãƒ¼ã‚·ãƒ§ãƒ³ã®ãƒªã‚»ãƒƒãƒˆ
+	// r ƒL[‚ÅƒAƒvƒŠƒP[ƒVƒ‡ƒ“‚ÌƒŠƒZƒbƒg
 	if ( key == 'r' )
 	{
 		if ( app )
 			app->Start();
+
+		// SpaceMouse‚Ì•ÏŠ·‚àƒŠƒZƒbƒg
+#ifdef USE_SPACEMOUSE
+		CSpaceMouseGLUT::GetInstance().Reset();
+#endif
 	}
 
-	// ã‚¢ãƒ—ãƒªã‚±ãƒ¼ã‚·ãƒ§ãƒ³ã®ã‚­ãƒ¼æŠ¼ä¸‹
+	// ƒAƒvƒŠƒP[ƒVƒ‡ƒ“‚ÌƒL[‰Ÿ‰º
 	if ( app )
 		app->Keyboard( key, mx, my );
 
-	// å†æç”»
+	// Ä•`‰æ
 	glutPostRedisplay();
 }
 
 
-
 //
-//  ã‚­ãƒ¼ãƒœãƒ¼ãƒ‰ã®ç‰¹æ®Šã‚­ãƒ¼ãŒæŠ¼ã•ã‚ŒãŸã¨ãã«å‘¼ã°ã‚Œã‚‹ã‚³ãƒ¼ãƒ«ãƒãƒƒã‚¯é–¢æ•°
+//  ƒL[ƒ{[ƒh‚Ì“ÁêƒL[‚ª‰Ÿ‚³‚ê‚½‚Æ‚«‚ÉŒÄ‚Î‚ê‚éƒR[ƒ‹ƒoƒbƒNŠÖ”
 //
 void  SpecialKeyboardCallback( int key, int mx, int my )
 {
-	// ã‚¢ãƒ—ãƒªã‚±ãƒ¼ã‚·ãƒ§ãƒ³ã®ç‰¹æ®Šã‚­ãƒ¼æŠ¼ä¸‹
+	// ƒAƒvƒŠƒP[ƒVƒ‡ƒ“‚Ì“ÁêƒL[‰Ÿ‰º
 	if ( app )
 		app->KeyboardSpecial( key, mx, my );
 
-	// å†æç”»
+	// Ä•`‰æ
 	glutPostRedisplay();
 }
 
 
 //
-//  ã‚¢ã‚¤ãƒ‰ãƒ«æ™‚ã«å‘¼ã°ã‚Œã‚‹ã‚³ãƒ¼ãƒ«ãƒãƒƒã‚¯é–¢æ•°
+//  ƒAƒCƒhƒ‹‚ÉŒÄ‚Î‚ê‚éƒR[ƒ‹ƒoƒbƒNŠÖ”
 //
 void  IdleCallback( void )
 {
-	// ã‚¢ãƒ‹ãƒ¡ãƒ¼ã‚·ãƒ§ãƒ³å‡¦ç†
+	// SpaceMouse“ü—Íˆ—
+#ifdef USE_SPACEMOUSE
+	UpdateSpaceMouseTransform();
+#endif
+
+	// ƒAƒjƒ[ƒVƒ‡ƒ“ˆ—
 	if ( app )
 	{
-		// ã‚¢ãƒ‹ãƒ¡ãƒ¼ã‚·ãƒ§ãƒ³ã®æ™‚é–“å¤‰åŒ–ï¼ˆÎ”ï½”ï¼‰ã‚’è¨ˆç®—
+		// ƒAƒjƒ[ƒVƒ‡ƒ“‚ÌŠÔ•Ï‰»iƒ¢‚”j‚ğŒvZ
 #ifdef  WIN32
-		// ã‚·ã‚¹ãƒ†ãƒ æ™‚é–“ã‚’å–å¾—ã—ã€å‰å›ã‹ã‚‰ã®çµŒéæ™‚é–“ã«å¿œã˜ã¦Î”ï½”ã‚’æ±ºå®š
+		// ƒVƒXƒeƒ€ŠÔ‚ğæ“¾‚µA‘O‰ñ‚©‚ç‚ÌŒo‰ßŠÔ‚É‰‚¶‚Äƒ¢‚”‚ğŒˆ’è
 		static DWORD  last_time = 0;
 		DWORD  curr_time = timeGetTime();
 		float  delta = ( curr_time - last_time ) * 0.001f;
@@ -474,28 +552,28 @@ void  IdleCallback( void )
 			delta = 0.03f;
 		last_time = curr_time;
 #else
-		// å›ºå®šã®Î”ï½”ã‚’ä½¿ç”¨
+		// ŒÅ’è‚Ìƒ¢‚”‚ğg—p
 		float  delta = 0.03f;
 #endif
 
-		// ã‚¢ãƒ—ãƒªã‚±ãƒ¼ã‚·ãƒ§ãƒ³ã®ã‚¢ãƒ‹ãƒ¡ãƒ¼ã‚·ãƒ§ãƒ³å‡¦ç†
+		// ƒAƒvƒŠƒP[ƒVƒ‡ƒ“‚ÌƒAƒjƒ[ƒVƒ‡ƒ“ˆ—
 		if ( app )
 			app->Animation( delta );
 
-		// å†æç”»ã®æŒ‡ç¤ºã‚’å‡ºã™ï¼ˆã“ã®å¾Œã§å†æç”»ã®ã‚³ãƒ¼ãƒ«ãƒãƒƒã‚¯é–¢æ•°ãŒå‘¼ã°ã‚Œã‚‹ï¼‰
+		// Ä•`‰æ‚Ìw¦‚ğo‚·i‚±‚ÌŒã‚ÅÄ•`‰æ‚ÌƒR[ƒ‹ƒoƒbƒNŠÖ”‚ªŒÄ‚Î‚ê‚éj
 		glutPostRedisplay();
 	}
 
 #ifdef _WIN32
-	// Windowsç’°å¢ƒã§ã¯ã€CTRLï¼‹å³ã‚¯ãƒªãƒƒã‚¯ã§ã‚‚ãƒ¡ãƒ‹ãƒ¥ãƒ¼ã‚’å‘¼ã³å‡ºã›ã‚‹ã‚ˆã†ã«ã™ã‚‹
+	// WindowsŠÂ‹«‚Å‚ÍACTRL{‰EƒNƒŠƒbƒN‚Å‚àƒƒjƒ…[‚ğŒÄ‚Ño‚¹‚é‚æ‚¤‚É‚·‚é
 
-	// å³ã‚¯ãƒªãƒƒã‚¯ã§ã®ãƒ¡ãƒ‹ãƒ¥ãƒ¼èµ·å‹•ã®çŠ¶æ…‹
+	// ‰EƒNƒŠƒbƒN‚Å‚Ìƒƒjƒ…[‹N“®‚Ìó‘Ô
 	static bool  menu_attached = false;
 
-	// CTRLã‚­ãƒ¼ã®æŠ¼ä¸‹çŠ¶æ…‹ã‚’å–å¾—ï¼ˆWin32 API ã‚’ä½¿ç”¨ï¼‰
+	// CTRLƒL[‚Ì‰Ÿ‰ºó‘Ô‚ğæ“¾iWin32 API ‚ğg—pj
 	bool  ctrl = ( GetKeyState( VK_CONTROL ) & 0x80 );
 
-	// å³ã‚¯ãƒªãƒƒã‚¯ã§ã®ãƒ¡ãƒ‹ãƒ¥ãƒ¼èµ·å‹•ã®ç™»éŒ²ãƒ»è§£é™¤
+	// ‰EƒNƒŠƒbƒN‚Å‚Ìƒƒjƒ…[‹N“®‚Ì“o˜^E‰ğœ
 	if ( ctrl && !menu_attached )
 	{
 		glutAttachMenu( GLUT_RIGHT_BUTTON );
@@ -511,14 +589,14 @@ void  IdleCallback( void )
 
 
 //
-//  å®Ÿè¡Œã‚¢ãƒ—ãƒªã‚±ãƒ¼ã‚·ãƒ§ãƒ³ã®åˆ‡æ›¿
+//  ÀsƒAƒvƒŠƒP[ƒVƒ‡ƒ“‚ÌØ‘Ö
 //
 void  ChangeApp( int app_no )
 {
 	if ( ( app_no < 0 ) || ( app_no >= applications.size() ) )
 		return;
 
-	// ç¾åœ¨ã®ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã®ã‚µã‚¤ã‚ºã‚’å–å¾—
+	// Œ»İ‚ÌƒEƒBƒ“ƒhƒE‚ÌƒTƒCƒY‚ğæ“¾
 	int  win_width, win_height;
 	GLUTBaseApp *  curr_app = app;
 	if ( curr_app )
@@ -527,7 +605,7 @@ void  ChangeApp( int app_no )
 		win_height = curr_app->GetWindowHeight();
 	}
 
-	// ã‚¢ãƒ—ãƒªã‚±ãƒ¼ã‚·ãƒ§ãƒ³ã®åˆæœŸåŒ–ãƒ»é–‹å§‹
+	// ƒAƒvƒŠƒP[ƒVƒ‡ƒ“‚Ì‰Šú‰»EŠJn
 	app = applications[ app_no ];
 	if ( !app->IsInitialized() )
 		app->Initialize();
@@ -538,17 +616,17 @@ void  ChangeApp( int app_no )
 
 
 //
-//  ãƒãƒƒãƒ—ã‚¢ãƒƒãƒ—ãƒ¡ãƒ‹ãƒ¥ãƒ¼é¸æŠæ™‚ã«å‘¼ã°ã‚Œã‚‹ã‚³ãƒ¼ãƒ«ãƒãƒƒã‚¯é–¢æ•°
+//  ƒ|ƒbƒvƒAƒbƒvƒƒjƒ…[‘I‘ğ‚ÉŒÄ‚Î‚ê‚éƒR[ƒ‹ƒoƒbƒNŠÖ”
 //
 void  MenuCallback( int no )
 {
-	// å®Ÿè¡Œã‚¢ãƒ—ãƒªã‚±ãƒ¼ã‚·ãƒ§ãƒ³ã®åˆ‡æ›¿
+	// ÀsƒAƒvƒŠƒP[ƒVƒ‡ƒ“‚ÌØ‘Ö
 	if ( ( no >= 0 ) && ( no < applications.size() ) )
 	{
 		ChangeApp( no );
 	}
 
-	// ã‚½ãƒ•ãƒˆã‚¦ã‚§ã‚¢èª¬æ˜ã‚’è¡¨ç¤ºï¼ˆãƒ€ã‚¤ã‚¢ãƒ­ã‚°ãƒœãƒƒã‚¯ã‚¹ã‚’ä½¿ç”¨ï¼‰
+	// ƒ\ƒtƒgƒEƒFƒAà–¾‚ğ•\¦iƒ_ƒCƒAƒƒOƒ{ƒbƒNƒX‚ğg—pj
 	else if ( no == applications.size() )
 	{
 #ifdef _WIN32
@@ -559,37 +637,37 @@ void  MenuCallback( int no )
 
 
 //
-//  å®Ÿè¡Œã‚¢ãƒ—ãƒªã‚±ãƒ¼ã‚·ãƒ§ãƒ³åˆ‡æ›¿ã®ãŸã‚ã®ãƒãƒƒãƒ—ã‚¢ãƒƒãƒ—ãƒ¡ãƒ‹ãƒ¥ãƒ¼ã®åˆæœŸåŒ–
+//  ÀsƒAƒvƒŠƒP[ƒVƒ‡ƒ“Ø‘Ö‚Ì‚½‚ß‚Ìƒ|ƒbƒvƒAƒbƒvƒƒjƒ…[‚Ì‰Šú‰»
 //
 void  InitAppMenu()
 {
-	// ãƒ¡ãƒ‹ãƒ¥ãƒ¼ç”Ÿæˆ
+	// ƒƒjƒ…[¶¬
 	int  menu;
 	menu = glutCreateMenu( MenuCallback );
 
-	// å„ã‚¢ãƒ—ãƒªã‚±ãƒ¼ã‚·ãƒ§ãƒ³ã®ãƒ¡ãƒ‹ãƒ¥ãƒ¼é …ç›®ã‚’è¿½åŠ 
+	// ŠeƒAƒvƒŠƒP[ƒVƒ‡ƒ“‚Ìƒƒjƒ…[€–Ú‚ğ’Ç‰Á
 	for ( int i = 0; i < applications.size(); i++ )
 	{
 		glutAddMenuEntry( applications[ i ]->GetAppName().c_str(), i );
 	}
 
-	// ã‚½ãƒ•ãƒˆã‚¦ã‚§ã‚¢èª¬æ˜ã®ãŸã‚ã®ãƒ¡ãƒ‹ãƒ¥ãƒ¼é …ç›®ã‚’è¿½åŠ 
+	// ƒ\ƒtƒgƒEƒFƒAà–¾‚Ì‚½‚ß‚Ìƒƒjƒ…[€–Ú‚ğ’Ç‰Á
 	glutAddMenuEntry( "About...", applications.size() );
 
-	// ãƒ¡ãƒ‹ãƒ¥ãƒ¼è¨­å®š
+	// ƒƒjƒ…[İ’è
 	glutSetMenu( menu );
 
-	// ãƒ¡ãƒ‹ãƒ¥ãƒ¼ç™»éŒ²ï¼ˆãƒã‚¦ã‚¹ã®ä¸­ãƒœã‚¿ãƒ³ã§è¡¨ç¤ºã•ã‚Œã‚‹ã‚ˆã†ã«è¨­å®šï¼‰
+	// ƒƒjƒ…[“o˜^iƒ}ƒEƒX‚Ì’†ƒ{ƒ^ƒ“‚Å•\¦‚³‚ê‚é‚æ‚¤‚Éİ’èj
 	glutAttachMenu( GLUT_MIDDLE_BUTTON );
 }
 
 
 //
-//  ãƒ¬ãƒ³ãƒ€ãƒªãƒ³ã‚°ç’°å¢ƒåˆæœŸåŒ–é–¢æ•°
+//  ƒŒƒ“ƒ_ƒŠƒ“ƒOŠÂ‹«‰Šú‰»ŠÖ”
 //
 void  initEnvironment( void )
 {
-	// å…‰æºã‚’ä½œæˆã™ã‚‹
+	// ŒõŒ¹‚ğì¬‚·‚é
 	float  light0_position[] = { 10.0, 10.0, 10.0, 1.0 };
 	float  light0_diffuse[] = { 0.5, 0.5, 0.5, 1.0 };
 	float  light0_specular[] = { 1.0, 1.0, 1.0, 1.0 };
@@ -600,20 +678,20 @@ void  initEnvironment( void )
 	glLightfv( GL_LIGHT0, GL_AMBIENT, light0_ambient );
 	glEnable( GL_LIGHT0 );
 
-	// å…‰æºè¨ˆç®—ã‚’æœ‰åŠ¹ã«ã™ã‚‹
+	// ŒõŒ¹ŒvZ‚ğ—LŒø‚É‚·‚é
 	glEnable( GL_LIGHTING );
 
-	// ç‰©ä½“ã®è‰²æƒ…å ±ã‚’æœ‰åŠ¹ã«ã™ã‚‹
+	// •¨‘Ì‚ÌFî•ñ‚ğ—LŒø‚É‚·‚é
 	glEnable( GL_COLOR_MATERIAL );
 
-	// ï¼ºãƒ†ã‚¹ãƒˆã‚’æœ‰åŠ¹ã«ã™ã‚‹
+	// ‚yƒeƒXƒg‚ğ—LŒø‚É‚·‚é
 	glEnable( GL_DEPTH_TEST );
 
-	// èƒŒé¢é™¤å»ã‚’æœ‰åŠ¹ã«ã™ã‚‹
+	// ”w–Êœ‹‚ğ—LŒø‚É‚·‚é
 	glCullFace( GL_BACK );
 	glEnable( GL_CULL_FACE );
 
-	// èƒŒæ™¯è‰²ã‚’è¨­å®š
+	// ”wŒiF‚ğİ’è
 	glClearColor( 0.5, 0.5, 0.8, 0.0 );
 }
 
@@ -621,16 +699,16 @@ void  initEnvironment( void )
 
 ///////////////////////////////////////////////////////////////////////////////
 //
-//  GLUTãƒ•ãƒ¬ãƒ¼ãƒ ãƒ¯ãƒ¼ã‚¯ã®ãƒ¡ã‚¤ãƒ³é–¢æ•°
+//  GLUTƒtƒŒ[ƒ€ƒ[ƒN‚ÌƒƒCƒ“ŠÖ”
 //
 
 
 //
-//  GLUTãƒ•ãƒ¬ãƒ¼ãƒ ãƒ¯ãƒ¼ã‚¯ã®ãƒ¡ã‚¤ãƒ³é–¢æ•°ï¼ˆå®Ÿè¡Œã™ã‚‹ã‚¢ãƒ—ãƒªã‚±ãƒ¼ã‚·ãƒ§ãƒ³ã®ãƒªã‚¹ãƒˆã‚’æŒ‡å®šï¼‰
+//  GLUTƒtƒŒ[ƒ€ƒ[ƒN‚ÌƒƒCƒ“ŠÖ”iÀs‚·‚éƒAƒvƒŠƒP[ƒVƒ‡ƒ“‚ÌƒŠƒXƒg‚ğw’èj
 //
 int  SimpleHumanGLUTMain( const vector< class GLUTBaseApp * > & app_lists, int argc, char ** argv, const char * win_title, int win_width, int win_height )
 {
-	// GLUTã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã®ãƒ‘ãƒ©ãƒ¡ã‚¿ã®æ±ºå®šï¼ˆå¼•æ•°ã§æŒ‡å®šã•ã‚Œãªã‹ã£ãŸå ´åˆã¯ãƒ‡ãƒ•ã‚©ãƒ«ãƒˆå€¤ã‚’è¨­å®šï¼‰
+	// GLUTƒEƒBƒ“ƒhƒE‚Ìƒpƒ‰ƒƒ^‚ÌŒˆ’èiˆø”‚Åw’è‚³‚ê‚È‚©‚Á‚½ê‡‚ÍƒfƒtƒHƒ‹ƒg’l‚ğİ’èj
 	if ( !win_title || ( strlen( win_title ) == 0 ) )
 		win_title = "Human Animation Sample";
 	if ( win_width <= 0 )
@@ -638,14 +716,21 @@ int  SimpleHumanGLUTMain( const vector< class GLUTBaseApp * > & app_lists, int a
 	if ( win_height <= 0 )
 		win_height = 640;
 	
-	// GLUTã®åˆæœŸåŒ–
+	// GLUT‚Ì‰Šú‰»
 	glutInit( &argc, argv );
 	glutInitDisplayMode( GLUT_DOUBLE | GLUT_RGBA | GLUT_STENCIL );
 	glutInitWindowSize( win_width, win_height );
 	glutInitWindowPosition( 0, 0 );
 	glutCreateWindow( win_title );
+
+	// SpaceMouse‚Ì‰Šú‰»
+#ifdef USE_SPACEMOUSE
+	if (CSpaceMouseGLUT::GetInstance().Initialize("Human Animation Sample")) {
+		CSpaceMouseGLUT::GetInstance().SetSensitivity(1.0f);
+	}
+#endif
 	
-	// ã‚³ãƒ¼ãƒ«ãƒãƒƒã‚¯é–¢æ•°ã®ç™»éŒ²
+	// ƒR[ƒ‹ƒoƒbƒNŠÖ”‚Ì“o˜^
 	glutDisplayFunc( DisplayCallback );
 	glutReshapeFunc( ReshapeCallback );
 	glutMouseFunc( MouseClickCallback );
@@ -655,26 +740,32 @@ int  SimpleHumanGLUTMain( const vector< class GLUTBaseApp * > & app_lists, int a
 	glutSpecialFunc( SpecialKeyboardCallback );
 	glutIdleFunc( IdleCallback );
 
-	// ãƒ¬ãƒ³ãƒ€ãƒªãƒ³ã‚°ç’°å¢ƒåˆæœŸåŒ–
+	// ƒŒƒ“ƒ_ƒŠƒ“ƒOŠÂ‹«‰Šú‰»
 	initEnvironment();
 
-	// å…¨ã‚¢ãƒ—ãƒªã‚±ãƒ¼ã‚·ãƒ§ãƒ³ã‚’ç™»éŒ²
+	// ‘SƒAƒvƒŠƒP[ƒVƒ‡ƒ“‚ğ“o˜^
 	applications = app_lists;
 
-	// æœ€åˆã®ã‚¢ãƒ—ãƒªã‚±ãƒ¼ã‚·ãƒ§ãƒ³ã‚’å®Ÿè¡Œé–‹å§‹
+	// Å‰‚ÌƒAƒvƒŠƒP[ƒVƒ‡ƒ“‚ğÀsŠJn
 	ChangeApp( 0 );
 
-	// å®Ÿè¡Œã‚¢ãƒ—ãƒªã‚±ãƒ¼ã‚·ãƒ§ãƒ³åˆ‡æ›¿ã®ãŸã‚ã®ãƒãƒƒãƒ—ã‚¢ãƒƒãƒ—ãƒ¡ãƒ‹ãƒ¥ãƒ¼ã®åˆæœŸåŒ–
+	// ÀsƒAƒvƒŠƒP[ƒVƒ‡ƒ“Ø‘Ö‚Ì‚½‚ß‚Ìƒ|ƒbƒvƒAƒbƒvƒƒjƒ…[‚Ì‰Šú‰»
 	InitAppMenu();
 
-	// GLUTã®ãƒ¡ã‚¤ãƒ³ãƒ«ãƒ¼ãƒ—ã«å‡¦ç†ã‚’ç§»ã™
+	// GLUT‚ÌƒƒCƒ“ƒ‹[ƒv‚Éˆ—‚ğˆÚ‚·
 	glutMainLoop();
+
+	// SpaceMouse‚ÌƒVƒƒƒbƒgƒ_ƒEƒ“iglutMainLoop‚Í’Êí–ß‚ç‚È‚¢‚ªA”O‚Ì‚½‚ßj
+#ifdef USE_SPACEMOUSE
+	CSpaceMouseGLUT::GetInstance().Shutdown();
+#endif
+
 	return 0;
 }
 
 
 //
-//  GLUTãƒ•ãƒ¬ãƒ¼ãƒ ãƒ¯ãƒ¼ã‚¯ã®ãƒ¡ã‚¤ãƒ³é–¢æ•°ï¼ˆå®Ÿè¡Œã™ã‚‹ä¸€ã¤ã®ã‚¢ãƒ—ãƒªã‚±ãƒ¼ã‚·ãƒ§ãƒ³ã‚’æŒ‡å®šï¼‰
+//  GLUTƒtƒŒ[ƒ€ƒ[ƒN‚ÌƒƒCƒ“ŠÖ”iÀs‚·‚éˆê‚Â‚ÌƒAƒvƒŠƒP[ƒVƒ‡ƒ“‚ğw’èj
 //
 int  SimpleHumanGLUTMain( class GLUTBaseApp * app, int argc, char ** argv, const char * win_title, int win_width, int win_height )
 {
@@ -683,6 +774,3 @@ int  SimpleHumanGLUTMain( class GLUTBaseApp * app, int argc, char ** argv, const
 	
 	return  SimpleHumanGLUTMain( app_lists, argc, argv, win_title, win_width,  win_height );
 }
-
-
-

@@ -36,6 +36,9 @@ MotionApp::MotionApp() {
     use_slice_gizmo = false;
     gizmo_dragging = false;
     slice_gizmo.SetMode(GIZMO_TRANSLATE);
+
+    // SpaceMouseによるスライス操作を有効化
+    use_spacemouse_slice = true;
 }
 
 MotionApp::~MotionApp() 
@@ -144,7 +147,7 @@ void MotionApp::Keyboard(unsigned char key, int mx, int my) {
         // 部位別表示モード
         case 'e': 
             analyzer.show_segment_mode = !analyzer.show_segment_mode;
-            // 部位別表示モードをオンにする時、最初の有効な部位を選択
+            // 部位別表示モードを有効にする時、最初の有効な部位を選択
             if (analyzer.show_segment_mode && motion) {
                 // 現在の選択が無効な場合、最初の有効な部位を探す
                 if (!HasVoxelData(analyzer.selected_segment_index)) {
@@ -158,13 +161,13 @@ void MotionApp::Keyboard(unsigned char key, int mx, int my) {
             break;
         case '[': 
             if (motion && analyzer.show_segment_mode) {
-                // 前のボクセル情報を持つ部位へ移動
+                // 前のボクセルのある部位へ移動
                 analyzer.selected_segment_index = GetNextValidSegment(analyzer.selected_segment_index, -1);
             }
             break;
         case ']': 
             if (motion && analyzer.show_segment_mode) {
-                // 次のボクセル情報を持つ部位へ移動
+                // 次のボクセルのある部位へ移動
                 analyzer.selected_segment_index = GetNextValidSegment(analyzer.selected_segment_index, 1);
             }
             break;
@@ -191,6 +194,14 @@ void MotionApp::Keyboard(unsigned char key, int mx, int my) {
         // ギズモモード切り替え
         case 'u':
             ToggleSliceGizmoMode();
+            break;
+
+        // SpaceMouseによるスライス操作ON/OFF
+        case 'p':
+            use_spacemouse_slice = !use_spacemouse_slice;
+            if (use_spacemouse_slice && !analyzer.use_rotated_slice) {
+                analyzer.ToggleRotatedSliceMode();
+            }
             break;
     }
 }
@@ -346,6 +357,7 @@ void MotionApp::Display()
     const char* segment_mode_str = (analyzer.show_segment_mode) ? "ON" : "OFF";
     const char* gizmo_str = (use_slice_gizmo) ? "ON" : "OFF";
     const char* gizmo_mode_str = (slice_gizmo.GetMode() == GIZMO_TRANSLATE) ? "Move" : "Rotate";
+    const char* spacemouse_str = (use_spacemouse_slice) ? "ON" : "OFF";
 
     // 部位情報を追加
     char segment_info[128] = "All";
@@ -360,10 +372,10 @@ void MotionApp::Display()
     sprintf(rotation_info, "Rot:X%.0f Y%.0f Z%.0f", 
             analyzer.slice_rotation_x, analyzer.slice_rotation_y, analyzer.slice_rotation_z);
 
-    sprintf(title, "CT-Scan | %s | Gizmo:%s(%s) | Feature:%s | Data:%s | Seg:%s | Planes:%s | Maps:%s | Voxels:%s",
-        rotation_info, gizmo_str, gizmo_mode_str,
+    sprintf(title, "CT-Scan | %s | Gizmo:%s(%s) | SpaceMouse:%s | Feature:%s | Data:%s | Seg:%s | Planes:%s | Voxels:%s",
+        rotation_info, gizmo_str, gizmo_mode_str, spacemouse_str,
         feature_mode_str, norm_mode_str, segment_info,
-        planes_on_str, maps_on_str, voxels_on_str);
+        planes_on_str, voxels_on_str);
     
     DrawTextInformation(0, title);
     if (motion) { 
@@ -684,4 +696,64 @@ void MotionApp::SyncGizmoToSliceState()
     if (slice_gizmo.GetMode() == GIZMO_TRANSLATE && analyzer.use_rotated_slice) {
         // keep current mode; user can toggle with 'u'
     }
+}
+
+//
+// SpaceMouse入力処理：スライス平面に適用
+//
+void MotionApp::ProcessSpaceMouseInput()
+{
+    // SpaceMouseによるスライス操作が無効の場合は何もしない
+    if (!use_spacemouse_slice)
+        return;
+
+    // 回転スライスモードでない場合は有効化
+    if (!analyzer.use_rotated_slice) {
+        analyzer.ToggleRotatedSliceMode();
+    }
+
+    // SpaceMouseから変換行列を取得
+    const Matrix4f& transform = GetSpaceMouseTransform();
+
+    // 平行移動成分を抽出してスライス平面に適用
+    float tx = transform.m03;
+    float ty = transform.m13;
+    float tz = transform.m23;
+
+    // 感度設定
+    const float translation_sensitivity = 0.01f;
+    const float deadzone = 0.001f;
+
+    // 平行移動を適用
+    if (fabs(tx) > deadzone || fabs(ty) > deadzone || fabs(tz) > deadzone) {
+        Point3f translation(
+            tx * translation_sensitivity,
+            ty * translation_sensitivity,
+            tz * translation_sensitivity
+        );
+        analyzer.ApplySlicePlaneTranslation(translation);
+    }
+
+    // 回転成分を抽出して適用
+    // 変換行列から回転成分のみを抽出（3x3部分）
+    Matrix4f local_rotation;
+    local_rotation.setIdentity();
+    local_rotation.m00 = transform.m00;
+    local_rotation.m01 = transform.m01;
+    local_rotation.m02 = transform.m02;
+    local_rotation.m10 = transform.m10;
+    local_rotation.m11 = transform.m11;
+    local_rotation.m12 = transform.m12;
+    local_rotation.m20 = transform.m20;
+    local_rotation.m21 = transform.m21;
+    local_rotation.m22 = transform.m22;
+
+    // 回転が単位行列でない場合のみ適用
+    float trace = local_rotation.m00 + local_rotation.m11 + local_rotation.m22;
+    if (fabs(trace - 3.0f) > deadzone) {
+        analyzer.ApplySlicePlaneRotation(local_rotation);
+    }
+
+    // 変換行列をリセット（累積を防ぐ）
+    ResetSpaceMouseTransform();
 }

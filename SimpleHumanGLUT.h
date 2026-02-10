@@ -36,6 +36,10 @@ using namespace std;
 
 
 
+// SpaceMouseサポートを有効化
+#define USE_SPACEMOUSE
+
+
 ///////////////////////////////////////////////////////////////////////////////
 //
 //  アプリケーション基底クラス
@@ -103,6 +107,11 @@ class  GLUTBaseApp
 	// 視点更新フラグ
 	bool  is_view_updated;
 
+  protected:
+	// SpaceMouse用：変換行列（派生クラスで利用可能）
+	Matrix4f  spacemouse_transform;
+	bool  spacemouse_has_input;  // SpaceMouseからの入力があったかどうか
+
 
   public:
 	// コンストラクタ
@@ -117,6 +126,13 @@ class  GLUTBaseApp
 	int  GetWindowWidth() { return  win_width; }
 	int  GetWindowHeight() { return  win_height; }
 	bool  IsInitialized() { return  is_initialized; }
+
+	// SpaceMouse変換行列のアクセサ
+	Matrix4f& GetSpaceMouseTransform() { return spacemouse_transform; }
+	const Matrix4f& GetSpaceMouseTransform() const { return spacemouse_transform; }
+	bool HasSpaceMouseInput() const { return spacemouse_has_input; }
+	void ClearSpaceMouseInput() { spacemouse_has_input = false; }
+	void ResetSpaceMouseTransform() { spacemouse_transform.setIdentity(); spacemouse_has_input = false; }
 
   public:
 	// イベント処理インターフェース
@@ -150,6 +166,9 @@ class  GLUTBaseApp
 	
 	// アニメーション処理
 	virtual void  Animation( float delta );
+
+	// SpaceMouse入力処理（派生クラスでオーバーライド可能）
+	virtual void  ProcessSpaceMouseInput();
 
   protected:
 	// 補助処理
