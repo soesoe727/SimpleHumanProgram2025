@@ -286,5 +286,8 @@ void  DrawPostureShadow( const Posture & posture, const Vector3f & light_dir, co
 // ADDED: 選択部位のみをハイライトして姿勢を描画
 void  DrawPostureSelective( const Posture & posture, int selected_segment_index, const Color3f& highlight_color, const Color3f& base_color );
 
+// ADDED: 複数選択された部位をハイライトして姿勢を描画
+void  DrawPostureMultiSelect( const Posture & posture, const std::vector<bool>& selected_segments, const Color3f& highlight_color, const Color3f& base_color );
+
 
 #endif // _SIMPLE_HUMAN_H_

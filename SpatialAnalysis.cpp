@@ -241,6 +241,12 @@ SpatialAnalyzer::SpatialAnalyzer() {
     selected_segment_index = -1;  // -1は全体表示
     show_segment_mode = false;
     
+    // 部位選択キャッシュ
+    segment_cache_dirty = true;
+    cached_segment_max_val = 1.0f;
+    cached_feature_mode = -1;
+    cached_selected_segment_index = -2;  // -1は有効な値なので、-2で初期化
+    
     // スライス平面の変換行列を単位行列で初期化
     slice_plane_transform.setIdentity();
     
@@ -365,10 +371,10 @@ void SpatialAnalyzer::DrawCTMaps(int win_width, int win_height) {
     
     // OpenGL 2D設定
     glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity();
-	gluOrtho2D(0.0, win_width, win_height, 0.0);
-	glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity();
-	glPushAttrib(GL_ENABLE_BIT | GL_LINE_BIT);
-	glDisable(GL_DEPTH_TEST); glDisable(GL_LIGHTING);
+    gluOrtho2D(0.0, win_width, win_height, 0.0);
+    glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity();
+    glPushAttrib(GL_ENABLE_BIT | GL_LINE_BIT);
+    glDisable(GL_DEPTH_TEST); glDisable(GL_LIGHTING);
 
     int margin = 50, gap = 15;
     int num_rows = slice_positions.size();
@@ -376,11 +382,8 @@ void SpatialAnalyzer::DrawCTMaps(int win_width, int win_height) {
     if (map_w > 250) map_w = 250; 
     int map_h = map_w; 
     
-    
     int start_x = margin;
     int start_y = win_height - margin - (num_rows * map_h + (num_rows - 1) * gap);
-
-    // 回転スライスモードでは1つのスライス（アクティブなもの）のみ表示
     int y_pos = start_y;
     
     char t1[64], t2[64], t3[64];
@@ -388,42 +391,25 @@ void SpatialAnalyzer::DrawCTMaps(int win_width, int win_height) {
     sprintf(t2, "Rotated M2");
     sprintf(t3, "Rotated Diff");
     
-    VoxelGrid* grid1 = nullptr;
-    VoxelGrid* grid2 = nullptr;
-    VoxelGrid* grid_diff = nullptr;
-    float max_value = 1.0f;
+    // 部位選択モードのチェック（複数選択 OR 単一選択）
+    int selected_count = GetSelectedSegmentCount();
+    bool use_segment_mode = show_segment_mode && (selected_count > 0 || selected_segment_index >= 0);
     
-    // 表示するボクセルグリッドを選択
-    if (show_segment_mode && selected_segment_index >= 0 && 
-        selected_segment_index < segment_presence_voxels1.num_segments) {
-        // 部位別表示モード: feature_modeに応じて占有率、速度、ジャークを使用
-        if (feature_mode == 0) {
-            // 占有率
-            grid1 = &segment_presence_voxels1.GetSegmentGrid(selected_segment_index);
-            grid2 = &segment_presence_voxels2.GetSegmentGrid(selected_segment_index);
-        } else if (feature_mode == 1) {
-            // 速度
-            grid1 = &segment_speed_voxels1.GetSegmentGrid(selected_segment_index);
-            grid2 = &segment_speed_voxels2.GetSegmentGrid(selected_segment_index);
-        } else {
-            // ジャーク
-            grid1 = &segment_jerk_voxels1.GetSegmentGrid(selected_segment_index);
-            grid2 = &segment_jerk_voxels2.GetSegmentGrid(selected_segment_index);
-        }
+    if (use_segment_mode) {
+        // 部位選択モード: キャッシュを使用
+        UpdateSegmentCache();
         
-        static VoxelGrid temp_diff;
-        temp_diff.Resize(grid_resolution);
-        temp_diff.Clear();
-        int size = grid_resolution * grid_resolution * grid_resolution;
-        max_value = 0.0f;
-        for (int j = 0; j < size; ++j) {
-            float diff = abs(grid1->data[j] - grid2->data[j]);
-            temp_diff.data[j] = diff;
-            if (diff > max_value) max_value = diff;
-        }
-        if (max_value < 1e-5f) max_value = 1.0f;
-        grid_diff = &temp_diff;
+        DrawRotatedSliceMap(start_x, y_pos, map_w, map_h, cached_segment_grid1, cached_segment_max_val, t1);
+        DrawRotatedSliceMap(start_x + map_w + gap, y_pos, map_w, map_h, cached_segment_grid2, cached_segment_max_val, t2);
+        DrawRotatedSliceMap(start_x + 2*(map_w + gap), y_pos, map_w, map_h, cached_segment_diff, cached_segment_max_val, t3);
+        
     } else {
+        // 全体表示（従来の動作）
+        VoxelGrid* grid1 = nullptr;
+        VoxelGrid* grid2 = nullptr;
+        VoxelGrid* grid_diff = nullptr;
+        float max_value = 1.0f;
+        
         if (norm_mode == 0) {
             // 瞬間表示
             if (feature_mode == 0) {
@@ -445,31 +431,27 @@ void SpatialAnalyzer::DrawCTMaps(int win_width, int win_height) {
         } else {
             // 累積ボクセルデータ
             if (feature_mode == 0) {
-                // 累積占有率
                 grid1 = &voxels1_psc_accumulated;
                 grid2 = &voxels2_psc_accumulated;
                 grid_diff = &voxels_psc_accumulated_diff;
                 max_value = max_psc_accumulated_val;
             } else if (feature_mode == 1) {
-                // 累積最大速度
                 grid1 = &voxels1_spd_accumulated;
                 grid2 = &voxels2_spd_accumulated;
                 grid_diff = &voxels_spd_accumulated_diff;
                 max_value = max_spd_accumulated_val;
             } else {
-                // 累積最大ジャーク
                 grid1 = &voxels1_jrk_accumulated;
                 grid2 = &voxels2_jrk_accumulated;
                 grid_diff = &voxels_jrk_accumulated_diff;
                 max_value = max_jrk_accumulated_val;
             }
         }
+        
+        DrawRotatedSliceMap(start_x, y_pos, map_w, map_h, *grid1, max_value, t1);
+        DrawRotatedSliceMap(start_x + map_w + gap, y_pos, map_w, map_h, *grid2, max_value, t2);
+        DrawRotatedSliceMap(start_x + 2*(map_w + gap), y_pos, map_w, map_h, *grid_diff, max_value, t3);
     }
-    
-    // 回転スライスマップを描画
-    DrawRotatedSliceMap(start_x, y_pos, map_w, map_h, *grid1, max_value, t1);
-    DrawRotatedSliceMap(start_x + map_w + gap, y_pos, map_w, map_h, *grid2, max_value, t2);
-    DrawRotatedSliceMap(start_x + 2*(map_w + gap), y_pos, map_w, map_h, *grid_diff, max_value, t3);
     
     glPopAttrib();
     glMatrixMode(GL_PROJECTION); glPopMatrix();
@@ -499,69 +481,45 @@ void SpatialAnalyzer::DrawVoxels3D() {
     int step = grid_resolution / 32;
     if (step < 1) step = 1;
     
+    // 部位選択モードのチェック（複数選択 OR 単一選択）
+    int selected_count = GetSelectedSegmentCount();
+    bool use_segment_mode = show_segment_mode && (selected_count > 0 || selected_segment_index >= 0);
+    
     VoxelGrid* grid_to_draw = nullptr;
     float max_val = 1.0f;
     
-    // 部位別表示モード
-    if (show_segment_mode && selected_segment_index >= 0 && 
-        selected_segment_index < segment_presence_voxels1.num_segments) {
-        // 特定の部位のみ表示（差分を計算）
-        static VoxelGrid temp_seg_diff;
-        temp_seg_diff.Resize(grid_resolution);
-        temp_seg_diff.Clear();
+    if (use_segment_mode) {
+        // 部位選択モード: キャッシュを使用
+        UpdateSegmentCache();
+        grid_to_draw = &cached_segment_diff;
+        max_val = cached_segment_max_val;
         
-        VoxelGrid* seg1;
-        VoxelGrid* seg2;
-        
-        // feature_modeに応じて占有率、速度、ジャークを使用
-        if (feature_mode == 0) {
-            seg1 = &segment_presence_voxels1.GetSegmentGrid(selected_segment_index);
-            seg2 = &segment_presence_voxels2.GetSegmentGrid(selected_segment_index);
-        } else if (feature_mode == 1) {
-            seg1 = &segment_speed_voxels1.GetSegmentGrid(selected_segment_index);
-            seg2 = &segment_speed_voxels2.GetSegmentGrid(selected_segment_index);
-        } else {
-            seg1 = &segment_jerk_voxels1.GetSegmentGrid(selected_segment_index);
-            seg2 = &segment_jerk_voxels2.GetSegmentGrid(selected_segment_index);
-        }
-        
-        int size = grid_resolution * grid_resolution * grid_resolution;
-        max_val = 0.0f;
-        for (int i = 0; i < size; ++i) {
-            float diff = abs(seg1->data[i] - seg2->data[i]);
-            temp_seg_diff.data[i] = diff;
-            if (diff > max_val) max_val = diff;
-        }
-        if (max_val < 1e-5f) max_val = 1.0f;
-        
-        grid_to_draw = &temp_seg_diff;
-        
-    } else if (norm_mode == 0) {
-        // 現在フレームのみ（瞬間表示）
-        if (feature_mode == 0) {
-            grid_to_draw = &voxels_psc_diff;
-            max_val = max_psc_val;
-        } else if (feature_mode == 1) {
-            grid_to_draw = &voxels_spd_diff;
-            max_val = max_spd_val;
-        } else {
-            grid_to_draw = &voxels_jrk_diff;
-            max_val = max_jrk_val;
-        }
     } else {
-        // 動作全体の累積データ
-        if (feature_mode == 0) {
-            // 累積占有率
-            grid_to_draw = &voxels_psc_accumulated_diff;
-            max_val = max_psc_accumulated_val;
-        } else if (feature_mode == 1) {
-            // 累積最大速度
-            grid_to_draw = &voxels_spd_accumulated_diff;
-            max_val = max_spd_accumulated_val;
+        // 従来の全体表示モード
+        if (norm_mode == 0) {
+            // 現在フレームのみ（瞬間表示）
+            if (feature_mode == 0) {
+                grid_to_draw = &voxels_psc_diff;
+                max_val = max_psc_val;
+            } else if (feature_mode == 1) {
+                grid_to_draw = &voxels_spd_diff;
+                max_val = max_spd_val;
+            } else {
+                grid_to_draw = &voxels_jrk_diff;
+                max_val = max_jrk_val;
+            }
         } else {
-            // 累積最大ジャーク
-            grid_to_draw = &voxels_jrk_accumulated_diff;
-            max_val = max_jrk_accumulated_val;
+            // 動作全体の累積データ
+            if (feature_mode == 0) {
+                grid_to_draw = &voxels_psc_accumulated_diff;
+                max_val = max_psc_accumulated_val;
+            } else if (feature_mode == 1) {
+                grid_to_draw = &voxels_spd_accumulated_diff;
+                max_val = max_spd_accumulated_val;
+            } else {
+                grid_to_draw = &voxels_jrk_accumulated_diff;
+                max_val = max_jrk_accumulated_val;
+            }
         }
     }
     
@@ -596,7 +554,7 @@ void SpatialAnalyzer::DrawVoxels3D() {
     glDisable(GL_BLEND);
 }
 
-// 動作全体を通った累積ボクセル計算（占有率と速度とジャークの両方 + 部位ごと）
+// 動作全体を通った累積ボクセル計算（占有率と速度とジャーク + 部位ごと）
 void SpatialAnalyzer::AccumulateAllFrames(Motion* m1, Motion* m2)
 {
     if (!m1 || !m2) return;
@@ -667,7 +625,7 @@ void SpatialAnalyzer::AccumulateAllFrames(Motion* m1, Motion* m2)
                     segment_jerk_voxels1.segment_grids[s].data[i] = jrk_val;
                 }
                 
-                // 全体への加算
+				// 全体への加算or最大値更新
                 voxels1_psc_accumulated.data[i] += psc_val;
                 if (spd_val > voxels1_spd_accumulated.data[i]) {
                     voxels1_spd_accumulated.data[i] = spd_val;
@@ -708,7 +666,7 @@ void SpatialAnalyzer::AccumulateAllFrames(Motion* m1, Motion* m2)
                     segment_jerk_voxels2.segment_grids[s].data[i] = jrk_val;
                 }
                 
-                // 全体への加算
+				// 全体への加算or最大値更新
                 voxels2_psc_accumulated.data[i] += psc_val;
                 if (spd_val > voxels2_spd_accumulated.data[i]) {
                     voxels2_spd_accumulated.data[i] = spd_val;
@@ -755,6 +713,26 @@ void SpatialAnalyzer::AccumulateAllFrames(Motion* m1, Motion* m2)
         voxels_psc_accumulated_diff.SetReference(
             voxels1_psc_accumulated.reference_root_pos, 
             voxels1_psc_accumulated.reference_root_ori);
+    }
+    
+    // 部位ごとの最大値を計算（正規化用）
+    InitializeSegmentSelection(num_segments);
+    for (int s = 0; s < num_segments; ++s) {
+        float max_psc = 0.0f, max_spd = 0.0f, max_jrk = 0.0f;
+        for (int i = 0; i < size; ++i) {
+            float diff_psc = abs(segment_presence_voxels1.segment_grids[s].data[i] - 
+                                  segment_presence_voxels2.segment_grids[s].data[i]);
+            float diff_spd = abs(segment_speed_voxels1.segment_grids[s].data[i] - 
+                                 segment_speed_voxels2.segment_grids[s].data[i]);
+            float diff_jrk = abs(segment_jerk_voxels1.segment_grids[s].data[i] - 
+                                 segment_jerk_voxels2.segment_grids[s].data[i]);
+            if (diff_psc > max_psc) max_psc = diff_psc;
+            if (diff_spd > max_spd) max_spd = diff_spd;
+            if (diff_jrk > max_jrk) max_jrk = diff_jrk;
+        }
+        segment_max_presence[s] = (max_psc < 1e-5f) ? 1.0f : max_psc;
+        segment_max_speed[s] = (max_spd < 1e-5f) ? 1.0f : max_spd;
+        segment_max_jerk[s] = (max_jrk < 1e-5f) ? 1.0f : max_jrk;
     }
     
     std::cout << "Integrated accumulation complete." << std::endl;
@@ -1421,27 +1399,27 @@ void SpatialAnalyzer::ExtractBoneData(Motion* m, const FrameData& frame_data, ve
             bone.speed2 = spd2_curr.length() / frame_data.dt;
             
             // 加速度を計算（前フレームの速度との差）
-            Vector3f spd1_prev = bone.p1_prev - bone.p1_prev2;
-            Vector3f spd2_prev = bone.p2_prev - bone.p2_prev2;
+             Vector3f spd1_prev = bone.p1_prev - bone.p1_prev2;
+             Vector3f spd2_prev = bone.p2_prev - bone.p2_prev2;
             
-            Vector3f accel1_curr = spd1_curr - spd1_prev;
-            Vector3f accel2_curr = spd2_curr - spd2_prev;
+             Vector3f accel1_curr = spd1_curr - spd1_prev;
+             Vector3f accel2_curr = spd2_curr - spd2_prev;
             
-            bone.accel1 = accel1_curr.length() / frame_data.dt;  // magnitude of acceleration
-            bone.accel2 = accel2_curr.length() / frame_data.dt;
+             bone.accel1 = accel1_curr.length() / frame_data.dt;
+             bone.accel2 = accel2_curr.length() / frame_data.dt;
 
 			// ジャークを計算（加速度の時間微分）
-			Vector3f spd1_prev2 = bone.p1_prev2 - bone.p1_prev3;
-            Vector3f spd2_prev2 = bone.p2_prev2 - bone.p2_prev3;
+ 			Vector3f spd1_prev2 = bone.p1_prev2 - bone.p1_prev3;
+             Vector3f spd2_prev2 = bone.p2_prev2 - bone.p2_prev3;
 
-            Vector3f accel1_prev = spd1_prev - spd1_prev2;
-			Vector3f accel2_prev = spd2_prev - spd2_prev2;
+             Vector3f accel1_prev = spd1_prev - spd1_prev2;
+ 			Vector3f accel2_prev = spd2_prev - spd2_prev2;
 
-			Vector3f jerk1_curr = accel1_curr - accel1_prev;
-			Vector3f jerk2_curr = accel2_curr - accel2_prev;
+ 			Vector3f jerk1_curr = accel1_curr - accel1_prev;
+ 			Vector3f jerk2_curr = accel2_curr - accel2_prev;
 
-			bone.jerk1 = jerk1_curr.length() / frame_data.dt;
-			bone.jerk2 = jerk2_curr.length() / frame_data.dt;
+ 			bone.jerk1 = jerk1_curr.length() / frame_data.dt;
+ 			bone.jerk2 = jerk2_curr.length() / frame_data.dt;
         }
         
         bones.push_back(bone);
@@ -1514,4 +1492,183 @@ void SpatialAnalyzer::WriteToVoxelGrid(const BoneData& bone, float bone_radius, 
             }
         }
     }
+}
+
+// === 部位選択操作（複数選択対応） ===
+
+void SpatialAnalyzer::InitializeSegmentSelection(int num_segments) {
+    selected_segments.assign(num_segments, false);
+    segment_max_presence.assign(num_segments, 1.0f);
+    segment_max_speed.assign(num_segments, 1.0f);
+    segment_max_jerk.assign(num_segments, 1.0f);
+}
+
+void SpatialAnalyzer::ToggleSegmentSelection(int segment_index) {
+    if (segment_index >= 0 && segment_index < (int)selected_segments.size()) {
+        selected_segments[segment_index] = !selected_segments[segment_index];
+        InvalidateSegmentCache();
+        std::cout << "Segment " << segment_index << " selection: " 
+                  << (selected_segments[segment_index] ? "ON" : "OFF") << std::endl;
+    }
+}
+
+void SpatialAnalyzer::SelectAllSegments() {
+    for (size_t i = 0; i < selected_segments.size(); ++i) {
+        selected_segments[i] = true;
+    }
+    InvalidateSegmentCache();
+    std::cout << "All segments selected" << std::endl;
+}
+
+void SpatialAnalyzer::ClearSegmentSelection() {
+    for (size_t i = 0; i < selected_segments.size(); ++i) {
+        selected_segments[i] = false;
+    }
+    InvalidateSegmentCache();
+    std::cout << "Segment selection cleared" << std::endl;
+}
+
+bool SpatialAnalyzer::IsSegmentSelected(int segment_index) const {
+    if (segment_index >= 0 && segment_index < (int)selected_segments.size()) {
+        return selected_segments[segment_index];
+    }
+    return false;
+}
+
+int SpatialAnalyzer::GetSelectedSegmentCount() const {
+    int count = 0;
+    for (size_t i = 0; i < selected_segments.size(); ++i) {
+        if (selected_segments[i]) count++;
+    }
+    return count;
+}
+
+float SpatialAnalyzer::GetSegmentMaxValue(int segment_index) const {
+    if (segment_index < 0 || segment_index >= (int)segment_max_presence.size()) {
+        return 1.0f;
+    }
+    
+    if (feature_mode == 0) {
+        return segment_max_presence[segment_index];
+    } else if (feature_mode == 1) {
+        return segment_max_speed[segment_index];
+    } else {
+        return segment_max_jerk[segment_index];
+    }
+}
+
+void SpatialAnalyzer::InvalidateSegmentCache() {
+    segment_cache_dirty = true;
+}
+
+void SpatialAnalyzer::UpdateSegmentCache() {
+    // キャッシュが有効かチェック
+    // 1. segment_cache_dirtyがfalse
+    // 2. feature_modeが同じ
+    // 3. selected_segment_indexが同じ
+    // 4. selected_segmentsが同じ
+    bool selection_changed = false;
+    if (cached_selected_segments.size() != selected_segments.size()) {
+        selection_changed = true;
+    } else {
+        for (size_t i = 0; i < selected_segments.size(); ++i) {
+            if (cached_selected_segments[i] != selected_segments[i]) {
+                selection_changed = true;
+                break;
+            }
+        }
+    }
+    
+    if (!segment_cache_dirty && 
+        !selection_changed &&
+        cached_feature_mode == feature_mode && 
+        cached_selected_segment_index == selected_segment_index) {
+        return;  // キャッシュは有効
+    }
+    
+    // キャッシュグリッドをリサイズ
+    cached_segment_grid1.Resize(grid_resolution);
+    cached_segment_grid2.Resize(grid_resolution);
+    cached_segment_diff.Resize(grid_resolution);
+    cached_segment_grid1.Clear();
+    cached_segment_grid2.Clear();
+    cached_segment_diff.Clear();
+    
+    SegmentVoxelData* seg_data1 = nullptr;
+    SegmentVoxelData* seg_data2 = nullptr;
+    
+    if (feature_mode == 0) {
+        seg_data1 = &segment_presence_voxels1;
+        seg_data2 = &segment_presence_voxels2;
+    } else if (feature_mode == 1) {
+        seg_data1 = &segment_speed_voxels1;
+        seg_data2 = &segment_speed_voxels2;
+    } else {
+        seg_data1 = &segment_jerk_voxels1;
+        seg_data2 = &segment_jerk_voxels2;
+    }
+    
+    // セグメントデータが無効な場合は終了
+    if (seg_data1->num_segments == 0) {
+        segment_cache_dirty = false;
+        cached_feature_mode = feature_mode;
+        cached_selected_segment_index = selected_segment_index;
+        cached_selected_segments = selected_segments;
+        return;
+    }
+    
+    int size = grid_resolution * grid_resolution * grid_resolution;
+    cached_segment_max_val = 0.0f;
+    
+    // 表示対象部位のリストを事前に作成（ループ内での条件分岐を減らす）
+    std::vector<int> active_segments;
+    for (size_t s = 0; s < selected_segments.size(); ++s) {
+        if (selected_segments[s]) {
+            active_segments.push_back((int)s);
+        }
+    }
+    // ナビゲート中の部位も追加（まだ選択されていない場合）
+    if (selected_segment_index >= 0 && 
+        selected_segment_index < (int)selected_segments.size() &&
+        !selected_segments[selected_segment_index]) {
+        active_segments.push_back(selected_segment_index);
+    }
+    
+    // 表示部位がない場合は終了
+    if (active_segments.empty()) {
+        segment_cache_dirty = false;
+        cached_feature_mode = feature_mode;
+        cached_selected_segment_index = selected_segment_index;
+        cached_selected_segments = selected_segments;
+        return;
+    }
+    
+    // 選択部位のボクセルを集約
+    for (int i = 0; i < size; ++i) {
+        float val1 = 0.0f, val2 = 0.0f;
+        
+        for (int s : active_segments) {
+            if (s < seg_data1->num_segments) {
+                float v = seg_data1->segment_grids[s].data[i];
+                if (v > val1) val1 = v;
+            }
+            if (s < seg_data2->num_segments) {
+                float v = seg_data2->segment_grids[s].data[i];
+                if (v > val2) val2 = v;
+            }
+        }
+        
+        cached_segment_grid1.data[i] = val1;
+        cached_segment_grid2.data[i] = val2;
+        float diff = abs(val1 - val2);
+        cached_segment_diff.data[i] = diff;
+        if (diff > cached_segment_max_val) cached_segment_max_val = diff;
+    }
+    
+    if (cached_segment_max_val < 1e-5f) cached_segment_max_val = 1.0f;
+    
+    segment_cache_dirty = false;
+    cached_feature_mode = feature_mode;
+    cached_selected_segment_index = selected_segment_index;
+    cached_selected_segments = selected_segments;
 }

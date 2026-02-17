@@ -157,6 +157,11 @@ public:
     float max_psc_accumulated_val; // 占有率累積用の最大値
     float max_spd_accumulated_val; // 速度累計用の最大値
     float max_jrk_accumulated_val; // ジャーク累計用の最大値
+    
+    // 部位ごとの最大値（正規化用）
+    std::vector<float> segment_max_presence;
+    std::vector<float> segment_max_speed;
+    std::vector<float> segment_max_jerk;
 
     // --- ビュー/スライス設定 ---
 	std::vector<float> slice_positions; // スライス位置 (0.0 - 1.0)
@@ -188,8 +193,19 @@ public:
 	int norm_mode; // 0: 瞬間表示, 1: 累積表示
     
     // 表示設定
-    int selected_segment_index;  // 表示する部位のインデックス (-1で全体)
+    int selected_segment_index;  // 表示する部位のインデックス (-1で全体) ※後方互換用
+    std::vector<bool> selected_segments;  // 各部位の選択状態（複数選択対応）
     bool show_segment_mode;      // 部位別表示モードON/OFF
+    
+    // 部位選択キャッシュ（パフォーマンス最適化用）
+    VoxelGrid cached_segment_grid1;   // 選択部位を集約したグリッド（M1）
+    VoxelGrid cached_segment_grid2;   // 選択部位を集約したグリッド（M2）
+    VoxelGrid cached_segment_diff;    // 選択部位の差分グリッド
+    float cached_segment_max_val;     // 選択部位の最大差分値
+    bool segment_cache_dirty;         // キャッシュが無効かどうか
+    int cached_feature_mode;          // キャッシュ作成時のfeature_mode
+    int cached_selected_segment_index;// キャッシュ作成時のselected_segment_index
+    std::vector<bool> cached_selected_segments; // キャッシュ作成時の選択状態
 
 public:
     SpatialAnalyzer();
@@ -239,10 +255,25 @@ public:
     void ResetSliceRotation();
     void ToggleRotatedSliceMode();
     
+    // 部位選択操作（複数選択対応）
+    void InitializeSegmentSelection(int num_segments);  // 選択状態の初期化
+    void ToggleSegmentSelection(int segment_index);     // 部位の選択をトグル
+    void SelectAllSegments();                           // 全部位を選択
+    void ClearSegmentSelection();                       // 選択をクリア
+    bool IsSegmentSelected(int segment_index) const;    // 選択状態を取得
+    int GetSelectedSegmentCount() const;                // 選択部位数を取得
+    float GetSegmentMaxValue(int segment_index) const;  // 部位ごとの最大値を取得
+    void InvalidateSegmentCache();                      // キャッシュを無効化
+    void UpdateSegmentCache();                          // キャッシュを更新
+
 private:
     // 回転スライス用のヘルパー
     void DrawRotatedSlicePlane();
     void DrawRotatedSliceMap(int x, int y, int w, int h, VoxelGrid& grid, float max_val, const char* title);
+    void DrawRotatedSliceMapMultiSegment(int x, int y, int w, int h,
+        SegmentVoxelData& seg_data, const char* title);  // M1/M2用
+    void DrawRotatedSliceMapMultiSegmentDiff(int x, int y, int w, int h,
+        const char* title);  // Diff用
     float SampleVoxelAtWorldPos(VoxelGrid& grid, const Point3f& world_pos);
     
     // オイラー角を変換行列から逆算（表示用）
