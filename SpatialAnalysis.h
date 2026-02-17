@@ -19,14 +19,13 @@ struct BoneData {
     Point3f p1, p2;           // 現在フレームの両端点
     Point3f p1_prev, p2_prev; // 前フレームの両端点
     Point3f p1_prev2, p2_prev2; // 2フレーム前の両端点（加速度計算用）
-	Point3f p1_prev3, p2_prev3; // 2フレーム前の両端点（ジャーク計算用）
+	Point3f p1_prev3, p2_prev3; // 3フレーム前の両端点（ジャーク計算用）
     float speed1, speed2;     // 両端の速度
-    float accel1, accel2;     // 両端の加速度
 	float jerk1, jerk2;       // 両端のジャーク
     int segment_index;        // セグメントインデックス
     bool valid;               // 有効なボーンかどうか
     
-    BoneData() : speed1(0), speed2(0), accel1(0), accel2(0), jerk1(0), jerk2(0), segment_index(-1), valid(false) {}
+    BoneData() : speed1(0), speed2(0), jerk1(0), jerk2(0), segment_index(-1), valid(false) {}
 };
 
 // フレームデータを格納する構造体（FK計算結果の共通化用）
@@ -64,16 +63,11 @@ struct VoxelGrid {
     float& At(int x, int y, int z);
     float Get(int x, int y, int z) const;
     
-    // 基準姿勢の設定・取得
+    // 基準姿勢の設定
     void SetReference(const Point3f& root_pos, const Matrix3f& root_ori) {
         reference_root_pos = root_pos;
         reference_root_ori = root_ori;
         has_reference = true;
-    }
-    
-    void GetReference(Point3f& root_pos, Matrix3f& root_ori) const {
-        root_pos = reference_root_pos;
-        root_ori = reference_root_ori;
     }
     
     // ファイル保存・読み込み
@@ -270,10 +264,6 @@ private:
     // 回転スライス用のヘルパー
     void DrawRotatedSlicePlane();
     void DrawRotatedSliceMap(int x, int y, int w, int h, VoxelGrid& grid, float max_val, const char* title);
-    void DrawRotatedSliceMapMultiSegment(int x, int y, int w, int h,
-        SegmentVoxelData& seg_data, const char* title);  // M1/M2用
-    void DrawRotatedSliceMapMultiSegmentDiff(int x, int y, int w, int h,
-        const char* title);  // Diff用
     float SampleVoxelAtWorldPos(VoxelGrid& grid, const Point3f& world_pos);
     
     // オイラー角を変換行列から逆算（表示用）
