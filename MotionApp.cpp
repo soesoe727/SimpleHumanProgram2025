@@ -182,27 +182,17 @@ void MotionApp::Keyboard(unsigned char key, int mx, int my) {
                 }
                 // 現在の選択が無効な場合、最初の有効な部位を選択
                 if (analyzer.selected_segment_index < 0 || !HasVoxelData(analyzer.selected_segment_index)) {
-                    analyzer.selected_segment_index = 0;
-                    if (!HasVoxelData(analyzer.selected_segment_index)) {
-                        analyzer.selected_segment_index = GetNextValidSegment(analyzer.selected_segment_index, 1);
-                    }
+                    analyzer.selected_segment_index = GetNextValidSegment(-1, 1);
                 }
             }
             std::cout << "Segment mode: " << (analyzer.show_segment_mode ? "ON" : "OFF") << std::endl;
             break;
             
         case '[':
-            if (motion && analyzer.show_segment_mode) {
-                analyzer.selected_segment_index = GetNextValidSegment(analyzer.selected_segment_index, -1);
-                analyzer.InvalidateSegmentCache();
-                std::cout << "Current segment: " << analyzer.selected_segment_index 
-                          << " (" << motion->body->segments[analyzer.selected_segment_index]->name << ")" << std::endl;
-            }
-            break;
-            
         case ']':
             if (motion && analyzer.show_segment_mode) {
-                analyzer.selected_segment_index = GetNextValidSegment(analyzer.selected_segment_index, 1);
+                int direction = (key == '[') ? -1 : 1;
+                analyzer.selected_segment_index = GetNextValidSegment(analyzer.selected_segment_index, direction);
                 analyzer.InvalidateSegmentCache();
                 std::cout << "Current segment: " << analyzer.selected_segment_index 
                           << " (" << motion->body->segments[analyzer.selected_segment_index]->name << ")" << std::endl;
@@ -323,76 +313,14 @@ void MotionApp::Display()
     
     // 1. 3Dモデルの描画 - Motion1 (赤色)
     if (curr_posture) {
-        if (analyzer.show_segment_mode) {
-            int selected_count = analyzer.GetSelectedSegmentCount();
-            Color3f highlight_color(1.0f, 0.0f, 0.0f);  // 赤
-            Color3f base_color(0.7f, 0.7f, 0.7f);       // 灰色
-            
-            // tキーで選択された部位 + []キーでナビゲート中の部位を結合
-            std::vector<bool> combined_selection = analyzer.selected_segments;
-            if (analyzer.selected_segment_index >= 0 && 
-                analyzer.selected_segment_index < (int)combined_selection.size()) {
-                combined_selection[analyzer.selected_segment_index] = true;
-            }
-            
-            // 結合された選択状態でカウント
-            int combined_count = 0;
-            for (size_t i = 0; i < combined_selection.size(); ++i) {
-                if (combined_selection[i]) combined_count++;
-            }
-            
-            if (combined_count > 0) {
-                // 選択されている部位がある場合
-                DrawPostureMultiSelect(*curr_posture, combined_selection, 
-                                       highlight_color, base_color);
-            } else {
-                // 部位モードだが何も選択されていない
-                glColor3f(1.0f, 0.0f, 0.0f); 
-                DrawPosture(*curr_posture);
-            }
-        } else {
-            // 通常表示：全体を赤色
-            glColor3f(1.0f, 0.0f, 0.0f); 
-            DrawPosture(*curr_posture);
-        }
+        DrawPostureWithSegmentMode(*curr_posture, Color3f(1.0f, 0.0f, 0.0f));
         glColor3f(0.0f, 0.0f, 0.0f);
         DrawPostureShadow(*curr_posture, shadow_dir, shadow_color); 
     }
     
     // 2. 3Dモデルの描画 - Motion2 (青色)
     if (curr_posture2) {
-        if (analyzer.show_segment_mode) {
-            int selected_count = analyzer.GetSelectedSegmentCount();
-            Color3f highlight_color(0.0f, 0.0f, 1.0f);  // 青
-            Color3f base_color(0.7f, 0.7f, 0.7f);       // 灰色
-            
-            // tキーで選択された部位 + []キーでナビゲート中の部位を結合
-            std::vector<bool> combined_selection = analyzer.selected_segments;
-            if (analyzer.selected_segment_index >= 0 && 
-                analyzer.selected_segment_index < (int)combined_selection.size()) {
-                combined_selection[analyzer.selected_segment_index] = true;
-            }
-            
-            // 結合された選択状態でカウント
-            int combined_count = 0;
-            for (size_t i = 0; i < combined_selection.size(); ++i) {
-                if (combined_selection[i]) combined_count++;
-            }
-            
-            if (combined_count > 0) {
-                // 選択されている部位がある場合
-                DrawPostureMultiSelect(*curr_posture2, combined_selection, 
-                                       highlight_color, base_color);
-            } else {
-                // 部位モードだが何も選択されていない
-                glColor3f(0.0f, 0.0f, 1.0f);
-                DrawPosture(*curr_posture2);
-            }
-        } else {
-            // 通常表示：全体を青色
-            glColor3f(0.0f, 0.0f, 1.0f);
-            DrawPosture(*curr_posture2);
-        }
+        DrawPostureWithSegmentMode(*curr_posture2, Color3f(0.0f, 0.0f, 1.0f));
         glColor3f(0.0f, 0.0f, 0.0f);
         DrawPostureShadow(*curr_posture2, shadow_dir, shadow_color); 
     }
@@ -423,21 +351,9 @@ void MotionApp::Display()
     }
 
     // 6. 情報テキストの表示
-    char title[512];
-    const char* feature_mode_str;
-    if (analyzer.feature_mode == 0) {
-        feature_mode_str = "Occupancy";
-    } else if (analyzer.feature_mode == 1) {
-        feature_mode_str = "Speed";
-    } else {
-        feature_mode_str = "Jerk";
-    }
+    const char* feature_names[] = {"Occupancy", "Speed", "Jerk"};
+    const char* feature_mode_str = feature_names[analyzer.feature_mode];
     const char* norm_mode_str = (analyzer.norm_mode == 0) ? "CurrentFrame" : "Accumulated";
-    const char* planes_on_str = (analyzer.show_planes) ? "ON" : "OFF";
-    const char* voxels_on_str = (analyzer.show_voxels) ? "ON" : "OFF";
-    const char* gizmo_str = (use_slice_gizmo) ? "ON" : "OFF";
-    const char* gizmo_mode_str = (slice_gizmo.GetMode() == GIZMO_TRANSLATE) ? "Move" : "Rotate";
-    const char* spacemouse_str = (use_spacemouse_slice) ? "ON" : "OFF";
 
     // 部位情報
     char segment_info[256] = "All";
@@ -451,16 +367,16 @@ void MotionApp::Display()
                     analyzer.selected_segment_index);
         }
     }
-    
-    // 回転情報
-    char rotation_info[64];
-    sprintf(rotation_info, "Rot:X%.0f Y%.0f Z%.0f", 
-            analyzer.slice_rotation_x, analyzer.slice_rotation_y, analyzer.slice_rotation_z);
 
-    sprintf(title, "CT-Scan | %s | Gizmo:%s(%s) | SpaceMouse:%s | Feature:%s | Data:%s | Seg:%s | Planes:%s | Voxels:%s",
-        rotation_info, gizmo_str, gizmo_mode_str, spacemouse_str,
+    char title[512];
+    sprintf(title, "CT-Scan | Rot:X%.0f Y%.0f Z%.0f | Gizmo:%s(%s) | SpaceMouse:%s | Feature:%s | Data:%s | Seg:%s | Planes:%s | Voxels:%s",
+        analyzer.slice_rotation_x, analyzer.slice_rotation_y, analyzer.slice_rotation_z,
+        use_slice_gizmo ? "ON" : "OFF",
+        slice_gizmo.GetMode() == GIZMO_TRANSLATE ? "Move" : "Rotate",
+        use_spacemouse_slice ? "ON" : "OFF",
         feature_mode_str, norm_mode_str, segment_info,
-        planes_on_str, voxels_on_str);
+        analyzer.show_planes ? "ON" : "OFF",
+        analyzer.show_voxels ? "ON" : "OFF");
     
     DrawTextInformation(0, title);
     
@@ -759,38 +675,61 @@ void MotionApp::ProcessSpaceMouseInput()
 
     const Matrix4f& transform = GetSpaceMouseTransform();
 
-    float tx = transform.m03;
-    float ty = transform.m13;
-    float tz = transform.m23;
-
     const float translation_sensitivity = 0.01f;
     const float deadzone = 0.001f;
 
-    if (fabs(tx) > deadzone || fabs(ty) > deadzone || fabs(tz) > deadzone) {
+    // 平行移動を適用
+    if (fabs(transform.m03) > deadzone || fabs(transform.m13) > deadzone || fabs(transform.m23) > deadzone) {
         Point3f translation(
-            tx * translation_sensitivity,
-            ty * translation_sensitivity,
-            tz * translation_sensitivity
+            transform.m03 * translation_sensitivity,
+            transform.m13 * translation_sensitivity,
+            transform.m23 * translation_sensitivity
         );
         analyzer.ApplySlicePlaneTranslation(translation);
     }
 
-    Matrix4f local_rotation;
-    local_rotation.setIdentity();
-    local_rotation.m00 = transform.m00;
-    local_rotation.m01 = transform.m01;
-    local_rotation.m02 = transform.m02;
-    local_rotation.m10 = transform.m10;
-    local_rotation.m11 = transform.m11;
-    local_rotation.m12 = transform.m12;
-    local_rotation.m20 = transform.m20;
-    local_rotation.m21 = transform.m21;
-    local_rotation.m22 = transform.m22;
-
-    float trace = local_rotation.m00 + local_rotation.m11 + local_rotation.m22;
+    // 回転を適用
+    float trace = transform.m00 + transform.m11 + transform.m22;
     if (fabs(trace - 3.0f) > deadzone) {
+        Matrix4f local_rotation;
+        local_rotation.setIdentity();
+        // 回転成分のみコピー
+        local_rotation.m00 = transform.m00; local_rotation.m01 = transform.m01; local_rotation.m02 = transform.m02;
+        local_rotation.m10 = transform.m10; local_rotation.m11 = transform.m11; local_rotation.m12 = transform.m12;
+        local_rotation.m20 = transform.m20; local_rotation.m21 = transform.m21; local_rotation.m22 = transform.m22;
         analyzer.ApplySlicePlaneRotation(local_rotation);
     }
 
     ResetSpaceMouseTransform();
+}
+
+// 姿勢描画ヘルパー（部位選択モード対応）
+void MotionApp::DrawPostureWithSegmentMode(Posture& posture, const Color3f& highlight_color)
+{
+    if (analyzer.show_segment_mode) {
+        Color3f base_color(0.7f, 0.7f, 0.7f);
+        
+        // 選択された部位 + ナビゲート中の部位を結合
+        std::vector<bool> combined_selection = analyzer.selected_segments;
+        if (analyzer.selected_segment_index >= 0 && 
+            analyzer.selected_segment_index < (int)combined_selection.size()) {
+            combined_selection[analyzer.selected_segment_index] = true;
+        }
+        
+        // 選択部位があるかカウント
+        int combined_count = 0;
+        for (size_t i = 0; i < combined_selection.size(); ++i) {
+            if (combined_selection[i]) combined_count++;
+        }
+        
+        if (combined_count > 0) {
+            DrawPostureMultiSelect(posture, combined_selection, highlight_color, base_color);
+        } else {
+            glColor3f(highlight_color.x, highlight_color.y, highlight_color.z);
+            DrawPosture(posture);
+        }
+    } else {
+        glColor3f(highlight_color.x, highlight_color.y, highlight_color.z);
+        DrawPosture(posture);
+    }
 }

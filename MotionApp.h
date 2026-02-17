@@ -74,6 +74,9 @@ protected:
 
     // ユーティリティ
     void DrawText(int x, int y, const char* text, void* font);
+    
+    // 姿勢描画ヘルパー（部位選択モード対応）
+    void DrawPostureWithSegmentMode(Posture& posture, const Color3f& highlight_color);
 };
 
 #endif // _MOTION_APP_H_
