@@ -84,25 +84,21 @@ void MotionApp::Keyboard(unsigned char key, int mx, int my) {
 
     // CTスキャン操作
     switch(key) {
-        // スライスの移動
         case 'w': 
-            if(!analyzer.slice_positions.empty()) {
+            if (!analyzer.slice_positions.empty()) {
                 Vector3f n = analyzer.GetSlicePlaneNormal(); 
                 n.normalize();
-                Point3f translation(n.x * 0.02f, n.y * 0.02f, n.z * 0.02f);
-                analyzer.ApplySlicePlaneTranslation(translation);
+                analyzer.ApplySlicePlaneTranslation(Point3f(n.x * 0.02f, n.y * 0.02f, n.z * 0.02f));
             }
             break;
         case 's': 
-            if(!analyzer.slice_positions.empty()) {
+            if (!analyzer.slice_positions.empty()) {
                 Vector3f n = analyzer.GetSlicePlaneNormal(); 
                 n.normalize();
-                Point3f translation(-n.x * 0.02f, -n.y * 0.02f, -n.z * 0.02f);
-                analyzer.ApplySlicePlaneTranslation(translation);
+                analyzer.ApplySlicePlaneTranslation(Point3f(-n.x * 0.02f, -n.y * 0.02f, -n.z * 0.02f));
             }
             break;
 
-        // 特徴量・正規化モード
         case 'f': 
             analyzer.feature_mode = (analyzer.feature_mode + 1) % 3; 
             break;
@@ -110,7 +106,6 @@ void MotionApp::Keyboard(unsigned char key, int mx, int my) {
             analyzer.norm_mode = (analyzer.norm_mode + 1) % 2; 
             break;
         
-        // 表示切り替え
         case 'b': 
             analyzer.show_planes = !analyzer.show_planes; 
             break;
@@ -121,69 +116,34 @@ void MotionApp::Keyboard(unsigned char key, int mx, int my) {
             analyzer.show_voxels = !analyzer.show_voxels; 
             break;
         
-        // 平面の回転操作
-        case '1':
-            analyzer.RotateSlicePlane(5.0f, 0.0f, 0.0f);
-            break;
-        case '2':
-            analyzer.RotateSlicePlane(-5.0f, 0.0f, 0.0f);
-            break;
-        case '3':
-            analyzer.RotateSlicePlane(0.0f, 5.0f, 0.0f);
-            break;
-        case '4':
-            analyzer.RotateSlicePlane(0.0f, -5.0f, 0.0f);
-            break;
-        case '5':
-            analyzer.RotateSlicePlane(0.0f, 0.0f, 5.0f);
-            break;
-        case '6':
-            analyzer.RotateSlicePlane(0.0f, 0.0f, -5.0f);
-            break;
-        case '0':
-            analyzer.ResetSliceRotation();
-            break;
+        case '1': analyzer.RotateSlicePlane(5.0f, 0.0f, 0.0f); break;
+        case '2': analyzer.RotateSlicePlane(-5.0f, 0.0f, 0.0f); break;
+        case '3': analyzer.RotateSlicePlane(0.0f, 5.0f, 0.0f); break;
+        case '4': analyzer.RotateSlicePlane(0.0f, -5.0f, 0.0f); break;
+        case '5': analyzer.RotateSlicePlane(0.0f, 0.0f, 5.0f); break;
+        case '6': analyzer.RotateSlicePlane(0.0f, 0.0f, -5.0f); break;
+        case '0': analyzer.ResetSliceRotation(); break;
 
-        // ズーム・リセット
-        case 'i': 
-            analyzer.Zoom(0.9f); 
-            break;
-        case 'o': 
-            analyzer.Zoom(1.1f); 
-            break;
-        case 'r': 
-            analyzer.ResetView(); 
-            break;
+        case 'i': analyzer.Zoom(0.9f); break;
+        case 'o': analyzer.Zoom(1.1f); break;
+        case 'r': analyzer.ResetView(); break;
 
-        // ギズモON/OFF
-        case 'y':
-            ToggleSliceGizmo();
-            break;
-        // ギズモモード切り替え
-        case 'u':
-            ToggleSliceGizmoMode();
-            break;
+        case 'y': ToggleSliceGizmo(); break;
+        case 'u': ToggleSliceGizmoMode(); break;
 
-        // SpaceMouseによるスライス操作ON/OFF
         case 'p':
             use_spacemouse_slice = !use_spacemouse_slice;
-            if (use_spacemouse_slice && !analyzer.use_rotated_slice) {
+            if (use_spacemouse_slice && !analyzer.use_rotated_slice)
                 analyzer.ToggleRotatedSliceMode();
-            }
             break;
         
-        // === 部位選択操作 ===
         case 'e': 
             analyzer.show_segment_mode = !analyzer.show_segment_mode;
             if (analyzer.show_segment_mode && motion) {
-                // 選択状態が初期化されていなければ初期化
-                if (analyzer.selected_segments.size() != (size_t)motion->body->num_segments) {
+                if (analyzer.selected_segments.size() != (size_t)motion->body->num_segments)
                     analyzer.InitializeSegmentSelection(motion->body->num_segments);
-                }
-                // 現在の選択が無効な場合、最初の有効な部位を選択
-                if (analyzer.selected_segment_index < 0 || !HasVoxelData(analyzer.selected_segment_index)) {
+                if (analyzer.selected_segment_index < 0 || !HasVoxelData(analyzer.selected_segment_index))
                     analyzer.selected_segment_index = GetNextValidSegment(-1, 1);
-                }
             }
             std::cout << "Segment mode: " << (analyzer.show_segment_mode ? "ON" : "OFF") << std::endl;
             break;
@@ -211,11 +171,9 @@ void MotionApp::Keyboard(unsigned char key, int mx, int my) {
             
         case '9':
             if (motion && analyzer.show_segment_mode) {
-                for (int i = 0; i < motion->body->num_segments; ++i) {
-                    if (HasVoxelData(i)) {
+                for (int i = 0; i < motion->body->num_segments; ++i)
+                    if (HasVoxelData(i))
                         analyzer.selected_segments[i] = true;
-                    }
-                }
                 analyzer.InvalidateSegmentCache();
                 std::cout << "All valid segments selected: " << analyzer.GetSelectedSegmentCount() << std::endl;
             }
@@ -240,9 +198,8 @@ void MotionApp::Keyboard(unsigned char key, int mx, int my) {
 void MotionApp::Special(int key, int mx, int my)
 {
     float world_range[3];
-    for (int i = 0; i < 3; ++i) {
+    for (int i = 0; i < 3; ++i)
         world_range[i] = analyzer.world_bounds[i][1] - analyzer.world_bounds[i][0];
-    }
     float max_range = max(world_range[0], max(world_range[1], world_range[2]));
     float step = max_range * 0.05f;
 
@@ -298,11 +255,14 @@ void MotionApp::MouseMotion(int mx, int my)
 
 void MotionApp::Animation(float delta)
 {
-    if (!on_animation || drag_mouse_l || !motion || !motion2) return;
+    if (!on_animation || drag_mouse_l || !motion || !motion2) 
+        return;
     animation_time += delta * animation_speed;
     float max_duration = max(motion->GetDuration(), motion2->GetDuration());
-    if (animation_time >= max_duration) animation_time = 0.0f;
-    if (animation_time < 0.0f) animation_time = 0.0f;
+    if (animation_time >= max_duration) 
+        animation_time = 0.0f;
+    if (animation_time < 0.0f) 
+        animation_time = 0.0f;
     motion->GetPosture(animation_time, *curr_posture);
     motion2->GetPosture(animation_time, *curr_posture2);
 }
@@ -326,9 +286,8 @@ void MotionApp::Display()
     }
 
     // 3. Analyzerによる3D描画
-    if (analyzer.show_planes) {
+    if (analyzer.show_planes)
         analyzer.DrawSlicePlanes();
-    }
     UpdateVoxelDataWrapper();
     analyzer.DrawVoxels3D();
 
@@ -346,9 +305,8 @@ void MotionApp::Display()
     }
 
     // 5. 2D UIの描画（CTマップ）
-    if (analyzer.show_maps) {
+    if (analyzer.show_maps)
         analyzer.DrawCTMaps(win_width, win_height);
-    }
 
     // 6. 情報テキストの表示
     const char* feature_names[] = {"Occupancy", "Speed", "Jerk"};
@@ -391,9 +349,15 @@ void MotionApp::Display()
 
 void MotionApp::LoadBVH(const char* file_name) {
     Motion* new_motion = LoadAndCoustructBVHMotion(file_name);
-    if (!new_motion) return;
-    if (motion) { if (motion->body) delete motion->body; delete motion; }
-    if (curr_posture) delete curr_posture;
+    if (!new_motion) 
+        return;
+    if (motion) { 
+        if (motion->body) 
+            delete motion->body; 
+        delete motion; 
+    }
+    if (curr_posture) 
+        delete curr_posture;
     motion = new_motion;
     curr_posture = new Posture(motion->body);
     Start();
@@ -401,11 +365,15 @@ void MotionApp::LoadBVH(const char* file_name) {
 
 void MotionApp::LoadBVH2(const char* file_name)
 { 
-    if (!motion) return;
+    if (!motion) 
+        return;
     Motion* m2 = LoadAndCoustructBVHMotion(file_name);
-    if (!m2) return;
-    if (motion2) delete motion2; 
-    if (curr_posture2) delete curr_posture2;
+    if (!m2) 
+        return;
+    if (motion2) 
+        delete motion2; 
+    if (curr_posture2) 
+        delete curr_posture2;
     motion2 = m2;
     curr_posture2 = new Posture(motion2->body); 
     PrepareAllData();
@@ -443,7 +411,8 @@ void MotionApp::OpenNewBVH2()
 }
 
 void MotionApp::AlignInitialPositions() {
-    if (!motion || !motion2 || motion->num_frames == 0 || motion2->num_frames == 0) return;
+    if (!motion || !motion2 || motion->num_frames == 0 || motion2->num_frames == 0) 
+        return;
     
     float y1 = motion->frames[0].root_pos.y;
     float y2 = motion2->frames[0].root_pos.y;
@@ -453,18 +422,17 @@ void MotionApp::AlignInitialPositions() {
     Point3f offset1 = motion->frames[0].root_pos - target_pos;
     Point3f offset2 = motion2->frames[0].root_pos - target_pos;
 
-    for (int i = 0; i < motion->num_frames; i++) { 
+    for (int i = 0; i < motion->num_frames; i++)
         motion->frames[i].root_pos -= offset1; 
-    }
-    for (int i = 0; i < motion2->num_frames; i++) { 
+    for (int i = 0; i < motion2->num_frames; i++)
         motion2->frames[i].root_pos -= offset2; 
-    }
 
     printf("Initial positions aligned.\n");
 }
 
 void MotionApp::AlignInitialOrientations() {
-    if (!motion || !motion2 || motion->num_frames == 0 || motion2->num_frames == 0) return;
+    if (!motion || !motion2 || motion->num_frames == 0 || motion2->num_frames == 0) 
+        return;
     
     Matrix3f ori1 = motion->frames[0].root_ori;
     float angle1 = -atan2(ori1.m02, ori1.m22);
@@ -486,7 +454,8 @@ void MotionApp::AlignInitialOrientations() {
 }
 
 void MotionApp::CalculateWorldBounds() {
-    if (!motion || !motion2) return;
+    if (!motion || !motion2) 
+        return;
 
     float bounds[3][2];
     for (int i = 0; i < 3; ++i) {
@@ -524,7 +493,8 @@ void MotionApp::CalculateWorldBounds() {
 }
 
 void MotionApp::PrepareAllData() {
-    if (!motion || !motion2) return;
+    if (!motion || !motion2) 
+        return;
     AlignInitialPositions();
     AlignInitialOrientations();
     CalculateWorldBounds();
@@ -534,7 +504,6 @@ void MotionApp::PrepareAllData() {
     if (!cache_loaded) {
         std::cout << "Cache not found. Calculating accumulated voxels (integrated)..." << std::endl;
         analyzer.AccumulateAllFrames(motion, motion2);
-        
         std::cout << "Saving voxel cache..." << std::endl;
         analyzer.SaveVoxelCache(motion->name.c_str(), motion2->name.c_str());
     } else {
@@ -545,7 +514,8 @@ void MotionApp::PrepareAllData() {
 }
 
 void MotionApp::UpdateVoxelDataWrapper() {
-    if(!motion || !motion2) return;
+    if (!motion || !motion2) 
+        return;
     analyzer.UpdateVoxels(motion, motion2, animation_time);
 }
 
@@ -558,8 +528,10 @@ void MotionApp::DrawText(int x, int y, const char *text, void *font)
 
 bool MotionApp::HasVoxelData(int segment_index)
 {
-    if (!motion || !motion->body) return false;
-    if (segment_index < 0 || segment_index >= motion->body->num_segments) return false;
+    if (!motion || !motion->body) 
+        return false;
+    if (segment_index < 0 || segment_index >= motion->body->num_segments) 
+        return false;
     
     const Segment* segment = motion->body->segments[segment_index];
     return !IsFingerSegment(segment);
@@ -567,7 +539,8 @@ bool MotionApp::HasVoxelData(int segment_index)
 
 int MotionApp::GetNextValidSegment(int current_segment, int direction)
 {
-    if (!motion || !motion->body) return -1;
+    if (!motion || !motion->body) 
+        return -1;
     
     int num_segments = motion->body->num_segments;
     int next_segment = current_segment;
@@ -575,15 +548,13 @@ int MotionApp::GetNextValidSegment(int current_segment, int direction)
     for (int i = 0; i < num_segments; i++) {
         next_segment += direction;
         
-        if (next_segment < 0) {
+        if (next_segment < 0)
             next_segment = num_segments - 1;
-        } else if (next_segment >= num_segments) {
+        else if (next_segment >= num_segments)
             next_segment = 0;
-        }
         
-        if (HasVoxelData(next_segment)) {
+        if (HasVoxelData(next_segment))
             return next_segment;
-        }
     }
     
     return current_segment;
@@ -592,9 +563,8 @@ int MotionApp::GetNextValidSegment(int current_segment, int direction)
 void MotionApp::ToggleSliceGizmo()
 {
     use_slice_gizmo = !use_slice_gizmo;
-    if (use_slice_gizmo && !analyzer.use_rotated_slice) {
+    if (use_slice_gizmo && !analyzer.use_rotated_slice)
         analyzer.ToggleRotatedSliceMode();
-    }
     gizmo_dragging = false;
     slice_gizmo.SetSelectedAxis(GIZMO_NONE);
     SyncGizmoToSliceState();
@@ -639,29 +609,27 @@ float MotionApp::ComputeGizmoScale() const
     float extent_y = analyzer.world_bounds[1][1] - analyzer.world_bounds[1][0];
     float extent_z = analyzer.world_bounds[2][1] - analyzer.world_bounds[2][0];
     float max_extent = (std::max)(extent_x, (std::max)(extent_y, extent_z));
-    if (max_extent <= 0.0f) max_extent = 1.0f;
+    if (max_extent <= 0.0f) 
+        max_extent = 1.0f;
     return max_extent * 0.6f;
 }
 
 void MotionApp::ApplySliceGizmoDelta(const Point3f& translation, const Matrix4f& local_rotation)
 {
-    if (fabsf(translation.x) > 1e-6f || fabsf(translation.y) > 1e-6f || fabsf(translation.z) > 1e-6f) {
+    if (fabsf(translation.x) > 1e-6f || fabsf(translation.y) > 1e-6f || fabsf(translation.z) > 1e-6f)
         analyzer.ApplySlicePlaneTranslation(translation);
-    }
 
     if (slice_gizmo.GetMode() == GIZMO_ROTATE) {
         float trace = local_rotation.m00 + local_rotation.m11 + local_rotation.m22;
-        if (fabsf(trace - 3.0f) > 0.0001f) {
+        if (fabsf(trace - 3.0f) > 0.0001f)
             analyzer.ApplySlicePlaneRotation(local_rotation);
-        }
     }
 }
 
 void MotionApp::SyncGizmoToSliceState()
 {
-    if (!analyzer.use_rotated_slice) {
+    if (!analyzer.use_rotated_slice)
         slice_gizmo.SetMode(GIZMO_TRANSLATE);
-    }
 }
 
 void MotionApp::ProcessSpaceMouseInput()
@@ -669,16 +637,14 @@ void MotionApp::ProcessSpaceMouseInput()
     if (!use_spacemouse_slice)
         return;
 
-    if (!analyzer.use_rotated_slice) {
+    if (!analyzer.use_rotated_slice)
         analyzer.ToggleRotatedSliceMode();
-    }
 
     const Matrix4f& transform = GetSpaceMouseTransform();
 
     const float translation_sensitivity = 0.01f;
     const float deadzone = 0.001f;
 
-    // 平行移動を適用
     if (fabs(transform.m03) > deadzone || fabs(transform.m13) > deadzone || fabs(transform.m23) > deadzone) {
         Point3f translation(
             transform.m03 * translation_sensitivity,
@@ -688,12 +654,10 @@ void MotionApp::ProcessSpaceMouseInput()
         analyzer.ApplySlicePlaneTranslation(translation);
     }
 
-    // 回転を適用
     float trace = transform.m00 + transform.m11 + transform.m22;
     if (fabs(trace - 3.0f) > deadzone) {
         Matrix4f local_rotation;
         local_rotation.setIdentity();
-        // 回転成分のみコピー
         local_rotation.m00 = transform.m00; local_rotation.m01 = transform.m01; local_rotation.m02 = transform.m02;
         local_rotation.m10 = transform.m10; local_rotation.m11 = transform.m11; local_rotation.m12 = transform.m12;
         local_rotation.m20 = transform.m20; local_rotation.m21 = transform.m21; local_rotation.m22 = transform.m22;
@@ -703,28 +667,24 @@ void MotionApp::ProcessSpaceMouseInput()
     ResetSpaceMouseTransform();
 }
 
-// 姿勢描画ヘルパー（部位選択モード対応）
 void MotionApp::DrawPostureWithSegmentMode(Posture& posture, const Color3f& highlight_color)
 {
     if (analyzer.show_segment_mode) {
         Color3f base_color(0.7f, 0.7f, 0.7f);
         
-        // 選択された部位 + ナビゲート中の部位を結合
         std::vector<bool> combined_selection = analyzer.selected_segments;
         if (analyzer.selected_segment_index >= 0 && 
-            analyzer.selected_segment_index < (int)combined_selection.size()) {
+            analyzer.selected_segment_index < (int)combined_selection.size())
             combined_selection[analyzer.selected_segment_index] = true;
-        }
         
-        // 選択部位があるかカウント
         int combined_count = 0;
-        for (size_t i = 0; i < combined_selection.size(); ++i) {
-            if (combined_selection[i]) combined_count++;
-        }
+        for (size_t i = 0; i < combined_selection.size(); ++i)
+            if (combined_selection[i]) 
+                combined_count++;
         
-        if (combined_count > 0) {
+        if (combined_count > 0)
             DrawPostureMultiSelect(posture, combined_selection, highlight_color, base_color);
-        } else {
+        else {
             glColor3f(highlight_color.x, highlight_color.y, highlight_color.z);
             DrawPosture(posture);
         }
