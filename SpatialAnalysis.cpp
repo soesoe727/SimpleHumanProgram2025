@@ -8,39 +8,37 @@
 
 using namespace std;
 
-// --- 内部ヘルパー関数 (MotionApp.cppから移植) ---
+// --- 内部ヘルパー関数 ---
 
 static float sa_get_axis_value(const Point3f& p, int axis_index) {
-	if (axis_index == 0) return p.x; 
-	if (axis_index == 1) return p.y;
-	return p.z; 
+    if (axis_index == 0) return p.x; 
+    if (axis_index == 1) return p.y;
+    return p.z; 
 }
 
+// HSV to RGBヒートマップ変換
 static Color3f sa_get_heatmap_color(float value) { 
-	Color3f color;
-	value = max(0.0f, min(1.0f, value));
-	
-	// HSV: H=0(赤)～240(青), S=100%, V=100%
-	// value=0 → H=240(青), value=1 → H=0(赤)
-	float hue = 240.0f * (1.0f - value);  // 0～240の範囲
-	
-	// HSV to RGB変換 (S=1, V=1)
-	float h = hue / 60.0f;
-	int i = (int)h;
-	float f = h - i;
-	float q = 1.0f - f;
-	float t = f;
-	
-	switch (i) {
-		case 0:  color.set(1.0f, t, 0.0f); break;     // 赤→黄
-		case 1:  color.set(q, 1.0f, 0.0f); break;     // 黄→緑
-		case 2:  color.set(0.0f, 1.0f, t); break;     // 緑→シアン
-		case 3:  color.set(0.0f, q, 1.0f); break;     // シアン→青
-		case 4:  color.set(t, 0.0f, 1.0f); break;     // 青→マゼンタ（240以下なのでここには来ない）
-		default: color.set(0.0f, 0.0f, 1.0f); break;  // 青
-	}
-	
-	return color; 
+    Color3f color;
+    value = max(0.0f, min(1.0f, value));
+    
+    // value=0 → H=240(青), value=1 → H=0(赤)
+    float hue = 240.0f * (1.0f - value);
+    float h = hue / 60.0f;
+    int i = (int)h;
+    float f = h - i;
+    float q = 1.0f - f;
+    float t = f;
+    
+    switch (i) {
+        case 0:  color.set(1.0f, t, 0.0f); break;
+        case 1:  color.set(q, 1.0f, 0.0f); break;
+        case 2:  color.set(0.0f, 1.0f, t); break;
+        case 3:  color.set(0.0f, q, 1.0f); break;
+        case 4:  color.set(t, 0.0f, 1.0f); break;
+        default: color.set(0.0f, 0.0f, 1.0f); break;
+    }
+    
+    return color; 
 }
 
 // --- VoxelGrid Implementation ---
@@ -55,34 +53,31 @@ void VoxelGrid::Clear() {
 }
 
 float& VoxelGrid::At(int x, int y, int z) {
-    if(x<0 || x>=resolution || y<0 || y>=resolution || z<0 || z>=resolution) {
-        static float dummy = 0.0f; return dummy;
+    if (x < 0 || x >= resolution || y < 0 || y >= resolution || z < 0 || z >= resolution) {
+        static float dummy = 0.0f; 
+        return dummy;
     }
     return data[z * resolution * resolution + y * resolution + x];
 }
 
 float VoxelGrid::Get(int x, int y, int z) const {
-    if (x < 0 || x >= resolution || y < 0 || y >= resolution || z < 0 || z >= resolution) return 0.0f;
-    return data[static_cast<std::vector<float, std::allocator<float>>::size_type>(z) * resolution * resolution + y * resolution + x];
+    if (x < 0 || x >= resolution || y < 0 || y >= resolution || z < 0 || z >= resolution) 
+        return 0.0f;
+    return data[static_cast<size_t>(z) * resolution * resolution + y * resolution + x];
 }
 
 // ファイルへ保存（基準姿勢情報も含む）
 bool VoxelGrid::SaveToFile(const char* filename) const {
     ofstream ofs(filename, ios::binary);
-    if (!ofs) return false;
+    if (!ofs) 
+        return false;
     
-    // バージョン情報を書き込み
-    int version = 2;  // バージョン2：基準姿勢情報を含む
+    int version = 2;
     ofs.write(reinterpret_cast<const char*>(&version), sizeof(int));
-    
-    // 解像度を書き込み
     ofs.write(reinterpret_cast<const char*>(&resolution), sizeof(int));
     
-    // データサイズを書き込み
     int data_size = data.size();
     ofs.write(reinterpret_cast<const char*>(&data_size), sizeof(int));
-    
-    // データを書き込み
     ofs.write(reinterpret_cast<const char*>(data.data()), data_size * sizeof(float));
     
     // 基準姿勢情報を書き込み
@@ -92,7 +87,6 @@ bool VoxelGrid::SaveToFile(const char* filename) const {
         ofs.write(reinterpret_cast<const char*>(&reference_root_pos.y), sizeof(float));
         ofs.write(reinterpret_cast<const char*>(&reference_root_pos.z), sizeof(float));
         
-        // 回転行列を保存（配列として一括書き込み）
         float m[9] = {
             reference_root_ori.m00, reference_root_ori.m01, reference_root_ori.m02,
             reference_root_ori.m10, reference_root_ori.m11, reference_root_ori.m12,
@@ -107,21 +101,18 @@ bool VoxelGrid::SaveToFile(const char* filename) const {
 // ファイルから読み込み（バージョン対応）
 bool VoxelGrid::LoadFromFile(const char* filename) {
     ifstream ifs(filename, ios::binary);
-    if (!ifs) return false;
+    if (!ifs) 
+        return false;
     
-    // バージョン情報を読み込み
     int version;
     ifs.read(reinterpret_cast<char*>(&version), sizeof(int));
     
-    // 解像度を読み込み
     int res;
     ifs.read(reinterpret_cast<char*>(&res), sizeof(int));
     
-    // データサイズを読み込み
     int data_size;
     ifs.read(reinterpret_cast<char*>(&data_size), sizeof(int));
     
-    // リサイズして読み込み
     Resize(res);
     ifs.read(reinterpret_cast<char*>(data.data()), data_size * sizeof(float));
     
@@ -133,7 +124,6 @@ bool VoxelGrid::LoadFromFile(const char* filename) {
             ifs.read(reinterpret_cast<char*>(&reference_root_pos.y), sizeof(float));
             ifs.read(reinterpret_cast<char*>(&reference_root_pos.z), sizeof(float));
             
-            // 回転行列を一括読み込み
             float m[9];
             ifs.read(reinterpret_cast<char*>(m), sizeof(m));
             reference_root_ori.set(m[0], m[1], m[2], m[3], m[4], m[5], m[6], m[7], m[8]);
@@ -148,23 +138,17 @@ bool VoxelGrid::LoadFromFile(const char* filename) {
 // SegmentVoxelDataのファイル保存
 bool SegmentVoxelData::SaveToFile(const char* filename) const {
     ofstream ofs(filename, ios::binary);
-    if (!ofs) return false;
+    if (!ofs) 
+        return false;
     
-    // セグメント数を書き込み
     ofs.write(reinterpret_cast<const char*>(&num_segments), sizeof(int));
     
-    // 各セグメントのグリッドを書き込み
     for (int i = 0; i < num_segments; ++i) {
         const VoxelGrid& grid = segment_grids[i];
-        
-        // 解像度
         ofs.write(reinterpret_cast<const char*>(&grid.resolution), sizeof(int));
         
-        // データサイズ
         int data_size = grid.data.size();
         ofs.write(reinterpret_cast<const char*>(&data_size), sizeof(int));
-        
-        // データ
         ofs.write(reinterpret_cast<const char*>(grid.data.data()), data_size * sizeof(float));
     }
     
@@ -174,28 +158,24 @@ bool SegmentVoxelData::SaveToFile(const char* filename) const {
 // SegmentVoxelDataのファイル読み込み
 bool SegmentVoxelData::LoadFromFile(const char* filename) {
     ifstream ifs(filename, ios::binary);
-    if (!ifs) return false;
+    if (!ifs) 
+        return false;
     
-    // セグメント数を読み込み
     int num_seg;
     ifs.read(reinterpret_cast<char*>(&num_seg), sizeof(int));
     
     num_segments = num_seg;
     segment_grids.resize(num_seg);
     
-    // 各セグメントのグリッドを読み込み
     for (int i = 0; i < num_segments; ++i) {
         VoxelGrid& grid = segment_grids[i];
         
-        // 解像度
         int res;
         ifs.read(reinterpret_cast<char*>(&res), sizeof(int));
         
-        // データサイズ
         int data_size;
         ifs.read(reinterpret_cast<char*>(&data_size), sizeof(int));
         
-        // リサイズして読み込み
         grid.Resize(res);
         ifs.read(reinterpret_cast<char*>(grid.data.data()), data_size * sizeof(float));
     }
@@ -224,14 +204,14 @@ SpatialAnalyzer::SpatialAnalyzer() {
     max_jrk_accumulated_val = 1.0f;
     
     // 部位別表示モード
-    selected_segment_index = -1;  // -1は全体表示
+    selected_segment_index = -1;
     show_segment_mode = false;
     
     // 部位選択キャッシュ
     segment_cache_dirty = true;
     cached_segment_max_val = 1.0f;
     cached_feature_mode = -1;
-    cached_selected_segment_index = -2;  // -1は有効な値なので、-2で初期化
+    cached_selected_segment_index = -2;
     
     // スライス平面の変換行列を単位行列で初期化
     slice_plane_transform.setIdentity();
@@ -242,8 +222,6 @@ SpatialAnalyzer::SpatialAnalyzer() {
     slice_rotation_z = 0.0f;
     
     use_rotated_slice = true;
-    
-    // スライス位置は1つだけ
     slice_positions.push_back(0.5f);
 }
 
@@ -251,28 +229,26 @@ SpatialAnalyzer::~SpatialAnalyzer() {}
 
 void SpatialAnalyzer::ResizeGrids(int res) {
     grid_resolution = res;
+    
+    // 瞬間グリッド
     voxels1_psc.Resize(res); voxels2_psc.Resize(res); voxels_psc_diff.Resize(res);
     voxels1_spd.Resize(res); voxels2_spd.Resize(res); voxels_spd_diff.Resize(res);
     voxels1_jrk.Resize(res); voxels2_jrk.Resize(res); voxels_jrk_diff.Resize(res);
     
-    // 累積グリッドもリサイズ
+    // 累積グリッド
     voxels1_psc_accumulated.Resize(res);
     voxels2_psc_accumulated.Resize(res);
     voxels_psc_accumulated_diff.Resize(res);
-    
-    // 速度累積グリッドもリサイズ
     voxels1_spd_accumulated.Resize(res);
     voxels2_spd_accumulated.Resize(res);
     voxels_spd_accumulated_diff.Resize(res);
-    
-    // ジャーク累積グリッドもリサイズ
     voxels1_jrk_accumulated.Resize(res);
     voxels2_jrk_accumulated.Resize(res);
     voxels_jrk_accumulated_diff.Resize(res);
 }
 
 void SpatialAnalyzer::SetWorldBounds(float bounds[3][2]) {
-    for(int i=0; i<3; ++i) {
+    for (int i = 0; i < 3; ++i) {
         world_bounds[i][0] = bounds[i][0];
         world_bounds[i][1] = bounds[i][1];
     }
@@ -282,7 +258,6 @@ void SpatialAnalyzer::SetWorldBounds(float bounds[3][2]) {
     float cy = (world_bounds[1][0] + world_bounds[1][1]) / 2.0f;
     float cz = (world_bounds[2][0] + world_bounds[2][1]) / 2.0f;
     
-    // 変換行列の平行移動成分を設定
     slice_plane_transform.setIdentity();
     slice_plane_transform.m03 = cx;
     slice_plane_transform.m13 = cy;
@@ -292,68 +267,89 @@ void SpatialAnalyzer::SetWorldBounds(float bounds[3][2]) {
 }
 
 void SpatialAnalyzer::VoxelizeMotion(Motion* m, float time, VoxelGrid& occ, VoxelGrid& spd, VoxelGrid& jrk) {
-    if (!m) return;
+    if (!m) 
+        return;
     
-    // ヘルパー関数でフレームデータを計算
     FrameData frame_data;
     ComputeFrameData(m, time, frame_data);
     
-    // ヘルパー関数で全ボーンのデータを抽出
     vector<BoneData> bones;
     ExtractBoneData(m, frame_data, bones);
 
     float bone_radius = 0.08f;
     float world_range[3];
-    for(int i=0; i<3; ++i) world_range[i] = world_bounds[i][1] - world_bounds[i][0];
+    for (int i = 0; i < 3; ++i) 
+        world_range[i] = world_bounds[i][1] - world_bounds[i][0];
 
-    // 各ボーンについてボクセル化
-    for (const BoneData& bone : bones) {
+    for (const BoneData& bone : bones)
         WriteToVoxelGrid(bone, bone_radius, world_range, &occ, &spd, &jrk);
-    }
 }
 
 void SpatialAnalyzer::UpdateVoxels(Motion* m1, Motion* m2, float current_time) {
+    // グリッドをクリア
     voxels1_psc.Clear(); voxels2_psc.Clear();
     voxels1_spd.Clear(); voxels2_spd.Clear();
-	voxels1_jrk.Clear(); voxels2_jrk.Clear();
+    voxels1_jrk.Clear(); voxels2_jrk.Clear();
 
     VoxelizeMotion(m1, current_time, voxels1_psc, voxels1_spd, voxels1_jrk);
     VoxelizeMotion(m2, current_time, voxels2_psc, voxels2_spd, voxels2_jrk);
 
+    // 差分計算と最大値更新
     max_psc_val = 0.0f;
-	max_spd_val = 0.0f;
-	max_jrk_val = 0.0f;
+    max_spd_val = 0.0f;
+    max_jrk_val = 0.0f;
     int size = grid_resolution * grid_resolution * grid_resolution;
 
-    for(int i=0; i<size; ++i) {
+    for (int i = 0; i < size; ++i) {
         float v1 = voxels1_psc.data[i];
         float v2 = voxels2_psc.data[i];
         float diff = abs(v1 - v2);
         voxels_psc_diff.data[i] = diff;
-        if(diff > max_psc_val) max_psc_val = diff;
+        if (diff > max_psc_val) 
+            max_psc_val = diff;
         
         float s1 = voxels1_spd.data[i];
         float s2 = voxels2_spd.data[i];
         voxels_spd_diff.data[i] = abs(s1 - s2);
-		if (abs(s1 - s2) > max_spd_val) max_spd_val = abs(s1 - s2);
+        if (abs(s1 - s2) > max_spd_val) 
+            max_spd_val = abs(s1 - s2);
 
-		float j1 = voxels1_jrk.data[i];
-		float j2 = voxels2_jrk.data[i];
-		voxels_jrk_diff.data[i] = abs(j1 - j2);
-		if (abs(j1 - j2) > max_jrk_val) max_jrk_val = abs(j1 - j2);
+        float j1 = voxels1_jrk.data[i];
+        float j2 = voxels2_jrk.data[i];
+        voxels_jrk_diff.data[i] = abs(j1 - j2);
+        if (abs(j1 - j2) > max_jrk_val) 
+            max_jrk_val = abs(j1 - j2);
     }
+    
     if (max_psc_val < 1e-5f) max_psc_val = 1.0f;
-	if (max_spd_val < 1e-5f) max_spd_val = 1.0f;
-	if (max_jrk_val < 1e-5f) max_jrk_val = 1.0f;
+    if (max_spd_val < 1e-5f) max_spd_val = 1.0f;
+    if (max_jrk_val < 1e-5f) max_jrk_val = 1.0f;
 }
 
 void SpatialAnalyzer::DrawSlicePlanes() {
-    // 回転スライスモードのみ使用
     DrawRotatedSlicePlane();
 }
 
+void SpatialAnalyzer::ResetView() { 
+    zoom = 1.0f; 
+    pan_center.set(0.0f, 0.0f); 
+    is_manual_view = false; 
+}
+
+void SpatialAnalyzer::Pan(float dx, float dy) { 
+    pan_center.x += dx; 
+    pan_center.y += dy; 
+    is_manual_view = true; 
+}
+
+void SpatialAnalyzer::Zoom(float factor) { 
+    zoom *= factor; 
+    is_manual_view = true; 
+}
+
 void SpatialAnalyzer::DrawCTMaps(int win_width, int win_height) {
-    if (!show_maps) return;
+    if (!show_maps) 
+        return;
     
     // OpenGL 2D設定
     glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity();
@@ -422,20 +418,18 @@ void SpatialAnalyzer::DrawCTMaps(int win_width, int win_height) {
     glMatrixMode(GL_MODELVIEW); glPopMatrix();
 }
 
-void SpatialAnalyzer::ResetView() { zoom = 1.0f; pan_center.set(0.0f, 0.0f); is_manual_view = false; }
-void SpatialAnalyzer::Pan(float dx, float dy) { pan_center.x += dx; pan_center.y += dy; is_manual_view = true; }
-void SpatialAnalyzer::Zoom(float factor) { zoom *= factor; is_manual_view = true; }
-
 // 3Dボクセルの描画
 void SpatialAnalyzer::DrawVoxels3D() {
-    if (!show_voxels) return;
+    if (!show_voxels) 
+        return;
 
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glEnable(GL_DEPTH_TEST);
 
     float world_range[3];
-    for(int i=0; i<3; ++i) world_range[i] = world_bounds[i][1] - world_bounds[i][0];
+    for (int i = 0; i < 3; ++i) 
+        world_range[i] = world_bounds[i][1] - world_bounds[i][0];
     
     float cell_size_x = world_range[0] / grid_resolution;
     float cell_size_y = world_range[1] / grid_resolution;
@@ -472,7 +466,8 @@ void SpatialAnalyzer::DrawVoxels3D() {
         for (int y = 0; y < grid_resolution; y += step) {
             for (int x = 0; x < grid_resolution; x += step) {
                 float val = grid_to_draw->Get(x, y, z);
-                if (val < 0.01f) continue;
+                if (val < 0.01f) 
+                    continue;
                 
                 float wx = world_bounds[0][0] + (x + 0.5f) * cell_size_x;
                 float wy = world_bounds[1][0] + (y + 0.5f) * cell_size_y;
@@ -497,16 +492,15 @@ void SpatialAnalyzer::DrawVoxels3D() {
 // 動作全体を通った累積ボクセル計算（占有率と速度とジャーク + 部位ごと）
 void SpatialAnalyzer::AccumulateAllFrames(Motion* m1, Motion* m2)
 {
-    if (!m1 || !m2) return;
+    if (!m1 || !m2) 
+        return;
     
-    // 部位数を取得
     int num_segments = m1->body->num_segments;
     int size = grid_resolution * grid_resolution * grid_resolution;
     
-    // === グリッドの初期化 ===
     ClearAccumulatedData();
     
-    // 全体の累積グリッドをリサイズ
+    // グリッドをリサイズ
     voxels1_psc_accumulated.Resize(grid_resolution);
     voxels2_psc_accumulated.Resize(grid_resolution);
     voxels_psc_accumulated_diff.Resize(grid_resolution);
@@ -526,12 +520,10 @@ void SpatialAnalyzer::AccumulateAllFrames(Motion* m1, Motion* m2)
     segment_jerk_voxels2.Resize(num_segments, grid_resolution);
     
     // 基準姿勢を保存
-    if (m1->num_frames > 0) {
+    if (m1->num_frames > 0)
         voxels1_psc_accumulated.SetReference(m1->frames[0].root_pos, m1->frames[0].root_ori);
-    }
-    if (m2->num_frames > 0) {
+    if (m2->num_frames > 0)
         voxels2_psc_accumulated.SetReference(m2->frames[0].root_pos, m2->frames[0].root_ori);
-    }
     
     std::cout << "Accumulating voxels (integrated) for " << num_segments << " segments..." << std::endl;
     
@@ -546,8 +538,10 @@ void SpatialAnalyzer::AccumulateAllFrames(Motion* m1, Motion* m2)
             temp_seg_spd.Resize(num_segments, grid_resolution);
             temp_seg_jrk.Resize(num_segments, grid_resolution);
             
+            // モーションに基づくボクセル化
             VoxelizeMotionBySegment(m, time, temp_seg_psc, temp_seg_spd, temp_seg_jrk);
             
+            // セグメントごとのボクセルデータを累積
             for (int s = 0; s < num_segments; ++s) {
                 for (int i = 0; i < size; ++i) {
                     float psc_val = temp_seg_psc.segment_grids[s].data[i];
@@ -555,12 +549,10 @@ void SpatialAnalyzer::AccumulateAllFrames(Motion* m1, Motion* m2)
                     float jrk_val = temp_seg_jrk.segment_grids[s].data[i];
                     
                     seg_psc.segment_grids[s].data[i] += psc_val;
-                    if (spd_val > seg_spd.segment_grids[s].data[i]) {
+                    if (spd_val > seg_spd.segment_grids[s].data[i])
                         seg_spd.segment_grids[s].data[i] = spd_val;
-                    }
-                    if (jrk_val > seg_jrk.segment_grids[s].data[i]) {
+                    if (jrk_val > seg_jrk.segment_grids[s].data[i])
                         seg_jrk.segment_grids[s].data[i] = jrk_val;
-                    }
                     
                     acc_psc.data[i] += psc_val;
                     if (spd_val > acc_spd.data[i]) acc_spd.data[i] = spd_val;
@@ -570,39 +562,39 @@ void SpatialAnalyzer::AccumulateAllFrames(Motion* m1, Motion* m2)
         }
     };
     
-    // モーション1と2を処理
     processMotion(m1, segment_presence_voxels1, segment_speed_voxels1, segment_jerk_voxels1,
                   voxels1_psc_accumulated, voxels1_spd_accumulated, voxels1_jrk_accumulated);
     processMotion(m2, segment_presence_voxels2, segment_speed_voxels2, segment_jerk_voxels2,
                   voxels2_psc_accumulated, voxels2_spd_accumulated, voxels2_jrk_accumulated);
     
-    // === 差分計算と最大値更新 ===
+    // 差分計算と最大値更新
     for (int i = 0; i < size; ++i) {
         float diff_psc = abs(voxels1_psc_accumulated.data[i] - voxels2_psc_accumulated.data[i]);
         voxels_psc_accumulated_diff.data[i] = diff_psc;
-        if (diff_psc > max_psc_accumulated_val) max_psc_accumulated_val = diff_psc;
+        if (diff_psc > max_psc_accumulated_val) 
+            max_psc_accumulated_val = diff_psc;
         
         float diff_spd = abs(voxels1_spd_accumulated.data[i] - voxels2_spd_accumulated.data[i]);
         voxels_spd_accumulated_diff.data[i] = diff_spd;
         float max_spd = max(voxels1_spd_accumulated.data[i], voxels2_spd_accumulated.data[i]);
-        if (max_spd > max_spd_accumulated_val) max_spd_accumulated_val = max_spd;
+        if (max_spd > max_spd_accumulated_val) 
+            max_spd_accumulated_val = max_spd;
 
         float diff_jrk = abs(voxels1_jrk_accumulated.data[i] - voxels2_jrk_accumulated.data[i]);
         voxels_jrk_accumulated_diff.data[i] = diff_jrk;
         float max_jrk = max(voxels1_jrk_accumulated.data[i], voxels2_jrk_accumulated.data[i]);
-        if (max_jrk > max_jrk_accumulated_val) max_jrk_accumulated_val = max_jrk;
+        if (max_jrk > max_jrk_accumulated_val) 
+            max_jrk_accumulated_val = max_jrk;
     }
     
     if (max_psc_accumulated_val < 1e-5f) max_psc_accumulated_val = 1.0f;
     if (max_spd_accumulated_val < 1e-5f) max_spd_accumulated_val = 1.0f;
     if (max_jrk_accumulated_val < 1e-5f) max_jrk_accumulated_val = 1.0f;
     
-    // 差分グリッドにも基準姿勢を設定
-    if (voxels1_psc_accumulated.has_reference) {
+    if (voxels1_psc_accumulated.has_reference)
         voxels_psc_accumulated_diff.SetReference(
             voxels1_psc_accumulated.reference_root_pos, 
             voxels1_psc_accumulated.reference_root_ori);
-    }
     
     // 部位ごとの最大値を計算
     InitializeSegmentSelection(num_segments);
@@ -630,53 +622,52 @@ void SpatialAnalyzer::AccumulateAllFrames(Motion* m1, Motion* m2)
     std::cout << "  Max jerk: " << max_jrk_accumulated_val << std::endl;
 }
 
-// 占有率・速度・ジャーク累積グリッドのクリア
+// 累積グリッドのクリア
 void SpatialAnalyzer::ClearAccumulatedData()
 {
     voxels1_psc_accumulated.Clear();
     voxels2_psc_accumulated.Clear();
     voxels_psc_accumulated_diff.Clear();
-	max_psc_accumulated_val = 0.0f;
+    max_psc_accumulated_val = 0.0f;
 
     voxels1_spd_accumulated.Clear();
     voxels2_spd_accumulated.Clear();
     voxels_spd_accumulated_diff.Clear();
-	max_spd_accumulated_val = 0.0f;
+    max_spd_accumulated_val = 0.0f;
 
     voxels1_jrk_accumulated.Clear();
     voxels2_jrk_accumulated.Clear();
     voxels_jrk_accumulated_diff.Clear();
-	max_jrk_accumulated_val = 0.0f;
+    max_jrk_accumulated_val = 0.0f;
 }
 
 // 部位ごとのボクセル化
 void SpatialAnalyzer::VoxelizeMotionBySegment(Motion* m, float time, SegmentVoxelData& seg_presence_data, SegmentVoxelData& seg_speed_data, SegmentVoxelData& seg_jerk_data)
 {
-    if (!m) return;
+    if (!m) 
+        return;
     
-    // ヘルパー関数でフレームデータを計算
     FrameData frame_data;
     ComputeFrameData(m, time, frame_data);
     
-    // ヘルパー関数で全ボーンのデータを抽出
     vector<BoneData> bones;
     ExtractBoneData(m, frame_data, bones);
 
     float bone_radius = 0.08f;
     float world_range[3];
 
-    for(int i=0; i<3; ++i) 
+    for (int i = 0; i < 3; ++i) 
         world_range[i] = world_bounds[i][1] - world_bounds[i][0];
 
-    // 各ボーンについて、対応するセグメントのグリッドに書き込み
     for (const BoneData& bone : bones) {
-        if (!bone.valid) continue;
+        if (!bone.valid) 
+            continue;
         
         VoxelGrid& seg_pres_grid = seg_presence_data.GetSegmentGrid(bone.segment_index);
         VoxelGrid& seg_spd_grid = seg_speed_data.GetSegmentGrid(bone.segment_index);
         VoxelGrid& seg_jrk_grid = seg_jerk_data.GetSegmentGrid(bone.segment_index);
         WriteToVoxelGrid(bone, bone_radius, world_range, &seg_pres_grid, &seg_spd_grid, &seg_jrk_grid);
-	}
+    }
 }
 
 // キャッシュファイル名を生成
@@ -691,70 +682,42 @@ std::string SpatialAnalyzer::GenerateCacheFilename(const char* motion1_name, con
 
 // ボクセルキャッシュを保存
 bool SpatialAnalyzer::SaveVoxelCache(const char* motion1_name, const char* motion2_name) {
-    std::string base_filename = GenerateCacheFilename(motion1_name, motion2_name);
+    std::string base = GenerateCacheFilename(motion1_name, motion2_name);
     
-    std::cout << "Saving voxel cache to " << base_filename << "..." << std::endl;
+    std::cout << "Saving voxel cache to " << base << "..." << std::endl;
     
     // 累積ボクセルデータを保存
-    std::string accumulated1_file = base_filename + "_acc1.bin";
-    std::string accumulated2_file = base_filename + "_acc2.bin";
-    std::string accumulated_diff_file = base_filename + "_acc_diff.bin";
+    if (!voxels1_psc_accumulated.SaveToFile((base + "_acc1.bin").c_str())) return false;
+    if (!voxels2_psc_accumulated.SaveToFile((base + "_acc2.bin").c_str())) return false;
+    if (!voxels_psc_accumulated_diff.SaveToFile((base + "_acc_diff.bin").c_str())) return false;
     
-    if (!voxels1_psc_accumulated.SaveToFile(accumulated1_file.c_str())) return false;
-    if (!voxels2_psc_accumulated.SaveToFile(accumulated2_file.c_str())) return false;
-    if (!voxels_psc_accumulated_diff.SaveToFile(accumulated_diff_file.c_str())) return false;
+    if (!voxels1_spd_accumulated.SaveToFile((base + "_spd_acc1.bin").c_str())) return false;
+    if (!voxels2_spd_accumulated.SaveToFile((base + "_spd_acc2.bin").c_str())) return false;
+    if (!voxels_spd_accumulated_diff.SaveToFile((base + "_spd_acc_diff.bin").c_str())) return false;
     
-    // 速度累積ボクセルデータを保存
-    std::string spd_acc1_file = base_filename + "_spd_acc1.bin";
-    std::string spd_acc2_file = base_filename + "_spd_acc2.bin";
-    std::string spd_acc_diff_file = base_filename + "_spd_acc_diff.bin";
-    
-    if (!voxels1_spd_accumulated.SaveToFile(spd_acc1_file.c_str())) return false;
-    if (!voxels2_spd_accumulated.SaveToFile(spd_acc2_file.c_str())) return false;
-    if (!voxels_spd_accumulated_diff.SaveToFile(spd_acc_diff_file.c_str())) return false;
-    
-    // ジャーク累積ボクセルデータを保存
-    std::string jrk_acc1_file = base_filename + "_jrk_acc1.bin";
-    std::string jrk_acc2_file = base_filename + "_jrk_acc2.bin";
-    std::string jrk_acc_diff_file = base_filename + "_jrk_acc_diff.bin";
-    
-    if (!voxels1_jrk_accumulated.SaveToFile(jrk_acc1_file.c_str())) return false;
-    if (!voxels2_jrk_accumulated.SaveToFile(jrk_acc2_file.c_str())) return false;
-    if (!voxels_jrk_accumulated_diff.SaveToFile(jrk_acc_diff_file.c_str())) return false;
+    if (!voxels1_jrk_accumulated.SaveToFile((base + "_jrk_acc1.bin").c_str())) return false;
+    if (!voxels2_jrk_accumulated.SaveToFile((base + "_jrk_acc2.bin").c_str())) return false;
+    if (!voxels_jrk_accumulated_diff.SaveToFile((base + "_jrk_acc_diff.bin").c_str())) return false;
     
     // 部位ごとのボクセルデータを保存
-    std::string segment1_file = base_filename + "_seg1.bin";
-    std::string segment2_file = base_filename + "_seg2.bin";
-    
-    if (!segment_presence_voxels1.SaveToFile(segment1_file.c_str())) return false;
-    if (!segment_presence_voxels2.SaveToFile(segment2_file.c_str())) return false;
-    
-    // 部位ごとの速度ボクセルデータを保存
-    std::string seg_spd1_file = base_filename + "_seg_spd1.bin";
-    std::string seg_spd2_file = base_filename + "_seg_spd2.bin";
-    
-    if (!segment_speed_voxels1.SaveToFile(seg_spd1_file.c_str())) return false;
-    if (!segment_speed_voxels2.SaveToFile(seg_spd2_file.c_str())) return false;
-    
-    // 部位ごとのジャークボクセルデータを保存
-    std::string seg_jrk1_file = base_filename + "_seg_jrk1.bin";
-    std::string seg_jrk2_file = base_filename + "_seg_jrk2.bin";
-    
-    if (!segment_jerk_voxels1.SaveToFile(seg_jrk1_file.c_str())) return false;
-    if (!segment_jerk_voxels2.SaveToFile(seg_jrk2_file.c_str())) return false;
+    if (!segment_presence_voxels1.SaveToFile((base + "_seg1.bin").c_str())) return false;
+    if (!segment_presence_voxels2.SaveToFile((base + "_seg2.bin").c_str())) return false;
+    if (!segment_speed_voxels1.SaveToFile((base + "_seg_spd1.bin").c_str())) return false;
+    if (!segment_speed_voxels2.SaveToFile((base + "_seg_spd2.bin").c_str())) return false;
+    if (!segment_jerk_voxels1.SaveToFile((base + "_seg_jrk1.bin").c_str())) return false;
+    if (!segment_jerk_voxels2.SaveToFile((base + "_seg_jrk2.bin").c_str())) return false;
     
     // メタデータを保存
-    std::string meta_file = base_filename + "_meta.txt";
-    ofstream meta_ofs(meta_file);
-    if (!meta_ofs) return false;
+    ofstream meta_ofs(base + "_meta.txt");
+    if (!meta_ofs) 
+        return false;
     
     meta_ofs << grid_resolution << std::endl;
     meta_ofs << max_psc_accumulated_val << std::endl;
     meta_ofs << max_spd_accumulated_val << std::endl;
     meta_ofs << max_jrk_accumulated_val << std::endl;
-    for (int i = 0; i < 3; ++i) {
+    for (int i = 0; i < 3; ++i)
         meta_ofs << world_bounds[i][0] << " " << world_bounds[i][1] << std::endl;
-    }
     meta_ofs.close();
     
     std::cout << "Voxel cache saved successfully!" << std::endl;
@@ -763,15 +726,14 @@ bool SpatialAnalyzer::SaveVoxelCache(const char* motion1_name, const char* motio
 
 // ボクセルキャッシュを読み込み
 bool SpatialAnalyzer::LoadVoxelCache(const char* motion1_name, const char* motion2_name) {
-    std::string base_filename = GenerateCacheFilename(motion1_name, motion2_name);
+    std::string base = GenerateCacheFilename(motion1_name, motion2_name);
     
-    std::cout << "Loading voxel cache from " << base_filename << "..." << std::endl;
+    std::cout << "Loading voxel cache from " << base << "..." << std::endl;
     
     // メタデータを読み込み
-    std::string meta_file = base_filename + "_meta.txt";
-    ifstream meta_ifs(meta_file);
+    ifstream meta_ifs(base + "_meta.txt");
     if (!meta_ifs) {
-        std::cout << "Cache file not found: " << meta_file << std::endl;
+        std::cout << "Cache file not found: " << base + "_meta.txt" << std::endl;
         return false;
     }
     
@@ -780,106 +742,49 @@ bool SpatialAnalyzer::LoadVoxelCache(const char* motion1_name, const char* motio
     meta_ifs >> max_psc_accumulated_val;
     meta_ifs >> max_spd_accumulated_val;
     meta_ifs >> max_jrk_accumulated_val;
-    for (int i = 0; i < 3; ++i) {
+    for (int i = 0; i < 3; ++i)
         meta_ifs >> world_bounds[i][0] >> world_bounds[i][1];
-    }
     meta_ifs.close();
     
-    // グリッドをリサイズ
     ResizeGrids(res);
     
+    // ファイル読み込み用ラムダ
+    auto loadFile = [](VoxelGrid& grid, const std::string& file) -> bool {
+        if (!grid.LoadFromFile(file.c_str())) {
+            std::cout << "Failed to load: " << file << std::endl;
+            return false;
+        }
+        return true;
+    };
+    
+    auto loadSegmentFile = [](SegmentVoxelData& data, const std::string& file) -> bool {
+        if (!data.LoadFromFile(file.c_str())) {
+            std::cout << "Failed to load: " << file << std::endl;
+            return false;
+        }
+        return true;
+    };
+    
     // 累積ボクセルデータを読み込み
-    std::string accumulated1_file = base_filename + "_acc1.bin";
-    std::string accumulated2_file = base_filename + "_acc2.bin";
-    std::string accumulated_diff_file = base_filename + "_acc_diff.bin";
+    if (!loadFile(voxels1_psc_accumulated, base + "_acc1.bin")) return false;
+    if (!loadFile(voxels2_psc_accumulated, base + "_acc2.bin")) return false;
+    if (!loadFile(voxels_psc_accumulated_diff, base + "_acc_diff.bin")) return false;
     
-    if (!voxels1_psc_accumulated.LoadFromFile(accumulated1_file.c_str())) {
-        std::cout << "Failed to load: " << accumulated1_file << std::endl;
-        return false;
-    }
-    if (!voxels2_psc_accumulated.LoadFromFile(accumulated2_file.c_str())) {
-        std::cout << "Failed to load: " << accumulated2_file << std::endl;
-        return false;
-    }
-    if (!voxels_psc_accumulated_diff.LoadFromFile(accumulated_diff_file.c_str())) {
-        std::cout << "Failed to load: " << accumulated_diff_file << std::endl;
-        return false;
-    }
+    if (!loadFile(voxels1_spd_accumulated, base + "_spd_acc1.bin")) return false;
+    if (!loadFile(voxels2_spd_accumulated, base + "_spd_acc2.bin")) return false;
+    if (!loadFile(voxels_spd_accumulated_diff, base + "_spd_acc_diff.bin")) return false;
     
-    // 速度累積ボクセルデータを読み込み
-    std::string spd_acc1_file = base_filename + "_spd_acc1.bin";
-    std::string spd_acc2_file = base_filename + "_spd_acc2.bin";
-    std::string spd_acc_diff_file = base_filename + "_spd_acc_diff.bin";
-    
-    if (!voxels1_spd_accumulated.LoadFromFile(spd_acc1_file.c_str())) {
-        std::cout << "Failed to load: " << spd_acc1_file << std::endl;
-        return false;
-    }
-    if (!voxels2_spd_accumulated.LoadFromFile(spd_acc2_file.c_str())) {
-        std::cout << "Failed to load: " << spd_acc2_file << std::endl;
-        return false;
-    }
-    if (!voxels_spd_accumulated_diff.LoadFromFile(spd_acc_diff_file.c_str())) {
-        std::cout << "Failed to load: " << spd_acc_diff_file << std::endl;
-        return false;
-    }
-    
-    // ジャーク累積ボクセルデータを読み込み
-    std::string jrk_acc1_file = base_filename + "_jrk_acc1.bin";
-    std::string jrk_acc2_file = base_filename + "_jrk_acc2.bin";
-    std::string jrk_acc_diff_file = base_filename + "_jrk_acc_diff.bin";
-    
-    if (!voxels1_jrk_accumulated.LoadFromFile(jrk_acc1_file.c_str())) {
-        std::cout << "Failed to load: " << jrk_acc1_file << std::endl;
-        return false;
-    }
-    if (!voxels2_jrk_accumulated.LoadFromFile(jrk_acc2_file.c_str())) {
-        std::cout << "Failed to load: " << jrk_acc2_file << std::endl;
-        return false;
-    }
-    if (!voxels_jrk_accumulated_diff.LoadFromFile(jrk_acc_diff_file.c_str())) {
-        std::cout << "Failed to load: " << jrk_acc_diff_file << std::endl;
-        return false;
-    }
+    if (!loadFile(voxels1_jrk_accumulated, base + "_jrk_acc1.bin")) return false;
+    if (!loadFile(voxels2_jrk_accumulated, base + "_jrk_acc2.bin")) return false;
+    if (!loadFile(voxels_jrk_accumulated_diff, base + "_jrk_acc_diff.bin")) return false;
     
     // 部位ごとのボクセルデータを読み込み
-    std::string segment1_file = base_filename + "_seg1.bin";
-    std::string segment2_file = base_filename + "_seg2.bin";
-    
-    if (!segment_presence_voxels1.LoadFromFile(segment1_file.c_str())) {
-        std::cout << "Failed to load: " << segment1_file << std::endl;
-        return false;
-    }
-    if (!segment_presence_voxels2.LoadFromFile(segment2_file.c_str())) {
-        std::cout << "Failed to load: " << segment2_file << std::endl;
-        return false;
-    }
-    
-    // 部位ごとの速度ボクセルデータを読み込み
-    std::string seg_spd1_file = base_filename + "_seg_spd1.bin";
-    std::string seg_spd2_file = base_filename + "_seg_spd2.bin";
-    
-    if (!segment_speed_voxels1.LoadFromFile(seg_spd1_file.c_str())) {
-        std::cout << "Failed to load: " << seg_spd1_file << std::endl;
-        return false;
-    }
-    if (!segment_speed_voxels2.LoadFromFile(seg_spd2_file.c_str())) {
-        std::cout << "Failed to load: " << seg_spd2_file << std::endl;
-        return false;
-    }
-    
-    // 部位ごとのジャークボクセルデータを読み込み
-    std::string seg_jrk1_file = base_filename + "_seg_jrk1.bin";
-    std::string seg_jrk2_file = base_filename + "_seg_jrk2.bin";
-    
-    if (!segment_jerk_voxels1.LoadFromFile(seg_jrk1_file.c_str())) {
-        std::cout << "Failed to load: " << seg_jrk1_file << std::endl;
-        return false;
-    }
-    if (!segment_jerk_voxels2.LoadFromFile(seg_jrk2_file.c_str())) {
-        std::cout << "Failed to load: " << seg_jrk2_file << std::endl;
-        return false;
-    }
+    if (!loadSegmentFile(segment_presence_voxels1, base + "_seg1.bin")) return false;
+    if (!loadSegmentFile(segment_presence_voxels2, base + "_seg2.bin")) return false;
+    if (!loadSegmentFile(segment_speed_voxels1, base + "_seg_spd1.bin")) return false;
+    if (!loadSegmentFile(segment_speed_voxels2, base + "_seg_spd2.bin")) return false;
+    if (!loadSegmentFile(segment_jerk_voxels1, base + "_seg_jrk1.bin")) return false;
+    if (!loadSegmentFile(segment_jerk_voxels2, base + "_seg_jrk2.bin")) return false;
     
     std::cout << "Voxel cache loaded successfully!" << std::endl;
     return true;
@@ -887,12 +792,10 @@ bool SpatialAnalyzer::LoadVoxelCache(const char* motion1_name, const char* motio
 
 // スライス平面の回転操作（キーボード用）
 void SpatialAnalyzer::RotateSlicePlane(float dx, float dy, float dz) {
-    // 角度をラジアンに変換
     float rx = dx * 3.14159265f / 180.0f;
     float ry = dy * 3.14159265f / 180.0f;
     float rz = dz * 3.14159265f / 180.0f;
     
-    // 各軸周りの回転行列を作成して適用
     if (fabsf(dx) > 0.001f) {
         Matrix4f rot_x;
         rot_x.setIdentity();
@@ -920,12 +823,10 @@ void SpatialAnalyzer::RotateSlicePlane(float dx, float dy, float dz) {
 }
 
 void SpatialAnalyzer::ResetSliceRotation() {
-    // ワールド中心を計算
     float cx = (world_bounds[0][0] + world_bounds[0][1]) / 2.0f;
     float cy = (world_bounds[1][0] + world_bounds[1][1]) / 2.0f;
     float cz = (world_bounds[2][0] + world_bounds[2][1]) / 2.0f;
     
-    // 変換行列を単位行列にリセット（中心位置のみ保持）
     slice_plane_transform.setIdentity();
     slice_plane_transform.m03 = cx;
     slice_plane_transform.m13 = cy;
@@ -934,39 +835,33 @@ void SpatialAnalyzer::ResetSliceRotation() {
     slice_rotation_x = 0.0f;
     slice_rotation_y = 0.0f;
     slice_rotation_z = 0.0f;
-    
-    // パンもリセット
     pan_center.set(0.0f, 0.0f);
 }
 
 void SpatialAnalyzer::ToggleRotatedSliceMode() {
     use_rotated_slice = !use_rotated_slice;
-    if (use_rotated_slice) {
-        // 回転スライスモードをオンにした時、リセット
+    if (use_rotated_slice)
         ResetSliceRotation();
-    }
     std::cout << "Rotated slice mode: " << (use_rotated_slice ? "ON" : "OFF") << std::endl;
 }
 
 // 回転スライス平面の描画
 void SpatialAnalyzer::DrawRotatedSlicePlane() {
-    if (!use_rotated_slice) return;
+    if (!use_rotated_slice) 
+        return;
     
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     
     float world_range[3];
-    for (int i = 0; i < 3; ++i) {
+    for (int i = 0; i < 3; ++i)
         world_range[i] = world_bounds[i][1] - world_bounds[i][0];
-    }
     float max_range = max(world_range[0], max(world_range[1], world_range[2]));
     float half_size = max_range * 0.6f * zoom;
 
-    // アクセサを使用してベクトルを取得
     Point3f center = GetSlicePlaneCenter();
     Vector3f slice_u = GetSlicePlaneU();
     Vector3f slice_v = GetSlicePlaneV();
-    Vector3f slice_n = GetSlicePlaneNormal();
 
     // パン操作を適用
     center.x += slice_u.x * pan_center.x + slice_v.x * pan_center.y;
@@ -975,7 +870,6 @@ void SpatialAnalyzer::DrawRotatedSlicePlane() {
     
     for (size_t i = 0; i < slice_positions.size(); ++i) {
         Point3f p[4];
-        
         p[0].set(center.x - slice_u.x * half_size - slice_v.x * half_size,
                  center.y - slice_u.y * half_size - slice_v.y * half_size,
                  center.z - slice_u.z * half_size - slice_v.z * half_size);
@@ -989,12 +883,12 @@ void SpatialAnalyzer::DrawRotatedSlicePlane() {
                  center.y - slice_u.y * half_size + slice_v.y * half_size,
                  center.z - slice_u.z * half_size + slice_v.z * half_size);
         
-        // 枠線
         glColor4f(1.0f, 1.0f, 0.0f, 0.9f);
         glLineWidth(5.0f);
 
         glBegin(GL_LINE_LOOP);
-        for (int k = 0; k < 4; ++k) glVertex3f(p[k].x, p[k].y, p[k].z);
+        for (int k = 0; k < 4; ++k) 
+            glVertex3f(p[k].x, p[k].y, p[k].z);
         glEnd();   
     }
     glDisable(GL_BLEND);
@@ -1002,6 +896,7 @@ void SpatialAnalyzer::DrawRotatedSlicePlane() {
 
 // 回転スライス用の2Dマップ描画
 void SpatialAnalyzer::DrawRotatedSliceMap(int x_pos, int y_pos, int w, int h, VoxelGrid& grid, float max_val, const char* title) {
+    // 背景
     glColor4f(0.9f, 0.9f, 0.9f, 1.0f);
     glLineWidth(2.0f);
     glBegin(GL_QUADS);
@@ -1011,6 +906,7 @@ void SpatialAnalyzer::DrawRotatedSliceMap(int x_pos, int y_pos, int w, int h, Vo
     glVertex2i(x_pos + w, y_pos);
     glEnd();
     
+    // 枠
     glColor4f(0, 0, 0, 1);
     glBegin(GL_LINE_LOOP);
     glVertex2i(x_pos, y_pos);
@@ -1020,18 +916,15 @@ void SpatialAnalyzer::DrawRotatedSliceMap(int x_pos, int y_pos, int w, int h, Vo
     glEnd();
     
     float world_range[3];
-    for (int i = 0; i < 3; ++i) {
+    for (int i = 0; i < 3; ++i)
         world_range[i] = world_bounds[i][1] - world_bounds[i][0];
-    }
     float max_range = max(world_range[0], max(world_range[1], world_range[2]));
     float half_size = max_range * 0.6f * zoom;
 
-    // アクセサを使用してベクトルを取得
     Point3f center = GetSlicePlaneCenter();
     Vector3f slice_u = GetSlicePlaneU();
     Vector3f slice_v = GetSlicePlaneV();
 
-    // パン操作を適用
     center.x += slice_u.x * pan_center.x + slice_v.x * pan_center.y;
     center.y += slice_u.y * pan_center.x + slice_v.y * pan_center.y;
     center.z += slice_u.z * pan_center.x + slice_v.z * pan_center.y;
@@ -1040,6 +933,7 @@ void SpatialAnalyzer::DrawRotatedSliceMap(int x_pos, int y_pos, int w, int h, Vo
     float cell_w = (float)w / draw_res;
     float cell_h = (float)h / draw_res;
     
+    // ヒートマップ描画
     glBegin(GL_QUADS);
     for (int iy = 0; iy < draw_res; ++iy) {
         for (int ix = 0; ix < draw_res; ++ix) {
@@ -1069,25 +963,25 @@ void SpatialAnalyzer::DrawRotatedSliceMap(int x_pos, int y_pos, int w, int h, Vo
     }
     glEnd();
     
-    // タイトルを描画
+    // タイトルと回転情報を描画
     glColor3f(0,0,0);
     glRasterPos2i(x_pos, y_pos - 5);
-    for (const char* c = title; *c != '\0'; c++) glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, *c);
+    for (const char* c = title; *c != '\0'; c++) 
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, *c);
     
     char rot_info[128];
     sprintf(rot_info, "Rot: X=%.0f Y=%.0f Z=%.0f", slice_rotation_x, slice_rotation_y, slice_rotation_z);
     glRasterPos2i(x_pos, y_pos + h + 22);
-    for (const char* c = rot_info; *c != '\0'; c++) glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, *c);
+    for (const char* c = rot_info; *c != '\0'; c++) 
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, *c);
 }
 
 // ワールド座標でボクセル値をサンプリング
 float SpatialAnalyzer::SampleVoxelAtWorldPos(VoxelGrid& grid, const Point3f& world_pos) {
     float world_range[3];
-    for (int i = 0; i < 3; ++i) {
+    for (int i = 0; i < 3; ++i)
         world_range[i] = world_bounds[i][1] - world_bounds[i][0];
-    }
     
-    // ワールド座標をボクセルインデックスに変換
     int gx = (int)(((world_pos.x - world_bounds[0][0]) / world_range[0]) * grid_resolution);
     int gy = (int)(((world_pos.y - world_bounds[1][0]) / world_range[1]) * grid_resolution);
     int gz = (int)(((world_pos.z - world_bounds[2][0]) / world_range[2]) * grid_resolution);
@@ -1098,27 +992,19 @@ float SpatialAnalyzer::SampleVoxelAtWorldPos(VoxelGrid& grid, const Point3f& wor
 // === スライス平面の変換行列ベース操作 ===
 
 Point3f SpatialAnalyzer::GetSlicePlaneCenter() const {
-    return Point3f(slice_plane_transform.m03, 
-                   slice_plane_transform.m13, 
-                   slice_plane_transform.m23);
+    return Point3f(slice_plane_transform.m03, slice_plane_transform.m13, slice_plane_transform.m23);
 }
 
 Vector3f SpatialAnalyzer::GetSlicePlaneU() const {
-    return Vector3f(slice_plane_transform.m00, 
-                    slice_plane_transform.m10, 
-                    slice_plane_transform.m20);
+    return Vector3f(slice_plane_transform.m00, slice_plane_transform.m10, slice_plane_transform.m20);
 }
 
 Vector3f SpatialAnalyzer::GetSlicePlaneV() const {
-    return Vector3f(slice_plane_transform.m01, 
-                    slice_plane_transform.m11, 
-                    slice_plane_transform.m21);
+    return Vector3f(slice_plane_transform.m01, slice_plane_transform.m11, slice_plane_transform.m21);
 }
 
 Vector3f SpatialAnalyzer::GetSlicePlaneNormal() const {
-    return Vector3f(slice_plane_transform.m02, 
-                    slice_plane_transform.m12, 
-                    slice_plane_transform.m22);
+    return Vector3f(slice_plane_transform.m02, slice_plane_transform.m12, slice_plane_transform.m22);
 }
 
 void SpatialAnalyzer::ApplySlicePlaneRotation(const Matrix4f& local_rotation) {
@@ -1133,7 +1019,7 @@ void SpatialAnalyzer::ApplySlicePlaneRotation(const Matrix4f& local_rotation) {
     current_rot.m13 = 0;
     current_rot.m23 = 0;
     
-    // ローカル座標系での回転を適用: new_rot = current_rot * local_rotation
+    // ローカル座標系での回転を適用
     Matrix4f result;
     result.mul(current_rot, local_rotation);
     
@@ -1153,12 +1039,10 @@ void SpatialAnalyzer::ApplySlicePlaneTranslation(const Point3f& world_translatio
 }
 
 void SpatialAnalyzer::UpdateEulerAnglesFromTransform() {
-    // 変換行列からオイラー角を逆算（表示用）
     Vector3f n = GetSlicePlaneNormal();
     Vector3f u = GetSlicePlaneU();
     Vector3f v = GetSlicePlaneV();
     
-    // 法線ベクトルからX軸回転とY軸回転を計算
     float ny = n.y;
     if (ny > 1.0f) ny = 1.0f;
     if (ny < -1.0f) ny = -1.0f;
@@ -1170,32 +1054,34 @@ void SpatialAnalyzer::UpdateEulerAnglesFromTransform() {
 }
 
 // === 共通ボクセル化ヘルパー関数 ===
-// フレームデータを計算（3フレーム分を取得）
+
+// フレームデータを計算（4フレーム分を取得）
 void SpatialAnalyzer::ComputeFrameData(Motion* m, float time, FrameData& frame_data) {
-    if (!m) return;
+    if (!m) 
+        return;
     
     Posture curr_pose(m->body);
     Posture prev_pose(m->body);
     Posture prev2_pose(m->body);
-	Posture prev3_pose(m->body);
+    Posture prev3_pose(m->body);
     
     frame_data.dt = m->interval;
     float prev_time = time - frame_data.dt;
     float prev2_time = time - 2.0f * frame_data.dt;
-	float prev3_time = time - 3.0f * frame_data.dt;
+    float prev3_time = time - 3.0f * frame_data.dt;
     if (prev_time < 0) prev_time = 0;
     if (prev2_time < 0) prev2_time = 0;
-	if (prev3_time < 0) prev3_time = 0;
+    if (prev3_time < 0) prev3_time = 0;
 
     m->GetPosture(time, curr_pose);
     m->GetPosture(prev_time, prev_pose);
     m->GetPosture(prev2_time, prev2_pose);
-	m->GetPosture(prev3_time, prev3_pose);
+    m->GetPosture(prev3_time, prev3_pose);
 
     curr_pose.ForwardKinematics(frame_data.curr_frames, frame_data.curr_joint_pos);
     prev_pose.ForwardKinematics(frame_data.prev_frames, frame_data.prev_joint_pos);
     prev2_pose.ForwardKinematics(frame_data.prev2_frames, frame_data.prev2_joint_pos);
-	prev3_pose.ForwardKinematics(frame_data.prev3_frames, frame_data.prev3_joint_pos);
+    prev3_pose.ForwardKinematics(frame_data.prev3_frames, frame_data.prev3_joint_pos);
 
     frame_data.curr_root_pos.set(curr_pose.root_pos);
 }
@@ -1218,18 +1104,10 @@ void SpatialAnalyzer::ExtractBoneData(Motion* m, const FrameData& frame_data, ve
         }
 
         if (seg->num_joints == 1) {
-            bone.p1 = Point3f(frame_data.curr_frames[s].m03, 
-                              frame_data.curr_frames[s].m13, 
-                              frame_data.curr_frames[s].m23);
-            bone.p1_prev = Point3f(frame_data.prev_frames[s].m03, 
-                                   frame_data.prev_frames[s].m13, 
-                                   frame_data.prev_frames[s].m23);
-            bone.p1_prev2 = Point3f(frame_data.prev2_frames[s].m03, 
-                                    frame_data.prev2_frames[s].m13, 
-			                    	frame_data.prev2_frames[s].m23);
-            bone.p1_prev3 = Point3f(frame_data.prev3_frames[s].m03, 
-			                    	frame_data.prev3_frames[s].m13,
-			                    	frame_data.prev3_frames[s].m23);
+            bone.p1 = Point3f(frame_data.curr_frames[s].m03, frame_data.curr_frames[s].m13, frame_data.curr_frames[s].m23);
+            bone.p1_prev = Point3f(frame_data.prev_frames[s].m03, frame_data.prev_frames[s].m13, frame_data.prev_frames[s].m23);
+            bone.p1_prev2 = Point3f(frame_data.prev2_frames[s].m03, frame_data.prev2_frames[s].m13, frame_data.prev2_frames[s].m23);
+            bone.p1_prev3 = Point3f(frame_data.prev3_frames[s].m03, frame_data.prev3_frames[s].m13, frame_data.prev3_frames[s].m23);
             
             if (seg->has_site) {
                 // site_positionをワールド座標に変換
@@ -1249,17 +1127,17 @@ void SpatialAnalyzer::ExtractBoneData(Motion* m, const FrameData& frame_data, ve
 
                 Matrix3f R_prev2(frame_data.prev2_frames[s].m00, frame_data.prev2_frames[s].m01, frame_data.prev2_frames[s].m02, 
                                  frame_data.prev2_frames[s].m10, frame_data.prev2_frames[s].m11, frame_data.prev2_frames[s].m12, 
-					frame_data.prev2_frames[s].m20, frame_data.prev2_frames[s].m21, frame_data.prev2_frames[s].m22);
-				Point3f offset_prev2 = seg->site_position;
-				R_prev2.transform(&offset_prev2);
-				bone.p2_prev2 = bone.p1_prev2 + offset_prev2;
+                                 frame_data.prev2_frames[s].m20, frame_data.prev2_frames[s].m21, frame_data.prev2_frames[s].m22);
+                Point3f offset_prev2 = seg->site_position;
+                R_prev2.transform(&offset_prev2);
+                bone.p2_prev2 = bone.p1_prev2 + offset_prev2;
 
                 Matrix3f R_prev3(frame_data.prev3_frames[s].m00, frame_data.prev3_frames[s].m01, frame_data.prev3_frames[s].m02, 
-					frame_data.prev3_frames[s].m10, frame_data.prev3_frames[s].m11, frame_data.prev3_frames[s].m12,
-					frame_data.prev3_frames[s].m20, frame_data.prev3_frames[s].m21, frame_data.prev3_frames[s].m22);
-				Point3f offset_prev3 = seg->site_position;
-				R_prev3.transform(&offset_prev3);
-				bone.p2_prev3 = bone.p1_prev3 + offset_prev3;
+                                 frame_data.prev3_frames[s].m10, frame_data.prev3_frames[s].m11, frame_data.prev3_frames[s].m12,
+                                 frame_data.prev3_frames[s].m20, frame_data.prev3_frames[s].m21, frame_data.prev3_frames[s].m22);
+                Point3f offset_prev3 = seg->site_position;
+                R_prev3.transform(&offset_prev3);
+                bone.p2_prev3 = bone.p1_prev3 + offset_prev3;
 
                 bone.valid = true;
             }
@@ -1271,22 +1149,21 @@ void SpatialAnalyzer::ExtractBoneData(Motion* m, const FrameData& frame_data, ve
             bone.p2 = frame_data.curr_joint_pos[end_joint->index];
             bone.p1_prev = frame_data.prev_joint_pos[root_joint->index];
             bone.p2_prev = frame_data.prev_joint_pos[end_joint->index];
-			bone.p1_prev2 = frame_data.prev2_joint_pos[root_joint->index];
-			bone.p2_prev2 = frame_data.prev2_joint_pos[end_joint->index];
-			bone.p1_prev3 = frame_data.prev3_joint_pos[root_joint->index];
-			bone.p2_prev3 = frame_data.prev3_joint_pos[end_joint->index];
+            bone.p1_prev2 = frame_data.prev2_joint_pos[root_joint->index];
+            bone.p2_prev2 = frame_data.prev2_joint_pos[end_joint->index];
+            bone.p1_prev3 = frame_data.prev3_joint_pos[root_joint->index];
+            bone.p2_prev3 = frame_data.prev3_joint_pos[end_joint->index];
 
             bone.valid = true;
         }
         
+        // 速度とジャークを計算
         if (bone.valid) {
-            // 速度を計算
             Vector3f spd1_curr = bone.p1 - bone.p1_prev;
             Vector3f spd2_curr = bone.p2 - bone.p2_prev;
             bone.speed1 = spd1_curr.length() / frame_data.dt;
             bone.speed2 = spd2_curr.length() / frame_data.dt;
             
-            // ジャークを計算（加速度の時間微分）
             Vector3f spd1_prev = bone.p1_prev - bone.p1_prev2;
             Vector3f spd2_prev = bone.p2_prev - bone.p2_prev2;
             Vector3f spd1_prev2 = bone.p1_prev2 - bone.p1_prev3;
@@ -1307,7 +1184,7 @@ void SpatialAnalyzer::ExtractBoneData(Motion* m, const FrameData& frame_data, ve
     }
 }
 
-// AABB計算（共通化）
+// AABB計算
 void SpatialAnalyzer::ComputeAABB(const Point3f& p1, const Point3f& p2, float radius, 
                                    int idx_min[3], int idx_max[3], const float world_range[3]) {
     float b_min[3], b_max[3];
@@ -1320,17 +1197,19 @@ void SpatialAnalyzer::ComputeAABB(const Point3f& p1, const Point3f& p2, float ra
     }
 }
 
-// ボクセルグリッドへの書き込み（占有率、速度、ジャークを同時に処理）
+// ボクセルグリッドへの書き込み
 void SpatialAnalyzer::WriteToVoxelGrid(const BoneData& bone, float bone_radius, const float world_range[3],
                                         VoxelGrid* occ_grid, VoxelGrid* spd_grid, VoxelGrid* jrk_grid) {
-    if (!bone.valid) return;
+    if (!bone.valid) 
+        return;
     
     int idx_min[3], idx_max[3];
     ComputeAABB(bone.p1, bone.p2, bone_radius, idx_min, idx_max, world_range);
     
     Point3f bone_vec = bone.p2 - bone.p1;
     float bone_len_sq = bone_vec.x*bone_vec.x + bone_vec.y*bone_vec.y + bone_vec.z*bone_vec.z;
-    if (bone_len_sq < 1e-6f) return;
+    if (bone_len_sq < 1e-6f) 
+        return;
     
     float sigma_sq = 2.0f * (bone_radius/2.0f) * (bone_radius/2.0f);
     float radius_sq = bone_radius * bone_radius;
@@ -1349,25 +1228,26 @@ void SpatialAnalyzer::WriteToVoxelGrid(const BoneData& bone, float bone_radius, 
                 float k_clamped = max(0.0f, min(1.0f, t));
                 Point3f closest = bone.p1 + bone_vec * k_clamped;
                 
-				float dist_sq = pow(voxel_center.x - closest.x, 2.0) + pow(voxel_center.y - closest.y, 2.0) + pow(voxel_center.z - closest.z, 2.0);
+                float dist_sq = pow(voxel_center.x - closest.x, 2.0) + pow(voxel_center.y - closest.y, 2.0) + pow(voxel_center.z - closest.z, 2.0);
 
                 if (dist_sq < radius_sq) {
                     float presence = exp(-dist_sq / sigma_sq);
                     
-                    if (occ_grid) {
+                    if (occ_grid)
                         occ_grid->At(x, y, z) += presence;
-                    }
                     
                     if (spd_grid) {
                         float s_interp = (1.0f - k_clamped) * bone.speed1 + k_clamped * bone.speed2;
                         float& current_spd = spd_grid->At(x, y, z);
-                        if (s_interp > current_spd) current_spd = s_interp;
+                        if (s_interp > current_spd) 
+                            current_spd = s_interp;
                     }
                     
                     if (jrk_grid) {
                         float j_interp = (1.0f - k_clamped) * bone.jerk1 + k_clamped * bone.jerk2;
                         float& current_jrk = jrk_grid->At(x, y, z);
-                        if (j_interp > current_jrk) current_jrk = j_interp;
+                        if (j_interp > current_jrk) 
+                            current_jrk = j_interp;
                     }
                 }
             }
@@ -1394,48 +1274,43 @@ void SpatialAnalyzer::ToggleSegmentSelection(int segment_index) {
 }
 
 void SpatialAnalyzer::SelectAllSegments() {
-    for (size_t i = 0; i < selected_segments.size(); ++i) {
+    for (size_t i = 0; i < selected_segments.size(); ++i)
         selected_segments[i] = true;
-    }
     InvalidateSegmentCache();
     std::cout << "All segments selected" << std::endl;
 }
 
 void SpatialAnalyzer::ClearSegmentSelection() {
-    for (size_t i = 0; i < selected_segments.size(); ++i) {
+    for (size_t i = 0; i < selected_segments.size(); ++i)
         selected_segments[i] = false;
-    }
     InvalidateSegmentCache();
     std::cout << "Segment selection cleared" << std::endl;
 }
 
 bool SpatialAnalyzer::IsSegmentSelected(int segment_index) const {
-    if (segment_index >= 0 && segment_index < (int)selected_segments.size()) {
+    if (segment_index >= 0 && segment_index < (int)selected_segments.size())
         return selected_segments[segment_index];
-    }
     return false;
 }
 
 int SpatialAnalyzer::GetSelectedSegmentCount() const {
     int count = 0;
-    for (size_t i = 0; i < selected_segments.size(); ++i) {
-        if (selected_segments[i]) count++;
-    }
+    for (size_t i = 0; i < selected_segments.size(); ++i)
+        if (selected_segments[i]) 
+            count++;
     return count;
 }
 
 float SpatialAnalyzer::GetSegmentMaxValue(int segment_index) const {
-    if (segment_index < 0 || segment_index >= (int)segment_max_presence.size()) {
+    if (segment_index < 0 || segment_index >= (int)segment_max_presence.size())
         return 1.0f;
-    }
     
-    if (feature_mode == 0) {
+    if (feature_mode == 0)
         return segment_max_presence[segment_index];
-    } else if (feature_mode == 1) {
+    else if (feature_mode == 1)
         return segment_max_speed[segment_index];
-    } else {
+    else
         return segment_max_jerk[segment_index];
-    }
 }
 
 void SpatialAnalyzer::InvalidateSegmentCache() {
@@ -1443,11 +1318,7 @@ void SpatialAnalyzer::InvalidateSegmentCache() {
 }
 
 void SpatialAnalyzer::UpdateSegmentCache() {
-    // キャッシュが有効かチェック
-    // 1. segment_cache_dirtyがfalse
-    // 2. feature_modeが同じ
-    // 3. selected_segment_indexが同じ
-    // 4. selected_segmentsが同じ
+    // キャッシュ有効性チェック
     bool selection_changed = false;
     if (cached_selected_segments.size() != selected_segments.size()) {
         selection_changed = true;
@@ -1460,14 +1331,12 @@ void SpatialAnalyzer::UpdateSegmentCache() {
         }
     }
     
-    if (!segment_cache_dirty && 
-        !selection_changed &&
+    if (!segment_cache_dirty && !selection_changed &&
         cached_feature_mode == feature_mode && 
-        cached_selected_segment_index == selected_segment_index) {
-        return;  // キャッシュは有効
-    }
+        cached_selected_segment_index == selected_segment_index)
+        return;
     
-    // キャッシュグリッドをリサイズ
+    // キャッシュグリッドをリサイズ・クリア
     cached_segment_grid1.Resize(grid_resolution);
     cached_segment_grid2.Resize(grid_resolution);
     cached_segment_diff.Resize(grid_resolution);
@@ -1475,6 +1344,7 @@ void SpatialAnalyzer::UpdateSegmentCache() {
     cached_segment_grid2.Clear();
     cached_segment_diff.Clear();
     
+    // 特徴量に応じたデータソース選択
     SegmentVoxelData* seg_data1 = nullptr;
     SegmentVoxelData* seg_data2 = nullptr;
     
@@ -1489,7 +1359,6 @@ void SpatialAnalyzer::UpdateSegmentCache() {
         seg_data2 = &segment_jerk_voxels2;
     }
     
-    // セグメントデータが無効な場合は終了
     if (seg_data1->num_segments == 0) {
         segment_cache_dirty = false;
         cached_feature_mode = feature_mode;
@@ -1501,21 +1370,18 @@ void SpatialAnalyzer::UpdateSegmentCache() {
     int size = grid_resolution * grid_resolution * grid_resolution;
     cached_segment_max_val = 0.0f;
     
-    // 表示対象部位のリストを事前に作成（ループ内での条件分岐を減らす）
+    // 表示対象部位のリストを作成
     std::vector<int> active_segments;
-    for (size_t s = 0; s < selected_segments.size(); ++s) {
-        if (selected_segments[s]) {
+    for (size_t s = 0; s < selected_segments.size(); ++s)
+        if (selected_segments[s])
             active_segments.push_back((int)s);
-        }
-    }
-    // ナビゲート中の部位も追加（まだ選択されていない場合）
+    
+    // ナビゲート中の部位も追加
     if (selected_segment_index >= 0 && 
         selected_segment_index < (int)selected_segments.size() &&
-        !selected_segments[selected_segment_index]) {
+        !selected_segments[selected_segment_index])
         active_segments.push_back(selected_segment_index);
-    }
     
-    // 表示部位がない場合は終了
     if (active_segments.empty()) {
         segment_cache_dirty = false;
         cached_feature_mode = feature_mode;
@@ -1543,10 +1409,12 @@ void SpatialAnalyzer::UpdateSegmentCache() {
         cached_segment_grid2.data[i] = val2;
         float diff = abs(val1 - val2);
         cached_segment_diff.data[i] = diff;
-        if (diff > cached_segment_max_val) cached_segment_max_val = diff;
+        if (diff > cached_segment_max_val) 
+            cached_segment_max_val = diff;
     }
     
-    if (cached_segment_max_val < 1e-5f) cached_segment_max_val = 1.0f;
+    if (cached_segment_max_val < 1e-5f) 
+        cached_segment_max_val = 1.0f;
     
     segment_cache_dirty = false;
     cached_feature_mode = feature_mode;
