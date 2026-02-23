@@ -102,9 +102,6 @@
     <ClCompile Include="MotionPlaybackApp3.cpp">
       <Filter>ソース ファイル\SimpleHuman</Filter>
     </ClCompile>
-    <ClCompile Include="MotionPlaybackApp4.cpp">
-      <Filter>ソース ファイル\SimpleHuman</Filter>
-    </ClCompile>
     <ClCompile Include="MotionTransition.cpp">
       <Filter>ソース ファイル\SimpleHuman</Filter>
     </ClCompile>
@@ -119,9 +116,6 @@
     </ClCompile>
     <ClCompile Include="CNavigationModel.cpp">
       <Filter>ソース ファイル\SpaceMouse</Filter>
-    </ClCompile>
-    <ClCompile Include="SimpleHumanGLUT.cpp">
-      <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="imgui.cpp">
       <Filter>ソース ファイル\imgui</Filter>
@@ -146,6 +140,12 @@
     </ClCompile>
     <ClCompile Include="main.cpp">
       <Filter>ソース ファイル\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="SimpleHumanGLUT.cpp">
+      <Filter>ソース ファイル\よく使うもの</Filter>
+    </ClCompile>
+    <ClCompile Include="MotionPlaybackApp4.cpp">
+      <Filter>ソース ファイル\SimpleHuman</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

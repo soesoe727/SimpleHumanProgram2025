@@ -673,7 +673,8 @@ void MotionApp::ProcessSpaceMouseInput()
 
     const Matrix4f& transform = GetSpaceMouseTransform();
 
-    const float translation_sensitivity = 0.01f;
+    const float translation_sensitivity = 0.004f;
+    const float rotation_sensitivity = 0.1f;
     const float deadzone = 0.001f;
 
     if (fabs(transform.m03) > deadzone || fabs(transform.m13) > deadzone || fabs(transform.m23) > deadzone) {
@@ -687,12 +688,38 @@ void MotionApp::ProcessSpaceMouseInput()
 
     float trace = transform.m00 + transform.m11 + transform.m22;
     if (fabs(trace - 3.0f) > deadzone) {
-        Matrix4f local_rotation;
-        local_rotation.setIdentity();
-        local_rotation.m00 = transform.m00; local_rotation.m01 = transform.m01; local_rotation.m02 = transform.m02;
-        local_rotation.m10 = transform.m10; local_rotation.m11 = transform.m11; local_rotation.m12 = transform.m12;
-        local_rotation.m20 = transform.m20; local_rotation.m21 = transform.m21; local_rotation.m22 = transform.m22;
-        analyzer.ApplySlicePlaneRotation(local_rotation);
+        float cos_angle = (trace - 1.0f) * 0.5f;
+        if (cos_angle > 1.0f) cos_angle = 1.0f;
+        if (cos_angle < -1.0f) cos_angle = -1.0f;
+        float angle = acosf(cos_angle);
+
+        if (angle > 1e-6f) {
+            float sin_angle = sinf(angle);
+            Vector3f axis(
+                (transform.m21 - transform.m12) / (2.0f * sin_angle),
+                (transform.m02 - transform.m20) / (2.0f * sin_angle),
+                (transform.m10 - transform.m01) / (2.0f * sin_angle)
+            );
+
+            float scaled_angle = angle * rotation_sensitivity;
+            float c = cosf(scaled_angle);
+            float s = sinf(scaled_angle);
+            float t = 1.0f - c;
+
+            Matrix4f local_rotation;
+            local_rotation.setIdentity();
+            local_rotation.m00 = t * axis.x * axis.x + c;
+            local_rotation.m01 = t * axis.x * axis.y - s * axis.z;
+            local_rotation.m02 = t * axis.x * axis.z + s * axis.y;
+            local_rotation.m10 = t * axis.x * axis.y + s * axis.z;
+            local_rotation.m11 = t * axis.y * axis.y + c;
+            local_rotation.m12 = t * axis.y * axis.z - s * axis.x;
+            local_rotation.m20 = t * axis.x * axis.z - s * axis.y;
+            local_rotation.m21 = t * axis.y * axis.z + s * axis.x;
+            local_rotation.m22 = t * axis.z * axis.z + c;
+
+            analyzer.ApplySlicePlaneRotation(local_rotation);
+        }
     }
 
     ResetSpaceMouseTransform();
