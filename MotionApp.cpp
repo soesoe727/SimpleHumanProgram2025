@@ -1,5 +1,6 @@
 #include "MotionApp.h"
 #include "BVH.h"
+#include "imgui.h"
 #include <string>
 #include <algorithm>
 #include <cstdio>
@@ -356,6 +357,139 @@ void MotionApp::Display()
                 animation_time, (int)(animation_time / motion->interval)); 
         DrawTextInformation(1, msg); 
     }
+
+    // === ImGui Control Panel ===
+    ImGui::Begin("Control Panel");
+
+    // --- Animation ---
+    if (ImGui::Button(on_animation ? "Pause (Space)" : "Play (Space)"))
+        on_animation = !on_animation;
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(120);
+    ImGui::SliderFloat("Speed", &animation_speed, 0.0f, 3.0f);
+
+    // --- Display ---
+    if (ImGui::CollapsingHeader("Display", ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui::Checkbox("Show Planes (B)", &analyzer.show_planes);
+        ImGui::Checkbox("Show Maps (M)", &analyzer.show_maps);
+        ImGui::Checkbox("Show Voxels (K)", &analyzer.show_voxels);
+    }
+
+    // --- Feature ---
+    if (ImGui::CollapsingHeader("Feature", ImGuiTreeNodeFlags_DefaultOpen)) {
+        const char* feature_items[] = {"Occupancy", "Speed", "Jerk"};
+        ImGui::Combo("Feature (F)", &analyzer.feature_mode, feature_items, 3);
+        const char* norm_items[] = {"CurrentFrame", "Accumulated"};
+        ImGui::Combo("Norm (N)", &analyzer.norm_mode, norm_items, 2);
+    }
+
+    // --- Slice Control ---
+    if (ImGui::CollapsingHeader("Slice Control", ImGuiTreeNodeFlags_DefaultOpen)) {
+        if (!analyzer.slice_positions.empty()) {
+            if (ImGui::Button("Forward (W)")) {
+                Vector3f n = analyzer.GetSlicePlaneNormal(); n.normalize();
+                analyzer.ApplySlicePlaneTranslation(Point3f(n.x * 0.02f, n.y * 0.02f, n.z * 0.02f));
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Backward (S)")) {
+                Vector3f n = analyzer.GetSlicePlaneNormal(); n.normalize();
+                analyzer.ApplySlicePlaneTranslation(Point3f(-n.x * 0.02f, -n.y * 0.02f, -n.z * 0.02f));
+            }
+        }
+
+        ImGui::Text("Rotation:");
+        if (ImGui::Button("X+")) analyzer.RotateSlicePlane(5.0f, 0.0f, 0.0f);
+        ImGui::SameLine();
+        if (ImGui::Button("X-")) analyzer.RotateSlicePlane(-5.0f, 0.0f, 0.0f);
+        ImGui::SameLine();
+        if (ImGui::Button("Y+")) analyzer.RotateSlicePlane(0.0f, 5.0f, 0.0f);
+        ImGui::SameLine();
+        if (ImGui::Button("Y-")) analyzer.RotateSlicePlane(0.0f, -5.0f, 0.0f);
+        ImGui::SameLine();
+        if (ImGui::Button("Z+")) analyzer.RotateSlicePlane(0.0f, 0.0f, 5.0f);
+        ImGui::SameLine();
+        if (ImGui::Button("Z-")) analyzer.RotateSlicePlane(0.0f, 0.0f, -5.0f);
+
+        if (ImGui::Button("Reset Rotation (0)")) analyzer.ResetSliceRotation();
+
+        if (ImGui::Button("Zoom In (I)")) analyzer.Zoom(0.9f);
+        ImGui::SameLine();
+        if (ImGui::Button("Zoom Out (O)")) analyzer.Zoom(1.1f);
+        ImGui::SameLine();
+        if (ImGui::Button("Reset View")) analyzer.ResetView();
+    }
+
+    // --- Gizmo ---
+    if (ImGui::CollapsingHeader("Gizmo")) {
+        if (ImGui::Button("Toggle Gizmo (Y)")) ToggleSliceGizmo();
+        ImGui::SameLine();
+        ImGui::Text(use_slice_gizmo ? "ON" : "OFF");
+
+        if (ImGui::Button("Toggle Mode (U)")) ToggleSliceGizmoMode();
+        ImGui::SameLine();
+        ImGui::Text(slice_gizmo.GetMode() == GIZMO_TRANSLATE ? "Move" : "Rotate");
+
+        if (ImGui::Button("Toggle SpaceMouse (P)")) {
+            use_spacemouse_slice = !use_spacemouse_slice;
+            if (use_spacemouse_slice && !analyzer.use_rotated_slice)
+                analyzer.ToggleRotatedSliceMode();
+        }
+        ImGui::SameLine();
+        ImGui::Text(use_spacemouse_slice ? "ON" : "OFF");
+    }
+
+    // --- Segment ---
+    if (ImGui::CollapsingHeader("Segment")) {
+        if (ImGui::Button("Segment Mode (E)")) {
+            analyzer.show_segment_mode = !analyzer.show_segment_mode;
+            if (analyzer.show_segment_mode && motion) {
+                if (analyzer.selected_segments.size() != (size_t)motion->body->num_segments)
+                    analyzer.InitializeSegmentSelection(motion->body->num_segments);
+                if (analyzer.selected_segment_index < 0 || !HasVoxelData(analyzer.selected_segment_index))
+                    analyzer.selected_segment_index = GetNextValidSegment(-1, 1);
+            }
+        }
+        ImGui::SameLine();
+        ImGui::Text(analyzer.show_segment_mode ? "ON" : "OFF");
+
+        if (motion && analyzer.show_segment_mode) {
+            if (analyzer.selected_segment_index >= 0 && analyzer.selected_segment_index < motion->body->num_segments)
+                ImGui::Text("Current: %s [%d]", motion->body->segments[analyzer.selected_segment_index]->name.c_str(), analyzer.selected_segment_index);
+
+            if (ImGui::Button("<< Prev")) {
+                analyzer.selected_segment_index = GetNextValidSegment(analyzer.selected_segment_index, -1);
+                analyzer.InvalidateSegmentCache();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Next >>")) {
+                analyzer.selected_segment_index = GetNextValidSegment(analyzer.selected_segment_index, 1);
+                analyzer.InvalidateSegmentCache();
+            }
+
+            if (analyzer.selected_segment_index >= 0) {
+                if (ImGui::Button("Toggle Selection (T)"))
+                    analyzer.ToggleSegmentSelection(analyzer.selected_segment_index);
+            }
+
+            if (ImGui::Button("Select All (9)")) {
+                for (int i = 0; i < motion->body->num_segments; ++i)
+                    if (HasVoxelData(i))
+                        analyzer.selected_segments[i] = true;
+                analyzer.InvalidateSegmentCache();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Clear (8)"))
+                analyzer.ClearSegmentSelection();
+
+            if (ImGui::Button("Reset All (\\)")) {
+                analyzer.selected_segment_index = -1;
+                analyzer.show_segment_mode = false;
+                analyzer.ClearSegmentSelection();
+            }
+        }
+    }
+
+    ImGui::End();
 }
 
 // 最初のBVHファイルを読み込み、Motion1として設定

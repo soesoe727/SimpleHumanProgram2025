@@ -34,7 +34,7 @@ struct FrameData {
     std::vector<Matrix4f> prev_frames;     // 前フレームの変換行列
     std::vector<Matrix4f> prev2_frames;    // 2フレーム前の変換行列（加速度計算用）
 	std::vector<Matrix4f> prev3_frames;    // 3フレーム前の変換行列（ジャーク計算用）
-    Point3f curr_root_pos;    // 現在フレームのルート位置  
+    Point3f curr_root_pos;  // 現在フレームのルート位置
     std::vector<Point3f> curr_joint_pos;   // 現在フレームの関節位置
     std::vector<Point3f> prev_joint_pos;   // 前フレームの関節位置
     std::vector<Point3f> prev2_joint_pos;  // 2フレーム前の関節位置（加速度計算用）

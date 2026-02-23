@@ -138,7 +138,7 @@
     <ClCompile Include="imgui_widgets.cpp">
       <Filter>ソース ファイル\imgui</Filter>
     </ClCompile>
-    <ClCompile Include="main.cpp">
+    <ClCompile Include="imgui_main.cpp">
       <Filter>ソース ファイル\imgui</Filter>
     </ClCompile>
     <ClCompile Include="SimpleHumanGLUT.cpp">

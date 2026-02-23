@@ -13,6 +13,11 @@
 #include "SimpleHumanGLUT.h"
 #include <cmath>
 
+// ImGui
+#include "imgui.h"
+#include "imgui_impl_glut.h"
+#include "imgui_impl_opengl2.h"
+
 // SpaceMouseヘルパーを使用
 #ifdef USE_SPACEMOUSE
 #include "SpaceMouseGLUTHelper.hpp"
@@ -395,14 +400,35 @@ void  UpdateSpaceMouseTransform()
 //
 
 
+// ImGui用キーアップコールバック
+void  KeyboardUpCallback( unsigned char key, int mx, int my )
+{
+	ImGui_ImplGLUT_KeyboardUpFunc(key, mx, my);
+}
+
+void  SpecialKeyboardUpCallback( int key, int mx, int my )
+{
+	ImGui_ImplGLUT_SpecialUpFunc(key, mx, my);
+}
+
+
 //
 //  画面描画時に呼ばれるコールバック関数
 //
 void  DisplayCallback( void )
 {
+	// ImGui new frame
+	ImGui_ImplOpenGL2_NewFrame();
+	ImGui_ImplGLUT_NewFrame();
+	ImGui::NewFrame();
+
 	// アプリケーションの描画処理
 	if ( app )
 		app->Display();
+
+	// ImGui rendering
+	ImGui::Render();
+	ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
 
 	// バックバッファに描画した画面をフロントバッファに表示
 	glutSwapBuffers();
@@ -414,6 +440,9 @@ void  DisplayCallback( void )
 //
 void  ReshapeCallback( int w, int h )
 {
+	// ImGuiにリサイズを通知
+	ImGui_ImplGLUT_ReshapeFunc(w, h);
+
 	// ウィンドウ内の描画を行う範囲を設定（ここではウィンドウ全体に描画）
 	glViewport(0, 0, w, h);
 	
@@ -433,6 +462,16 @@ void  ReshapeCallback( int w, int h )
 //
 void  MouseClickCallback( int button, int state, int mx, int my )
 {
+	// ImGuiにマウスイベントを転送
+	ImGui_ImplGLUT_MouseFunc(button, state, mx, my);
+
+	// ImGuiがマウスを使用中の場合、アプリケーションの処理をスキップ
+	if (ImGui::GetIO().WantCaptureMouse)
+	{
+		glutPostRedisplay();
+		return;
+	}
+
 	// アプリケーションのマウスクリック
 	if ( app )
 		app->MouseClick( button, state, mx, my );
@@ -447,6 +486,16 @@ void  MouseClickCallback( int button, int state, int mx, int my )
 //
 void  MouseDragCallback( int mx, int my )
 {
+	// ImGuiにマウス移動を転送
+	ImGui_ImplGLUT_MotionFunc(mx, my);
+
+	// ImGuiがマウスを使用中の場合、アプリケーションの処理をスキップ
+	if (ImGui::GetIO().WantCaptureMouse)
+	{
+		glutPostRedisplay();
+		return;
+	}
+
 	// アプリケーションのマウスドラッグ
 	if ( app )
 		app->MouseDrag( mx, my );
@@ -461,6 +510,9 @@ void  MouseDragCallback( int mx, int my )
 //
 void  MouseMotionCallback( int mx, int my )
 {
+	// ImGuiにマウス移動を転送
+	ImGui_ImplGLUT_MotionFunc(mx, my);
+
 	// アプリケーションのマウスドラッグ
 	if ( app )
 		app->MouseMotion( mx, my );
@@ -475,6 +527,16 @@ void  MouseMotionCallback( int mx, int my )
 //
 void  KeyboardCallback( unsigned char key, int mx, int my )
 {
+	// ImGuiにキーボードイベントを転送
+	ImGui_ImplGLUT_KeyboardFunc(key, mx, my);
+
+	// ImGuiがキーボードを使用中の場合、アプリケーションの処理をスキップ
+	if (ImGui::GetIO().WantCaptureKeyboard)
+	{
+		glutPostRedisplay();
+		return;
+	}
+
 	// m キーでモードの切り替え
 	if ( ( key == 'm' ) && app && ( applications.size() > 1 ) )
 	{
@@ -520,6 +582,9 @@ void  KeyboardCallback( unsigned char key, int mx, int my )
 //
 void  SpecialKeyboardCallback( int key, int mx, int my )
 {
+	// ImGuiに特殊キーイベントを転送
+	ImGui_ImplGLUT_SpecialFunc(key, mx, my);
+
 	// アプリケーションの特殊キー押下
 	if ( app )
 		app->KeyboardSpecial( key, mx, my );
@@ -738,10 +803,21 @@ int  SimpleHumanGLUTMain( const vector< class GLUTBaseApp * > & app_lists, int a
 	glutPassiveMotionFunc( MouseMotionCallback );
 	glutKeyboardFunc( KeyboardCallback );
 	glutSpecialFunc( SpecialKeyboardCallback );
+	glutKeyboardUpFunc( KeyboardUpCallback );
+	glutSpecialUpFunc( SpecialKeyboardUpCallback );
 	glutIdleFunc( IdleCallback );
 
 	// レンダリング環境初期化
 	initEnvironment();
+
+	// ImGui初期化
+	IMGUI_CHECKVERSION();
+	ImGui::CreateContext();
+	ImGuiIO& io = ImGui::GetIO(); (void)io;
+	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+	ImGui::StyleColorsDark();
+	ImGui_ImplGLUT_Init();
+	ImGui_ImplOpenGL2_Init();
 
 	// 全アプリケーションを登録
 	applications = app_lists;
@@ -759,6 +835,11 @@ int  SimpleHumanGLUTMain( const vector< class GLUTBaseApp * > & app_lists, int a
 #ifdef USE_SPACEMOUSE
 	CSpaceMouseGLUT::GetInstance().Shutdown();
 #endif
+
+	// ImGuiシャットダウン
+	ImGui_ImplOpenGL2_Shutdown();
+	ImGui_ImplGLUT_Shutdown();
+	ImGui::DestroyContext();
 
 	return 0;
 }

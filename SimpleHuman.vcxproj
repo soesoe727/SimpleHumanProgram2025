@@ -165,7 +165,7 @@
     <ClCompile Include="imgui_widgets.cpp" />
     <ClCompile Include="InverseKinematicsCCDApp.cpp" />
     <ClCompile Include="KeyframeMotionPlaybackApp.cpp" />
-    <ClCompile Include="main.cpp">
+    <ClCompile Include="imgui_main.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="MotionApp.cpp" />
@@ -175,7 +175,9 @@
     <ClCompile Include="MotionPlaybackApp3.cpp" />
     <ClCompile Include="MotionPlaybackApp.cpp" />
     <ClCompile Include="MotionPlaybackApp2.cpp" />
-    <ClCompile Include="MotionPlaybackApp4.cpp" />
+    <ClCompile Include="MotionPlaybackApp4.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="MotionTransition.cpp" />
     <ClCompile Include="MotionTransitionApp.cpp" />
     <ClCompile Include="PostureInterpolationApp.cpp" />
