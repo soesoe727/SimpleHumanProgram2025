@@ -236,6 +236,7 @@ public:
     
     // スライス平面の変換行列操作
     void ApplySlicePlaneRotation(const Matrix4f& local_rotation);  // ローカル座標系での回転適用
+    void ApplySlicePlaneWorldRotation(const Matrix4f& world_rotation);  // ワールド座標系での回転適用
     void ApplySlicePlaneTranslation(const Point3f& world_translation);  // ワールド座標系での平行移動
     
     // スライス平面のアクセサ

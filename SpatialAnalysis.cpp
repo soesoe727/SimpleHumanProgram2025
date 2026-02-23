@@ -1055,6 +1055,32 @@ void SpatialAnalyzer::ApplySlicePlaneRotation(const Matrix4f& local_rotation) {
     UpdateEulerAnglesFromTransform();
 }
 
+// スライス平面にワールド座標系での回転を適用
+void SpatialAnalyzer::ApplySlicePlaneWorldRotation(const Matrix4f& world_rotation) {
+    // 現在の中心位置を保存
+    float cx = slice_plane_transform.m03;
+    float cy = slice_plane_transform.m13;
+    float cz = slice_plane_transform.m23;
+
+    // 平行移動を除去した回転のみの行列
+    Matrix4f current_rot = slice_plane_transform;
+    current_rot.m03 = 0;
+    current_rot.m13 = 0;
+    current_rot.m23 = 0;
+
+    // ワールド座標系での回転を適用: new = world_rotation * current_rot
+    Matrix4f result;
+    result.mul(world_rotation, current_rot);
+
+    // 中心位置を復元
+    result.m03 = cx;
+    result.m13 = cy;
+    result.m23 = cz;
+
+    slice_plane_transform = result;
+    UpdateEulerAnglesFromTransform();
+}
+
 // スライス平面にワールド座標での平行移動を適用
 void SpatialAnalyzer::ApplySlicePlaneTranslation(const Point3f& world_translation) {
     slice_plane_transform.m03 += world_translation.x;

@@ -662,7 +662,7 @@ void MotionApp::SyncGizmoToSliceState()
         slice_gizmo.SetMode(GIZMO_TRANSLATE);
 }
 
-// SpaceMouse入力をスライス平面の移動・回転に適用
+// SpaceMouse入力をカメラ座標系に基づいてスライス平面の移動・回転に適用
 void MotionApp::ProcessSpaceMouseInput()
 {
     if (!use_spacemouse_slice)
@@ -677,15 +677,33 @@ void MotionApp::ProcessSpaceMouseInput()
     const float rotation_sensitivity = 0.1f;
     const float deadzone = 0.001f;
 
+    // カメラの向き行列を計算（camera_yaw, camera_pitchから）
+    // R_cam = Ry(yaw) * Rx(pitch) でカメラのワールド空間での座標軸を求める
+    float yaw_rad = camera_yaw * kPi / 180.0f;
+    float pitch_rad = camera_pitch * kPi / 180.0f;
+    float cy = cosf(yaw_rad), sy = sinf(yaw_rad);
+    float cp = cosf(pitch_rad), sp = sinf(pitch_rad);
+
+    // カメラの座標軸（ワールド空間）
+    Vector3f cam_right(cy, 0.0f, -sy);
+    Vector3f cam_up(sy * sp, cp, cy * sp);
+    Vector3f cam_forward(sy * cp, -sp, cy * cp);
+
+    // 平行移動：カメラ座標系からワールド座標系に変換
     if (fabs(transform.m03) > deadzone || fabs(transform.m13) > deadzone || fabs(transform.m23) > deadzone) {
-        Point3f translation(
-            transform.m03 * translation_sensitivity,
-            transform.m13 * translation_sensitivity,
-            transform.m23 * translation_sensitivity
+        float tx = transform.m03 * translation_sensitivity;
+        float ty = transform.m13 * translation_sensitivity;
+        float tz = transform.m23 * translation_sensitivity;
+
+        Point3f world_translation(
+            tx * cam_right.x + ty * cam_up.x + tz * cam_forward.x,
+            tx * cam_right.y + ty * cam_up.y + tz * cam_forward.y,
+            tx * cam_right.z + ty * cam_up.z + tz * cam_forward.z
         );
-        analyzer.ApplySlicePlaneTranslation(translation);
+        analyzer.ApplySlicePlaneTranslation(world_translation);
     }
 
+    // 回転：カメラ座標系からワールド座標系に変換
     float trace = transform.m00 + transform.m11 + transform.m22;
     if (fabs(trace - 3.0f) > deadzone) {
         float cos_angle = (trace - 1.0f) * 0.5f;
@@ -695,30 +713,45 @@ void MotionApp::ProcessSpaceMouseInput()
 
         if (angle > 1e-6f) {
             float sin_angle = sinf(angle);
-            Vector3f axis(
+            // カメラ座標系での回転軸
+            Vector3f cam_axis(
                 (transform.m21 - transform.m12) / (2.0f * sin_angle),
                 (transform.m02 - transform.m20) / (2.0f * sin_angle),
                 (transform.m10 - transform.m01) / (2.0f * sin_angle)
             );
 
+            // カメラ座標系の軸をワールド座標系に変換
+            Vector3f world_axis(
+                cam_axis.x * cam_right.x + cam_axis.y * cam_up.x + cam_axis.z * cam_forward.x,
+                cam_axis.x * cam_right.y + cam_axis.y * cam_up.y + cam_axis.z * cam_forward.y,
+                cam_axis.x * cam_right.z + cam_axis.y * cam_up.z + cam_axis.z * cam_forward.z
+            );
+            float len = sqrtf(world_axis.x * world_axis.x + world_axis.y * world_axis.y + world_axis.z * world_axis.z);
+            if (len > 1e-6f) {
+                world_axis.x /= len;
+                world_axis.y /= len;
+                world_axis.z /= len;
+            }
+
+            // スケーリングされた回転角でワールド空間の回転行列を構築
             float scaled_angle = angle * rotation_sensitivity;
             float c = cosf(scaled_angle);
             float s = sinf(scaled_angle);
             float t = 1.0f - c;
 
-            Matrix4f local_rotation;
-            local_rotation.setIdentity();
-            local_rotation.m00 = t * axis.x * axis.x + c;
-            local_rotation.m01 = t * axis.x * axis.y - s * axis.z;
-            local_rotation.m02 = t * axis.x * axis.z + s * axis.y;
-            local_rotation.m10 = t * axis.x * axis.y + s * axis.z;
-            local_rotation.m11 = t * axis.y * axis.y + c;
-            local_rotation.m12 = t * axis.y * axis.z - s * axis.x;
-            local_rotation.m20 = t * axis.x * axis.z - s * axis.y;
-            local_rotation.m21 = t * axis.y * axis.z + s * axis.x;
-            local_rotation.m22 = t * axis.z * axis.z + c;
+            Matrix4f world_rotation;
+            world_rotation.setIdentity();
+            world_rotation.m00 = t * world_axis.x * world_axis.x + c;
+            world_rotation.m01 = t * world_axis.x * world_axis.y - s * world_axis.z;
+            world_rotation.m02 = t * world_axis.x * world_axis.z + s * world_axis.y;
+            world_rotation.m10 = t * world_axis.x * world_axis.y + s * world_axis.z;
+            world_rotation.m11 = t * world_axis.y * world_axis.y + c;
+            world_rotation.m12 = t * world_axis.y * world_axis.z - s * world_axis.x;
+            world_rotation.m20 = t * world_axis.x * world_axis.z - s * world_axis.y;
+            world_rotation.m21 = t * world_axis.y * world_axis.z + s * world_axis.x;
+            world_rotation.m22 = t * world_axis.z * world_axis.z + c;
 
-            analyzer.ApplySlicePlaneRotation(local_rotation);
+            analyzer.ApplySlicePlaneWorldRotation(world_rotation);
         }
     }
 
