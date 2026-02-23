@@ -13,7 +13,7 @@ static const float kPi = 3.14159265358979323846f;
 // インスタンスを保持する static ポインタ
 static MotionApp* g_app_instance = NULL;
 
-// 'Special'関数を呼び出すための静的ラッパー
+// 特殊キー入力をインスタンスメソッドに転送する静的ラッパー関数
 static void SpecialKeyWrapper(int key, int x, int y)
 {
     if (g_app_instance) {
@@ -21,6 +21,7 @@ static void SpecialKeyWrapper(int key, int x, int y)
     }
 }
 
+// コンストラクタ：アプリケーションの初期状態を設定
 MotionApp::MotionApp() {
     g_app_instance = this;
     app_name = "Motion Analysis App";
@@ -41,9 +42,10 @@ MotionApp::MotionApp() {
     use_spacemouse_slice = true;
 }
 
+// デストラクタ：モーションデータとポスチャを解放
 MotionApp::~MotionApp() 
 {
-    if ( motion ) { 
+    if ( motion ) {
         if (motion->body) delete motion->body;
         delete motion;
     } 
@@ -52,6 +54,7 @@ MotionApp::~MotionApp()
     if ( curr_posture2 ) delete curr_posture2;
 }
 
+// アプリケーションの初期化とBVHファイルの読み込み
 void MotionApp::Initialize() 
 {
     GLUTBaseApp::Initialize();
@@ -60,6 +63,7 @@ void MotionApp::Initialize()
     OpenNewBVH2();
 }
 
+// アニメーションを開始し、時刻をリセット
 void MotionApp::Start()
 {
     GLUTBaseApp::Start();
@@ -68,9 +72,10 @@ void MotionApp::Start()
     Animation(0.0f);
 }
 
+// キーボード入力を処理（アニメーション制御、スライス操作、部位選択など）
 void MotionApp::Keyboard(unsigned char key, int mx, int my) {
     GLUTBaseApp::Keyboard(key, mx, my);
-    
+
     // 基本操作
     switch (key) {
         case ' ': 
@@ -195,6 +200,7 @@ void MotionApp::Keyboard(unsigned char key, int mx, int my) {
     }
 }
 
+// 特殊キー入力を処理（矢印キーによるスライス平面のパン操作）
 void MotionApp::Special(int key, int mx, int my)
 {
     float world_range[3];
@@ -212,6 +218,7 @@ void MotionApp::Special(int key, int mx, int my)
     }
 }
 
+// マウスクリックを処理（ギズモの軸選択とドラッグ開始/終了）
 void MotionApp::MouseClick(int button, int state, int mx, int my)
 {
     GLUTBaseApp::MouseClick(button, state, mx, my);
@@ -236,6 +243,7 @@ void MotionApp::MouseClick(int button, int state, int mx, int my)
     }
 }
 
+// マウスドラッグを処理（ギズモによるスライス平面の移動・回転）
 void MotionApp::MouseDrag(int mx, int my)
 {
     if (use_slice_gizmo && gizmo_dragging && slice_gizmo.GetSelectedAxis() != GIZMO_NONE) {
@@ -248,14 +256,16 @@ void MotionApp::MouseDrag(int mx, int my)
     GLUTBaseApp::MouseDrag(mx, my);
 }
 
+// マウス移動を処理
 void MotionApp::MouseMotion(int mx, int my)
 {
     GLUTBaseApp::MouseMotion(mx, my);
 }
 
+// アニメーション時刻を進め、現在のポスチャを更新
 void MotionApp::Animation(float delta)
 {
-    if (!on_animation || drag_mouse_l || !motion || !motion2) 
+    if (!on_animation || drag_mouse_l || !motion || !motion2)
         return;
     animation_time += delta * animation_speed;
     float max_duration = max(motion->GetDuration(), motion2->GetDuration());
@@ -267,10 +277,11 @@ void MotionApp::Animation(float delta)
     motion2->GetPosture(animation_time, *curr_posture2);
 }
 
+// 3Dモデル、ボクセル、ギズモ、2DUI、情報テキストを描画
 void MotionApp::Display()
 {
     GLUTBaseApp::Display();
-    
+
     // 1. 3Dモデルの描画 - Motion1 (赤色)
     if (curr_posture) {
         DrawPostureWithSegmentMode(*curr_posture, Color3f(1.0f, 0.0f, 0.0f));
@@ -347,6 +358,7 @@ void MotionApp::Display()
     }
 }
 
+// 最初のBVHファイルを読み込み、Motion1として設定
 void MotionApp::LoadBVH(const char* file_name) {
     Motion* new_motion = LoadAndCoustructBVHMotion(file_name);
     if (!new_motion) 
@@ -363,9 +375,10 @@ void MotionApp::LoadBVH(const char* file_name) {
     Start();
 }
 
+// 2番目のBVHファイルを読み込み、Motion2として設定し、データ準備を開始
 void MotionApp::LoadBVH2(const char* file_name)
 { 
-    if (!motion) 
+    if (!motion)
         return;
     Motion* m2 = LoadAndCoustructBVHMotion(file_name);
     if (!m2) 
@@ -380,6 +393,7 @@ void MotionApp::LoadBVH2(const char* file_name)
     Start();
 }
 
+// ファイル選択ダイアログから最初のBVHファイルを開く
 void MotionApp::OpenNewBVH()
 {
 #ifdef WIN32
@@ -395,6 +409,7 @@ void MotionApp::OpenNewBVH()
 #endif
 }
 
+// ファイル選択ダイアログから2番目のBVHファイルを開く
 void MotionApp::OpenNewBVH2()
 {
 #ifdef WIN32
@@ -410,8 +425,9 @@ void MotionApp::OpenNewBVH2()
 #endif
 }
 
+// 両モーションの初期位置を原点に揃える（Y座標は低い方に合わせる）
 void MotionApp::AlignInitialPositions() {
-    if (!motion || !motion2 || motion->num_frames == 0 || motion2->num_frames == 0) 
+    if (!motion || !motion2 || motion->num_frames == 0 || motion2->num_frames == 0)
         return;
     
     float y1 = motion->frames[0].root_pos.y;
@@ -430,8 +446,9 @@ void MotionApp::AlignInitialPositions() {
     printf("Initial positions aligned.\n");
 }
 
+// 両モーションの初期向きを+Z軸方向に揃える
 void MotionApp::AlignInitialOrientations() {
-    if (!motion || !motion2 || motion->num_frames == 0 || motion2->num_frames == 0) 
+    if (!motion || !motion2 || motion->num_frames == 0 || motion2->num_frames == 0)
         return;
     
     Matrix3f ori1 = motion->frames[0].root_ori;
@@ -453,8 +470,9 @@ void MotionApp::AlignInitialOrientations() {
     printf("Initial orientations aligned to face +Z axis.\n");
 }
 
+// 両モーションの全フレームを走査してワールド座標の境界を計算
 void MotionApp::CalculateWorldBounds() {
-    if (!motion || !motion2) 
+    if (!motion || !motion2)
         return;
 
     float bounds[3][2];
@@ -492,8 +510,9 @@ void MotionApp::CalculateWorldBounds() {
     printf("World bounds calculated and set to Analyzer.\n");
 }
 
+// 位置・向き調整、境界計算、ボクセルキャッシュの読み込み/計算を実行
 void MotionApp::PrepareAllData() {
-    if (!motion || !motion2) 
+    if (!motion || !motion2)
         return;
     AlignInitialPositions();
     AlignInitialOrientations();
@@ -513,12 +532,14 @@ void MotionApp::PrepareAllData() {
     UpdateVoxelDataWrapper();
 }
 
+// 現在のアニメーション時刻でボクセルデータを更新
 void MotionApp::UpdateVoxelDataWrapper() {
-    if (!motion || !motion2) 
+    if (!motion || !motion2)
         return;
     analyzer.UpdateVoxels(motion, motion2, animation_time);
 }
 
+// 指定座標にテキストを描画
 void MotionApp::DrawText(int x, int y, const char *text, void *font)
 {
     glRasterPos2i(x, y);
@@ -526,9 +547,10 @@ void MotionApp::DrawText(int x, int y, const char *text, void *font)
         glutBitmapCharacter(font, *c);
 }
 
+// 指定部位が有効なボクセルデータを持つか判定（指は除外）
 bool MotionApp::HasVoxelData(int segment_index)
 {
-    if (!motion || !motion->body) 
+    if (!motion || !motion->body)
         return false;
     if (segment_index < 0 || segment_index >= motion->body->num_segments) 
         return false;
@@ -537,9 +559,10 @@ bool MotionApp::HasVoxelData(int segment_index)
     return !IsFingerSegment(segment);
 }
 
+// 現在の部位から指定方向に次の有効な部位を探す（循環）
 int MotionApp::GetNextValidSegment(int current_segment, int direction)
 {
-    if (!motion || !motion->body) 
+    if (!motion || !motion->body)
         return -1;
     
     int num_segments = motion->body->num_segments;
@@ -560,6 +583,7 @@ int MotionApp::GetNextValidSegment(int current_segment, int direction)
     return current_segment;
 }
 
+// スライス操作用ギズモの表示/非表示を切り替え
 void MotionApp::ToggleSliceGizmo()
 {
     use_slice_gizmo = !use_slice_gizmo;
@@ -570,12 +594,14 @@ void MotionApp::ToggleSliceGizmo()
     SyncGizmoToSliceState();
 }
 
+// ギズモのモードを移動/回転で切り替え
 void MotionApp::ToggleSliceGizmoMode()
 {
     GizmoMode mode = slice_gizmo.GetMode();
     slice_gizmo.SetMode(mode == GIZMO_TRANSLATE ? GIZMO_ROTATE : GIZMO_TRANSLATE);
 }
 
+// スライス平面の向きをギズモ用の回転行列として取得
 Matrix3f MotionApp::GetSliceGizmoOrientation() const
 {
     Matrix3f ori;
@@ -598,11 +624,13 @@ Matrix3f MotionApp::GetSliceGizmoOrientation() const
     return ori;
 }
 
+// スライス平面の中心座標をギズモ位置として取得
 Point3f MotionApp::GetSliceGizmoPosition() const
 {
     return analyzer.GetSlicePlaneCenter();
 }
 
+// ワールド境界に基づいてギズモの表示サイズを計算
 float MotionApp::ComputeGizmoScale() const
 {
     float extent_x = analyzer.world_bounds[0][1] - analyzer.world_bounds[0][0];
@@ -614,6 +642,7 @@ float MotionApp::ComputeGizmoScale() const
     return max_extent * 0.6f;
 }
 
+// ギズモのドラッグによる移動・回転をスライス平面に適用
 void MotionApp::ApplySliceGizmoDelta(const Point3f& translation, const Matrix4f& local_rotation)
 {
     if (fabsf(translation.x) > 1e-6f || fabsf(translation.y) > 1e-6f || fabsf(translation.z) > 1e-6f)
@@ -626,12 +655,14 @@ void MotionApp::ApplySliceGizmoDelta(const Point3f& translation, const Matrix4f&
     }
 }
 
+// ギズモの状態をスライス平面の状態に同期
 void MotionApp::SyncGizmoToSliceState()
 {
     if (!analyzer.use_rotated_slice)
         slice_gizmo.SetMode(GIZMO_TRANSLATE);
 }
 
+// SpaceMouse入力をスライス平面の移動・回転に適用
 void MotionApp::ProcessSpaceMouseInput()
 {
     if (!use_spacemouse_slice)
@@ -667,6 +698,7 @@ void MotionApp::ProcessSpaceMouseInput()
     ResetSpaceMouseTransform();
 }
 
+// 部位選択モードに応じてポスチャを描画（選択部位をハイライト）
 void MotionApp::DrawPostureWithSegmentMode(Posture& posture, const Color3f& highlight_color)
 {
     if (analyzer.show_segment_mode) {
