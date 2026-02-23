@@ -45,6 +45,9 @@
     <ClCompile Include="SpatialAnalysis.cpp">
       <Filter>ソース ファイル\よく使うもの</Filter>
     </ClCompile>
+    <ClCompile Include="VoxelData.cpp">
+      <Filter>ソース ファイル\よく使うもの</Filter>
+    </ClCompile>
     <ClCompile Include="TransformGizmo.cpp">
       <Filter>ソース ファイル\よく使うもの</Filter>
     </ClCompile>
@@ -159,6 +162,9 @@
       <Filter>ヘッダー ファイル\よく使うもの</Filter>
     </ClInclude>
     <ClInclude Include="SpatialAnalysis.h">
+      <Filter>ヘッダー ファイル\よく使うもの</Filter>
+    </ClInclude>
+    <ClInclude Include="VoxelData.h">
       <Filter>ヘッダー ファイル\よく使うもの</Filter>
     </ClInclude>
     <ClInclude Include="TransformGizmo.h">

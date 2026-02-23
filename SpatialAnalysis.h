@@ -5,6 +5,7 @@
 #include <Point3.h>
 #include "SimpleHuman.h"
 #include "SimpleHumanGLUT.h"
+#include "VoxelData.h"
 
 // 2D point structure for spatial analysis
 struct SpatialPoint2f {
@@ -20,12 +21,13 @@ struct BoneData {
     Point3f p1_prev, p2_prev; // 前フレームの両端点
     Point3f p1_prev2, p2_prev2; // 2フレーム前の両端点（加速度計算用）
 	Point3f p1_prev3, p2_prev3; // 3フレーム前の両端点（ジャーク計算用）
-    float speed1, speed2;     // 両端の速度
+	float speed1, speed2;     // 両端の速度
 	float jerk1, jerk2;       // 両端のジャーク
-    int segment_index;        // セグメントインデックス
-    bool valid;               // 有効なボーンかどうか
-    
-    BoneData() : speed1(0), speed2(0), jerk1(0), jerk2(0), segment_index(-1), valid(false) {}
+	float inertia1, inertia2; // 両端の慣性モーメント（ルートからの距離の2乗）
+	int segment_index;        // セグメントインデックス
+	bool valid;               // 有効なボーンかどうか
+
+	BoneData() : speed1(0), speed2(0), jerk1(0), jerk2(0), inertia1(0), inertia2(0), segment_index(-1), valid(false) {}
 };
 
 // フレームデータを格納する構造体（FK計算結果の共通化用）
@@ -41,74 +43,7 @@ struct FrameData {
 	std::vector<Point3f> prev3_joint_pos;  // 3フレーム前の関節位置（ジャーク計算用）
     float dt;                              // フレーム間隔
     
-    FrameData() : dt(0) {}
-};
-
-struct VoxelGrid {
-    int resolution;
-	std::vector<float> data; //data数=resolution^3
-    
-    // 基準姿勢情報（腰の位置・回転）
-    Point3f reference_root_pos;
-    Matrix3f reference_root_ori;
-    bool has_reference;
-    
-    VoxelGrid() : resolution(0), has_reference(false) {
-        reference_root_pos.set(0, 0, 0);
-        reference_root_ori.setIdentity();
-    }
-    
-    void Resize(int res);
-    void Clear();
-    float& At(int x, int y, int z);
-    float Get(int x, int y, int z) const;
-    
-    // 基準姿勢の設定
-    void SetReference(const Point3f& root_pos, const Matrix3f& root_ori) {
-        reference_root_pos = root_pos;
-        reference_root_ori = root_ori;
-        has_reference = true;
-    }
-    
-    // ファイル保存・読み込み
-    bool SaveToFile(const char* filename) const;
-    bool LoadFromFile(const char* filename);
-};
-
-// 部位ごとのボクセルグリッドコレクション
-struct SegmentVoxelData {
-	std::vector<VoxelGrid> segment_grids; // 各部位のボクセルグリッド
-	int num_segments; // 部位数
-    
-    SegmentVoxelData() : num_segments(0) {}
-    
-	// 部位数と各グリッドの解像度を設定
-    void Resize(int num_seg, int resolution) {
-        num_segments = num_seg;
-        segment_grids.resize(num_seg);
-        for (int i = 0; i < num_seg; ++i) {
-            segment_grids[i].Resize(resolution);
-        }
-    }
-    
-    void Clear() {
-        for (auto& grid : segment_grids) {
-            grid.Clear();
-        }
-    }
-    
-	// 指定部位のボクセルグリッドを取得
-    VoxelGrid& GetSegmentGrid(int segment_index) {
-        if (segment_index >= 0 && segment_index < num_segments) {
-            return segment_grids[segment_index];
-        }
-        static VoxelGrid dummy;
-        return dummy;
-    }
-    
-    // ファイル保存・読み込み
-    bool SaveToFile(const char* filename) const;
-    bool LoadFromFile(const char* filename);
+	FrameData() : dt(0) {}
 };
 
 class SpatialAnalyzer {
@@ -126,7 +61,10 @@ public:
     
     // 瞬間表示用ジャークボクセルデータ
     VoxelGrid voxels1_jrk, voxels2_jrk, voxels_jrk_diff;
-    
+
+    // 瞬間表示用慣性モーメントボクセルデータ
+    VoxelGrid voxels1_ine, voxels2_ine, voxels_ine_diff;
+
     // 占有率累積ボクセル（動作全体を通した占有率累積値）
     VoxelGrid voxels1_psc_accumulated, voxels2_psc_accumulated, voxels_psc_accumulated_diff;
 
@@ -136,6 +74,9 @@ public:
     // ジャーク累計ボクセル（動作全体を通した最大ジャーク）
     VoxelGrid voxels1_jrk_accumulated, voxels2_jrk_accumulated, voxels_jrk_accumulated_diff;
 
+    // 慣性モーメント累計ボクセル（動作全体を通した最大慣性モーメント）
+    VoxelGrid voxels1_ine_accumulated, voxels2_ine_accumulated, voxels_ine_accumulated_diff;
+
     // 部位ごとのボクセルデータ
 	SegmentVoxelData segment_presence_voxels1; // Motion1 部位ごとの占有率ボクセルデータ
 	SegmentVoxelData segment_presence_voxels2; // Motion2 部位ごとの占有率ボクセルデータ
@@ -143,19 +84,24 @@ public:
 	SegmentVoxelData segment_speed_voxels2; // Motion2 部位ごとの速度ボクセルデータ
 	SegmentVoxelData segment_jerk_voxels1; // Motion1 部位ごとのジャークボクセルデータ
 	SegmentVoxelData segment_jerk_voxels2; // Motion2 部位ごとのジャークボクセルデータ
-    
+	SegmentVoxelData segment_inertia_voxels1; // Motion1 部位ごとの慣性モーメントボクセルデータ
+	SegmentVoxelData segment_inertia_voxels2; // Motion2 部位ごとの慣性モーメントボクセルデータ
+
 	float max_psc_val; // 全体の最大占有率
 	float max_spd_val; // 全体の最大速度
 	float max_jrk_val; // 全体の最大ジャーク
-    
-    float max_psc_accumulated_val; // 占有率累積用の最大値
-    float max_spd_accumulated_val; // 速度累計用の最大値
-    float max_jrk_accumulated_val; // ジャーク累計用の最大値
-    
-    // 部位ごとの最大値（正規化用）
-    std::vector<float> segment_max_presence;
-    std::vector<float> segment_max_speed;
-    std::vector<float> segment_max_jerk;
+	float max_ine_val; // 全体の最大慣性モーメント
+
+	float max_psc_accumulated_val; // 占有率累積用の最大値
+	float max_spd_accumulated_val; // 速度累計用の最大値
+	float max_jrk_accumulated_val; // ジャーク累計用の最大値
+	float max_ine_accumulated_val; // 慣性モーメント累計用の最大値
+
+	// 部位ごとの最大値（正規化用）
+	std::vector<float> segment_max_presence;
+	std::vector<float> segment_max_speed;
+	std::vector<float> segment_max_jerk;
+	std::vector<float> segment_max_inertia;
 
     // --- ビュー/スライス設定 ---
 	std::vector<float> slice_positions; // スライス位置 (0.0 - 1.0)
@@ -183,7 +129,7 @@ public:
 	bool show_planes; // スライス平面表示フラグ
 	bool show_maps; // 2Dマップ表示フラグ
     bool show_voxels;  // 3Dボクセル表示フラグ
-	int feature_mode; // 0: 占有率, 1: 速度
+	int feature_mode; // 0: 占有率, 1: 速度, 2: ジャーク, 3: 慣性モーメント
 	int norm_mode; // 0: 瞬間表示, 1: 累積表示
     
     // 表示設定
@@ -210,14 +156,14 @@ public:
     
     // ボクセル計算
     void UpdateVoxels(Motion* m1, Motion* m2, float current_time);
-	void VoxelizeMotion(Motion* m, float time, VoxelGrid& occ, VoxelGrid& spd, VoxelGrid& jrk);
+	void VoxelizeMotion(Motion* m, float time, VoxelGrid& occ, VoxelGrid& spd, VoxelGrid& jrk, VoxelGrid& ine);
 
     // 総合累積ボクセル計算（全体＋部位ごとを同時に計算）
     void AccumulateAllFrames(Motion* m1, Motion* m2);
     void ClearAccumulatedData();
 
-    // 部位ごとの占有率・速度・ジャークボクセル計算（1フレーム分）
-    void VoxelizeMotionBySegment(Motion* m, float time, SegmentVoxelData& seg_presence_data, SegmentVoxelData& seg_speed_data, SegmentVoxelData& seg_jerk_data);
+    // 部位ごとの占有率・速度・ジャーク・慣性モーメントボクセル計算（1フレーム分）
+    void VoxelizeMotionBySegment(Motion* m, float time, SegmentVoxelData& seg_presence_data, SegmentVoxelData& seg_speed_data, SegmentVoxelData& seg_jerk_data, SegmentVoxelData& seg_inertia_data);
     
     // ボクセルキャッシュ（ファイル保存・読み込み）
     bool SaveVoxelCache(const char* motion1_name, const char* motion2_name);
@@ -276,5 +222,5 @@ private:
     void ComputeAABB(const Point3f& p1, const Point3f& p2, float radius, 
                      int idx_min[3], int idx_max[3], const float world_range[3]);
     void WriteToVoxelGrid(const BoneData& bone, float bone_radius, const float world_range[3],
-                          VoxelGrid* occ_grid, VoxelGrid* spd_grid, VoxelGrid* jrk_grid = nullptr);
+                          VoxelGrid* occ_grid, VoxelGrid* spd_grid, VoxelGrid* jrk_grid = nullptr, VoxelGrid* ine_grid = nullptr);
 };

@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -187,6 +187,7 @@
     <ClCompile Include="SpaceMouseDemoApp.cpp" />
     <ClCompile Include="SpaceMouseGLUTHelper.cpp" />
     <ClCompile Include="SpatialAnalysis.cpp" />
+    <ClCompile Include="VoxelData.cpp" />
     <ClCompile Include="stdafx.cpp" />
     <ClCompile Include="Timeline.cpp" />
     <ClCompile Include="TransformGizmo.cpp" />
@@ -241,6 +242,7 @@
     <ClInclude Include="SpaceMouseDemoApp.h" />
     <ClInclude Include="SpaceMouseGLUTHelper.hpp" />
     <ClInclude Include="SpatialAnalysis.h" />
+    <ClInclude Include="VoxelData.h" />
     <ClInclude Include="Timeline.h" />
     <ClInclude Include="Transform3D.hpp" />
     <ClInclude Include="TransformGizmo.h" />

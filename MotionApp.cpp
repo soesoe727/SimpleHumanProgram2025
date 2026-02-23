@@ -106,7 +106,7 @@ void MotionApp::Keyboard(unsigned char key, int mx, int my) {
             break;
 
         case 'f': 
-            analyzer.feature_mode = (analyzer.feature_mode + 1) % 3; 
+            analyzer.feature_mode = (analyzer.feature_mode + 1) % 4; 
             break;
         case 'n': 
             analyzer.norm_mode = (analyzer.norm_mode + 1) % 2; 
@@ -321,7 +321,7 @@ void MotionApp::Display()
         analyzer.DrawCTMaps(win_width, win_height);
 
     // 6. 情報テキストの表示
-    const char* feature_names[] = {"Occupancy", "Speed", "Jerk"};
+    const char* feature_names[] = {"Occupancy", "Speed", "Jerk", "Inertia"};
     const char* feature_mode_str = feature_names[analyzer.feature_mode];
     const char* norm_mode_str = (analyzer.norm_mode == 0) ? "CurrentFrame" : "Accumulated";
 
@@ -377,8 +377,8 @@ void MotionApp::Display()
 
     // --- Feature ---
     if (ImGui::CollapsingHeader("Feature", ImGuiTreeNodeFlags_DefaultOpen)) {
-        const char* feature_items[] = {"Occupancy", "Speed", "Jerk"};
-        ImGui::Combo("Feature (F)", &analyzer.feature_mode, feature_items, 3);
+        const char* feature_items[] = {"Occupancy", "Speed", "Jerk", "Inertia"};
+        ImGui::Combo("Feature (F)", &analyzer.feature_mode, feature_items, 4);
         const char* norm_items[] = {"CurrentFrame", "Accumulated"};
         ImGui::Combo("Norm (N)", &analyzer.norm_mode, norm_items, 2);
     }
