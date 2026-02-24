@@ -895,7 +895,13 @@ void SpatialAnalyzer::DrawRotatedSliceMap(int x_pos, int y_pos, int w, int h, Vo
     glEnd();
     
     // タイトルと回転情報を描画
-    glColor3f(0,0,0);
+    if(strstr(title, "M1") != nullptr)
+        glColor3f(1,0,0);
+    else if(strstr(title, "M2") != nullptr)
+        glColor3f(0,0,1);
+    else
+        glColor3f(0,0,0);
+
     glRasterPos2i(x_pos, y_pos - 5);
     for (const char* c = title; *c != '\0'; c++) 
         glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, *c);
