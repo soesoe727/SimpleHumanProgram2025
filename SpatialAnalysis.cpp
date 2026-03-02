@@ -783,6 +783,7 @@ void SpatialAnalyzer::DrawRotatedSlicePlane() {
     
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glDisable(GL_CULL_FACE);  // 両面描画を有効化
     
     float world_range[3];
     for (int i = 0; i < 3; ++i)
@@ -814,6 +815,16 @@ void SpatialAnalyzer::DrawRotatedSlicePlane() {
                  center.y - slice_u.y * half_size + slice_v.y * half_size,
                  center.z - slice_u.z * half_size + slice_v.z * half_size);
         
+        // 半透明の面を描画（奥が透けて見えるように深度書き込みを無効化）
+        glDepthMask(GL_FALSE);
+        glColor4f(1.0f, 1.0f, 0.0f, 0.15f);
+        glBegin(GL_QUADS);
+        for (int k = 0; k < 4; ++k)
+            glVertex3f(p[k].x, p[k].y, p[k].z);
+        glEnd();
+        glDepthMask(GL_TRUE);
+
+        // 枠線を描画
         glColor4f(1.0f, 1.0f, 0.0f, 0.9f);
         glLineWidth(5.0f);
 
@@ -822,6 +833,8 @@ void SpatialAnalyzer::DrawRotatedSlicePlane() {
             glVertex3f(p[k].x, p[k].y, p[k].z);
         glEnd();   
     }
+    
+    glEnable(GL_CULL_FACE);  // カリングを復元
     glDisable(GL_BLEND);
 }
 
