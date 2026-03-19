@@ -41,6 +41,15 @@ MotionApp::MotionApp() {
 
     // SpaceMouseによるスライス操作を有効化
     use_spacemouse_slice = true;
+
+    occupancy_move1_x = 0.0f;
+    occupancy_move1_z = 0.0f;
+    occupancy_move2_x = 0.0f;
+    occupancy_move2_z = 0.0f;
+    occupancy_prev_move1_x = 0.0f;
+    occupancy_prev_move1_z = 0.0f;
+    occupancy_prev_move2_x = 0.0f;
+    occupancy_prev_move2_z = 0.0f;
 }
 
 // デストラクタ：モーションデータとポスチャを解放
@@ -383,6 +392,35 @@ void MotionApp::Display()
         ImGui::Combo("Norm (N)", &analyzer.norm_mode, norm_items, 2);
     }
 
+    // --- Model Move (XZ) ---
+    if (ImGui::CollapsingHeader("Model Move (XZ)")) {
+        bool apply_preview = false;
+        bool apply_finalize = false;
+        ImGui::SliderFloat("M1 X", &occupancy_move1_x, -2.0f, 2.0f);
+        apply_preview = apply_preview || ImGui::IsItemEdited();
+        apply_finalize = apply_finalize || ImGui::IsItemDeactivatedAfterEdit();
+        ImGui::SliderFloat("M1 Z", &occupancy_move1_z, -2.0f, 2.0f);
+        apply_preview = apply_preview || ImGui::IsItemEdited();
+        apply_finalize = apply_finalize || ImGui::IsItemDeactivatedAfterEdit();
+        ImGui::SliderFloat("M2 X", &occupancy_move2_x, -2.0f, 2.0f);
+        apply_preview = apply_preview || ImGui::IsItemEdited();
+        apply_finalize = apply_finalize || ImGui::IsItemDeactivatedAfterEdit();
+        ImGui::SliderFloat("M2 Z", &occupancy_move2_z, -2.0f, 2.0f);
+        apply_preview = apply_preview || ImGui::IsItemEdited();
+        apply_finalize = apply_finalize || ImGui::IsItemDeactivatedAfterEdit();
+        if (ImGui::Button("Reset Occupancy Move")) {
+            occupancy_move1_x = 0.0f;
+            occupancy_move1_z = 0.0f;
+            occupancy_move2_x = 0.0f;
+            occupancy_move2_z = 0.0f;
+            apply_preview = true;
+            apply_finalize = true;
+        }
+
+        if (apply_preview || apply_finalize)
+            ApplyOccupancyXZMoveFromUI(apply_finalize);
+    }
+
     // --- Slice Control ---
     if (ImGui::CollapsingHeader("Slice Control", ImGuiTreeNodeFlags_DefaultOpen)) {
         if (!analyzer.slice_positions.empty()) {
@@ -506,6 +544,12 @@ void MotionApp::LoadBVH(const char* file_name) {
         delete curr_posture;
     motion = new_motion;
     curr_posture = new Posture(motion->body);
+
+    occupancy_move1_x = 0.0f;
+    occupancy_move1_z = 0.0f;
+    occupancy_prev_move1_x = 0.0f;
+    occupancy_prev_move1_z = 0.0f;
+
     Start();
 }
 
@@ -523,6 +567,12 @@ void MotionApp::LoadBVH2(const char* file_name)
         delete curr_posture2;
     motion2 = m2;
     curr_posture2 = new Posture(motion2->body); 
+
+    occupancy_move2_x = 0.0f;
+    occupancy_move2_z = 0.0f;
+    occupancy_prev_move2_x = 0.0f;
+    occupancy_prev_move2_z = 0.0f;
+
     PrepareAllData();
     Start();
 }
@@ -647,9 +697,9 @@ void MotionApp::PrepareAllData() {
     AlignInitialPositions();
     AlignInitialOrientations();
     CalculateWorldBounds();
-    
+
     bool cache_loaded = analyzer.LoadVoxelCache(motion->name.c_str(), motion2->name.c_str());
-    
+
     if (!cache_loaded) {
         std::cout << "Cache not found. Calculating accumulated voxels (integrated)..." << std::endl;
         analyzer.AccumulateAllFrames(motion, motion2);
@@ -658,7 +708,48 @@ void MotionApp::PrepareAllData() {
     } else {
         std::cout << "Voxel cache loaded successfully. Skipping calculation." << std::endl;
     }
-    
+
+    std::cout << "Building feature frame caches..." << std::endl;
+    analyzer.BuildAllFeatureFrameCaches(motion, motion2);
+
+    UpdateVoxelDataWrapper();
+}
+
+void MotionApp::ApplyOccupancyXZMoveFromUI(bool finalize_update) {
+    if (!motion || !motion2)
+        return;
+
+    float d1x = occupancy_move1_x - occupancy_prev_move1_x;
+    float d1z = occupancy_move1_z - occupancy_prev_move1_z;
+    float d2x = occupancy_move2_x - occupancy_prev_move2_x;
+    float d2z = occupancy_move2_z - occupancy_prev_move2_z;
+
+    if (fabsf(d1x) < 1e-6f && fabsf(d1z) < 1e-6f && fabsf(d2x) < 1e-6f && fabsf(d2z) < 1e-6f)
+        return;
+
+    for (int i = 0; i < motion->num_frames; ++i) {
+        motion->frames[i].root_pos.x += d1x;
+        motion->frames[i].root_pos.z += d1z;
+    }
+    for (int i = 0; i < motion2->num_frames; ++i) {
+        motion2->frames[i].root_pos.x += d2x;
+        motion2->frames[i].root_pos.z += d2z;
+    }
+
+    occupancy_prev_move1_x = occupancy_move1_x;
+    occupancy_prev_move1_z = occupancy_move1_z;
+    occupancy_prev_move2_x = occupancy_move2_x;
+    occupancy_prev_move2_z = occupancy_move2_z;
+
+    motion->GetPosture(animation_time, *curr_posture);
+    motion2->GetPosture(animation_time, *curr_posture2);
+
+    if (finalize_update) {
+        // モーション移動確定後にワールド範囲と各特徴量のフレームキャッシュを更新
+        CalculateWorldBounds();
+        analyzer.BuildAllFeatureFrameCaches(motion, motion2);
+    }
+
     UpdateVoxelDataWrapper();
 }
 
@@ -667,6 +758,10 @@ void MotionApp::UpdateVoxelDataWrapper() {
     if (!motion || !motion2)
         return;
     analyzer.UpdateVoxels(motion, motion2, animation_time);
+
+    // accumulated表示時は、現在の特徴量をフレームキャッシュから再合成
+    if (analyzer.norm_mode == 1)
+        analyzer.ComposeAccumulatedFeatureFromFrameCache(motion, motion2, analyzer.feature_mode);
 }
 
 // 指定座標にテキストを描画

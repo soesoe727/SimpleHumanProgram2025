@@ -87,6 +87,41 @@ public:
 	SegmentVoxelData segment_inertia_voxels1; // Motion1 部位ごとの慣性モーメントボクセルデータ
 	SegmentVoxelData segment_inertia_voxels2; // Motion2 部位ごとの慣性モーメントボクセルデータ
 
+    // occupancy専用：フレーム単位の疎ボクセルキャッシュ
+    MotionFrameSparseVoxelCache occupancy_frame_cache1;
+    MotionFrameSparseVoxelCache occupancy_frame_cache2;
+    MotionFrameSparseVoxelCache speed_frame_cache1;
+    MotionFrameSparseVoxelCache speed_frame_cache2;
+    MotionFrameSparseVoxelCache jerk_frame_cache1;
+    MotionFrameSparseVoxelCache jerk_frame_cache2;
+    MotionFrameSparseVoxelCache inertia_frame_cache1;
+    MotionFrameSparseVoxelCache inertia_frame_cache2;
+    bool has_occupancy_frame_cache;
+    bool has_speed_frame_cache;
+    bool has_jerk_frame_cache;
+    bool has_inertia_frame_cache;
+    float occupancy_sparse_threshold;
+
+    // 再合成済みキャッシュの姿勢スナップショット
+    struct AccumulatedPoseCache {
+        bool valid;
+        Point3f motion1_root_pos;
+        Matrix3f motion1_root_ori;
+        Point3f motion2_root_pos;
+        Matrix3f motion2_root_ori;
+
+        AccumulatedPoseCache() : valid(false) {
+            motion1_root_pos.set(0, 0, 0);
+            motion2_root_pos.set(0, 0, 0);
+            motion1_root_ori.setIdentity();
+            motion2_root_ori.setIdentity();
+        }
+    } occupancy_accumulated_pose_cache;
+
+    AccumulatedPoseCache speed_accumulated_pose_cache;
+    AccumulatedPoseCache jerk_accumulated_pose_cache;
+    AccumulatedPoseCache inertia_accumulated_pose_cache;
+
 	float max_psc_val; // 全体の最大占有率
 	float max_spd_val; // 全体の最大速度
 	float max_jrk_val; // 全体の最大ジャーク
@@ -161,6 +196,8 @@ public:
     // 総合累積ボクセル計算（全体＋部位ごとを同時に計算）
     void AccumulateAllFrames(Motion* m1, Motion* m2);
     void ClearAccumulatedData();
+    void BuildAllFeatureFrameCaches(Motion* m1, Motion* m2);
+    void ComposeAccumulatedFeatureFromFrameCache(Motion* m1, Motion* m2, int feature);
 
     // 部位ごとの占有率・速度・ジャーク・慣性モーメントボクセル計算（1フレーム分）
     void VoxelizeMotionBySegment(Motion* m, float time, SegmentVoxelData& seg_presence_data, SegmentVoxelData& seg_speed_data, SegmentVoxelData& seg_jerk_data, SegmentVoxelData& seg_inertia_data);
@@ -223,4 +260,5 @@ private:
                      int idx_min[3], int idx_max[3], const float world_range[3]);
     void WriteToVoxelGrid(const BoneData& bone, float bone_radius, const float world_range[3],
                           VoxelGrid* occ_grid, VoxelGrid* spd_grid, VoxelGrid* jrk_grid = nullptr, VoxelGrid* ine_grid = nullptr);
+    void BuildSingleMotionFeatureFrameCache(Motion* m, MotionFrameSparseVoxelCache& cache, int feature);
 };

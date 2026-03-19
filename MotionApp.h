@@ -28,6 +28,16 @@ protected:
     // SpaceMouse用：スライス平面操作の有効/無効
     bool use_spacemouse_slice;
 
+    // occupancy表示時のXZ移動（ImGui操作）
+    float occupancy_move1_x;
+    float occupancy_move1_z;
+    float occupancy_move2_x;
+    float occupancy_move2_z;
+    float occupancy_prev_move1_x;
+    float occupancy_prev_move1_z;
+    float occupancy_prev_move2_x;
+    float occupancy_prev_move2_z;
+
 public:
     MotionApp();
     virtual ~MotionApp();
@@ -52,6 +62,7 @@ protected:
     void AlignInitialPositions();
     void AlignInitialOrientations();
     void PrepareAllData();
+    void ApplyOccupancyXZMoveFromUI(bool finalize_update);
     
     // ラッパー
     void UpdateVoxelDataWrapper();
