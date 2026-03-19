@@ -42,14 +42,14 @@ MotionApp::MotionApp() {
     // SpaceMouseによるスライス操作を有効化
     use_spacemouse_slice = true;
 
-    occupancy_move1_x = 0.0f;
-    occupancy_move1_z = 0.0f;
-    occupancy_move2_x = 0.0f;
-    occupancy_move2_z = 0.0f;
-    occupancy_prev_move1_x = 0.0f;
-    occupancy_prev_move1_z = 0.0f;
-    occupancy_prev_move2_x = 0.0f;
-    occupancy_prev_move2_z = 0.0f;
+    move1_x = 0.0f;
+    move1_z = 0.0f;
+    move2_x = 0.0f;
+    move2_z = 0.0f;
+    prev_move1_x = 0.0f;
+    prev_move1_z = 0.0f;
+    prev_move2_x = 0.0f;
+    prev_move2_z = 0.0f;
 }
 
 // デストラクタ：モーションデータとポスチャを解放
@@ -396,29 +396,29 @@ void MotionApp::Display()
     if (ImGui::CollapsingHeader("Model Move (XZ)")) {
         bool apply_preview = false;
         bool apply_finalize = false;
-        ImGui::SliderFloat("M1 X", &occupancy_move1_x, -2.0f, 2.0f);
+        ImGui::SliderFloat("M1 X", &move1_x, -2.0f, 2.0f);
         apply_preview = apply_preview || ImGui::IsItemEdited();
         apply_finalize = apply_finalize || ImGui::IsItemDeactivatedAfterEdit();
-        ImGui::SliderFloat("M1 Z", &occupancy_move1_z, -2.0f, 2.0f);
+        ImGui::SliderFloat("M1 Z", &move1_z, -2.0f, 2.0f);
         apply_preview = apply_preview || ImGui::IsItemEdited();
         apply_finalize = apply_finalize || ImGui::IsItemDeactivatedAfterEdit();
-        ImGui::SliderFloat("M2 X", &occupancy_move2_x, -2.0f, 2.0f);
+        ImGui::SliderFloat("M2 X", &move2_x, -2.0f, 2.0f);
         apply_preview = apply_preview || ImGui::IsItemEdited();
         apply_finalize = apply_finalize || ImGui::IsItemDeactivatedAfterEdit();
-        ImGui::SliderFloat("M2 Z", &occupancy_move2_z, -2.0f, 2.0f);
+        ImGui::SliderFloat("M2 Z", &move2_z, -2.0f, 2.0f);
         apply_preview = apply_preview || ImGui::IsItemEdited();
         apply_finalize = apply_finalize || ImGui::IsItemDeactivatedAfterEdit();
-        if (ImGui::Button("Reset Occupancy Move")) {
-            occupancy_move1_x = 0.0f;
-            occupancy_move1_z = 0.0f;
-            occupancy_move2_x = 0.0f;
-            occupancy_move2_z = 0.0f;
+        if (ImGui::Button("Reset Move")) {
+            move1_x = 0.0f;
+            move1_z = 0.0f;
+            move2_x = 0.0f;
+            move2_z = 0.0f;
             apply_preview = true;
             apply_finalize = true;
         }
 
         if (apply_preview || apply_finalize)
-            ApplyOccupancyXZMoveFromUI(apply_finalize);
+            ApplyXZMoveFromUI(apply_finalize);
     }
 
     // --- Slice Control ---
@@ -545,10 +545,10 @@ void MotionApp::LoadBVH(const char* file_name) {
     motion = new_motion;
     curr_posture = new Posture(motion->body);
 
-    occupancy_move1_x = 0.0f;
-    occupancy_move1_z = 0.0f;
-    occupancy_prev_move1_x = 0.0f;
-    occupancy_prev_move1_z = 0.0f;
+    move1_x = 0.0f;
+    move1_z = 0.0f;
+    prev_move1_x = 0.0f;
+    prev_move1_z = 0.0f;
 
     Start();
 }
@@ -568,10 +568,10 @@ void MotionApp::LoadBVH2(const char* file_name)
     motion2 = m2;
     curr_posture2 = new Posture(motion2->body); 
 
-    occupancy_move2_x = 0.0f;
-    occupancy_move2_z = 0.0f;
-    occupancy_prev_move2_x = 0.0f;
-    occupancy_prev_move2_z = 0.0f;
+    move2_x = 0.0f;
+    move2_z = 0.0f;
+    prev_move2_x = 0.0f;
+    prev_move2_z = 0.0f;
 
     PrepareAllData();
     Start();
@@ -715,14 +715,14 @@ void MotionApp::PrepareAllData() {
     UpdateVoxelDataWrapper();
 }
 
-void MotionApp::ApplyOccupancyXZMoveFromUI(bool finalize_update) {
+void MotionApp::ApplyXZMoveFromUI(bool finalize_update) {
     if (!motion || !motion2)
         return;
 
-    float d1x = occupancy_move1_x - occupancy_prev_move1_x;
-    float d1z = occupancy_move1_z - occupancy_prev_move1_z;
-    float d2x = occupancy_move2_x - occupancy_prev_move2_x;
-    float d2z = occupancy_move2_z - occupancy_prev_move2_z;
+    float d1x = move1_x - prev_move1_x;
+    float d1z = move1_z - prev_move1_z;
+    float d2x = move2_x - prev_move2_x;
+    float d2z = move2_z - prev_move2_z;
 
     if (fabsf(d1x) < 1e-6f && fabsf(d1z) < 1e-6f && fabsf(d2x) < 1e-6f && fabsf(d2z) < 1e-6f)
         return;
@@ -736,10 +736,10 @@ void MotionApp::ApplyOccupancyXZMoveFromUI(bool finalize_update) {
         motion2->frames[i].root_pos.z += d2z;
     }
 
-    occupancy_prev_move1_x = occupancy_move1_x;
-    occupancy_prev_move1_z = occupancy_move1_z;
-    occupancy_prev_move2_x = occupancy_move2_x;
-    occupancy_prev_move2_z = occupancy_move2_z;
+    prev_move1_x = move1_x;
+    prev_move1_z = move1_z;
+    prev_move2_x = move2_x;
+    prev_move2_z = move2_z;
 
     motion->GetPosture(animation_time, *curr_posture);
     motion2->GetPosture(animation_time, *curr_posture2);
