@@ -88,18 +88,9 @@ public:
 	SegmentVoxelData segment_inertia_voxels2; // Motion2 部位ごとの慣性モーメントボクセルデータ
 
     // occupancy専用：フレーム単位の疎ボクセルキャッシュ
-    MotionFrameSparseVoxelCache occupancy_frame_cache1;
-    MotionFrameSparseVoxelCache occupancy_frame_cache2;
-    MotionFrameSparseVoxelCache speed_frame_cache1;
-    MotionFrameSparseVoxelCache speed_frame_cache2;
-    MotionFrameSparseVoxelCache jerk_frame_cache1;
-    MotionFrameSparseVoxelCache jerk_frame_cache2;
-    MotionFrameSparseVoxelCache inertia_frame_cache1;
-    MotionFrameSparseVoxelCache inertia_frame_cache2;
-    bool has_occupancy_frame_cache;
-    bool has_speed_frame_cache;
-    bool has_jerk_frame_cache;
-    bool has_inertia_frame_cache;
+    MotionFrameSparseVoxelCache frame_cache1;
+    MotionFrameSparseVoxelCache frame_cache2;
+    bool has_frame_cache;
     float occupancy_sparse_threshold;
 
     // 再合成済みキャッシュの姿勢スナップショット
@@ -260,5 +251,5 @@ private:
                      int idx_min[3], int idx_max[3], const float world_range[3]);
     void WriteToVoxelGrid(const BoneData& bone, float bone_radius, const float world_range[3],
                           VoxelGrid* occ_grid, VoxelGrid* spd_grid, VoxelGrid* jrk_grid = nullptr, VoxelGrid* ine_grid = nullptr);
-    void BuildSingleMotionFeatureFrameCache(Motion* m, MotionFrameSparseVoxelCache& cache, int feature);
+    void BuildSingleMotionFeatureFrameCache(Motion* m, MotionFrameSparseVoxelCache& cache);
 };

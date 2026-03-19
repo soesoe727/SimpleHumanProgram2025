@@ -155,10 +155,7 @@ SpatialAnalyzer::SpatialAnalyzer() {
     use_rotated_slice = true;
     slice_positions.push_back(0.5f);
 
-    has_occupancy_frame_cache = false;
-    has_speed_frame_cache = false;
-    has_jerk_frame_cache = false;
-    has_inertia_frame_cache = false;
+    has_frame_cache = false;
     occupancy_sparse_threshold = 1e-4f;
     occupancy_accumulated_pose_cache.valid = false;
     speed_accumulated_pose_cache.valid = false;
@@ -644,7 +641,7 @@ void SpatialAnalyzer::ClearAccumulatedData()
     max_ine_accumulated_val = 0.0f;
 }
 
-void SpatialAnalyzer::BuildSingleMotionFeatureFrameCache(Motion* m, MotionFrameSparseVoxelCache& cache, int feature) {
+void SpatialAnalyzer::BuildSingleMotionFeatureFrameCache(Motion* m, MotionFrameSparseVoxelCache& cache) {
     cache.Clear();
     if (!m || !m->body || m->num_frames <= 0)
         return;
@@ -672,36 +669,30 @@ void SpatialAnalyzer::BuildSingleMotionFeatureFrameCache(Motion* m, MotionFrameS
         frame_sparse.Clear();
         frame_sparse.SetReference(m->frames[f].root_pos, m->frames[f].root_ori);
 
-        SegmentVoxelData* src = &temp_seg_psc;
-        if (feature == 1) src = &temp_seg_spd;
-        else if (feature == 2) src = &temp_seg_jrk;
-        else if (feature == 3) src = &temp_seg_ine;
-
         for (int s = 0; s < num_segments; ++s) {
-            const VoxelGrid& g = src->segment_grids[s];
+            const VoxelGrid& g0 = temp_seg_psc.segment_grids[s];
+            const VoxelGrid& g1 = temp_seg_spd.segment_grids[s];
+            const VoxelGrid& g2 = temp_seg_jrk.segment_grids[s];
+            const VoxelGrid& g3 = temp_seg_ine.segment_grids[s];
             std::vector<SparseVoxel>& sparse_list = frame_sparse.segment_sparse_voxels[s];
             sparse_list.clear();
             for (int i = 0; i < size; ++i) {
-                float v = g.data[i];
-                if (v > occupancy_sparse_threshold)
-                    sparse_list.push_back(SparseVoxel(i, v));
+                float v0 = g0.data[i];
+                float v1 = g1.data[i];
+                float v2 = g2.data[i];
+                float v3 = g3.data[i];
+                if (v0 > occupancy_sparse_threshold || v1 > occupancy_sparse_threshold || v2 > occupancy_sparse_threshold || v3 > occupancy_sparse_threshold)
+                    sparse_list.push_back(SparseVoxel(i, v0, v1, v2, v3));
             }
         }
     }
 }
 
 void SpatialAnalyzer::BuildAllFeatureFrameCaches(Motion* m1, Motion* m2) {
-    has_occupancy_frame_cache = false;
-    occupancy_frame_cache1.Clear();
-    occupancy_frame_cache2.Clear();
+    has_frame_cache = false;
+    frame_cache1.Clear();
+    frame_cache2.Clear();
     occupancy_accumulated_pose_cache.valid = false;
-
-    has_speed_frame_cache = false;
-    has_jerk_frame_cache = false;
-    has_inertia_frame_cache = false;
-    speed_frame_cache1.Clear(); speed_frame_cache2.Clear();
-    jerk_frame_cache1.Clear(); jerk_frame_cache2.Clear();
-    inertia_frame_cache1.Clear(); inertia_frame_cache2.Clear();
     speed_accumulated_pose_cache.valid = false;
     jerk_accumulated_pose_cache.valid = false;
     inertia_accumulated_pose_cache.valid = false;
@@ -709,21 +700,9 @@ void SpatialAnalyzer::BuildAllFeatureFrameCaches(Motion* m1, Motion* m2) {
     if (!m1 || !m2)
         return;
 
-    BuildSingleMotionFeatureFrameCache(m1, occupancy_frame_cache1, 0);
-    BuildSingleMotionFeatureFrameCache(m2, occupancy_frame_cache2, 0);
-    has_occupancy_frame_cache = !occupancy_frame_cache1.frames.empty() && !occupancy_frame_cache2.frames.empty();
-
-    BuildSingleMotionFeatureFrameCache(m1, speed_frame_cache1, 1);
-    BuildSingleMotionFeatureFrameCache(m2, speed_frame_cache2, 1);
-    has_speed_frame_cache = !speed_frame_cache1.frames.empty() && !speed_frame_cache2.frames.empty();
-
-    BuildSingleMotionFeatureFrameCache(m1, jerk_frame_cache1, 2);
-    BuildSingleMotionFeatureFrameCache(m2, jerk_frame_cache2, 2);
-    has_jerk_frame_cache = !jerk_frame_cache1.frames.empty() && !jerk_frame_cache2.frames.empty();
-
-    BuildSingleMotionFeatureFrameCache(m1, inertia_frame_cache1, 3);
-    BuildSingleMotionFeatureFrameCache(m2, inertia_frame_cache2, 3);
-    has_inertia_frame_cache = !inertia_frame_cache1.frames.empty() && !inertia_frame_cache2.frames.empty();
+    BuildSingleMotionFeatureFrameCache(m1, frame_cache1);
+    BuildSingleMotionFeatureFrameCache(m2, frame_cache2);
+    has_frame_cache = !frame_cache1.frames.empty() && !frame_cache2.frames.empty();
 }
 
 void SpatialAnalyzer::ComposeAccumulatedFeatureFromFrameCache(Motion* m1, Motion* m2, int feature) {
@@ -739,26 +718,26 @@ void SpatialAnalyzer::ComposeAccumulatedFeatureFromFrameCache(Motion* m1, Motion
     float* max_val = nullptr;
     std::vector<float>* seg_max = nullptr;
 
+    c1 = &frame_cache1;
+    c2 = &frame_cache2;
+    has_cache = has_frame_cache;
+
     if (feature == 0) {
-        c1 = &occupancy_frame_cache1; c2 = &occupancy_frame_cache2; has_cache = has_occupancy_frame_cache;
         pose_cache = &occupancy_accumulated_pose_cache;
         seg1 = &segment_presence_voxels1; seg2 = &segment_presence_voxels2;
         acc1 = &voxels1_psc_accumulated; acc2 = &voxels2_psc_accumulated; diff = &voxels_psc_accumulated_diff;
         max_val = &max_psc_accumulated_val; seg_max = &segment_max_presence;
     } else if (feature == 1) {
-        c1 = &speed_frame_cache1; c2 = &speed_frame_cache2; has_cache = has_speed_frame_cache;
         pose_cache = &speed_accumulated_pose_cache;
         seg1 = &segment_speed_voxels1; seg2 = &segment_speed_voxels2;
         acc1 = &voxels1_spd_accumulated; acc2 = &voxels2_spd_accumulated; diff = &voxels_spd_accumulated_diff;
         max_val = &max_spd_accumulated_val; seg_max = &segment_max_speed;
     } else if (feature == 2) {
-        c1 = &jerk_frame_cache1; c2 = &jerk_frame_cache2; has_cache = has_jerk_frame_cache;
         pose_cache = &jerk_accumulated_pose_cache;
         seg1 = &segment_jerk_voxels1; seg2 = &segment_jerk_voxels2;
         acc1 = &voxels1_jrk_accumulated; acc2 = &voxels2_jrk_accumulated; diff = &voxels_jrk_accumulated_diff;
         max_val = &max_jrk_accumulated_val; seg_max = &segment_max_jerk;
     } else {
-        c1 = &inertia_frame_cache1; c2 = &inertia_frame_cache2; has_cache = has_inertia_frame_cache;
         pose_cache = &inertia_accumulated_pose_cache;
         seg1 = &segment_inertia_voxels1; seg2 = &segment_inertia_voxels2;
         acc1 = &voxels1_ine_accumulated; acc2 = &voxels2_ine_accumulated; diff = &voxels_ine_accumulated_diff;
@@ -815,14 +794,15 @@ void SpatialAnalyzer::ComposeAccumulatedFeatureFromFrameCache(Motion* m1, Motion
                     if (!sa_world_to_voxel_index(transformed_world, grid_resolution, world_bounds, x, y, z))
                         continue;
 
+                    float v = sv.values[feature];
                     if (feature == 0) {
-                        seg_grid.At(x, y, z) += sv.value;
-                        out_acc.At(x, y, z) += sv.value;
+                        seg_grid.At(x, y, z) += v;
+                        out_acc.At(x, y, z) += v;
                     } else {
                         float& sv_seg = seg_grid.At(x, y, z);
-                        if (sv.value > sv_seg) sv_seg = sv.value;
+                        if (v > sv_seg) sv_seg = v;
                         float& sv_acc = out_acc.At(x, y, z);
-                        if (sv.value > sv_acc) sv_acc = sv.value;
+                        if (v > sv_acc) sv_acc = v;
                     }
                 }
             }

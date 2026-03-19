@@ -34,13 +34,20 @@ struct VoxelGrid {
     bool LoadFromFile(const char* filename);
 };
 
-// フレーム単位の疎ボクセル（occupancy専用）
+// フレーム単位の疎ボクセル
 struct SparseVoxel {
     int index;
-    float value;
+    float values[4]; // 0:occupancy, 1:speed, 2:jerk, 3:inertia
 
-    SparseVoxel() : index(0), value(0.0f) {}
-    SparseVoxel(int idx, float v) : index(idx), value(v) {}
+    SparseVoxel() : index(0) {
+        values[0] = values[1] = values[2] = values[3] = 0.0f;
+    }
+    SparseVoxel(int idx, float v0, float v1, float v2, float v3) : index(idx) {
+        values[0] = v0;
+        values[1] = v1;
+        values[2] = v2;
+        values[3] = v3;
+    }
 };
 
 struct SegmentFrameSparseVoxelData {
