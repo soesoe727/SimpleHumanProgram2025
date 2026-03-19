@@ -556,8 +556,7 @@ void SpatialAnalyzer::ClearAccumulatedData()
 }
 
 // 指定時刻のモーションを部位ごとにボクセル化
-void SpatialAnalyzer::VoxelizeMotionBySegment(Motion* m, float time, SegmentVoxelData& seg_presence_data, SegmentVoxelData& seg_speed_data, SegmentVoxelData& seg_jerk_data, SegmentVoxelData& seg_inertia_data)
-{
+void SpatialAnalyzer::VoxelizeMotionBySegment(Motion* m, float time, SegmentVoxelData& seg_presence_data, SegmentVoxelData& seg_speed_data, SegmentVoxelData& seg_jerk_data, SegmentVoxelData& seg_inertia_data){
     if (!m) 
         return;
 

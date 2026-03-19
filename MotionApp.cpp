@@ -559,18 +559,14 @@ void MotionApp::OpenNewBVH2()
 #endif
 }
 
-// 両モーションの初期位置を原点に揃える（Y座標は低い方に合わせる）
+// 両モーションの初期位置を原点に揃える（Y座標はそのまま維持）
 void MotionApp::AlignInitialPositions() {
     if (!motion || !motion2 || motion->num_frames == 0 || motion2->num_frames == 0)
         return;
     
-    float y1 = motion->frames[0].root_pos.y;
-    float y2 = motion2->frames[0].root_pos.y;
-    float target_y = min(y1, y2);
-
-    Point3f target_pos(0.0f, target_y, 0.0f);
-    Point3f offset1 = motion->frames[0].root_pos - target_pos;
-    Point3f offset2 = motion2->frames[0].root_pos - target_pos;
+    // XZ平面のみを原点に揃える（Y座標は維持）
+    Point3f offset1(motion->frames[0].root_pos.x, 0.0f, motion->frames[0].root_pos.z);
+    Point3f offset2(motion2->frames[0].root_pos.x, 0.0f, motion2->frames[0].root_pos.z);
 
     for (int i = 0; i < motion->num_frames; i++)
         motion->frames[i].root_pos -= offset1; 
