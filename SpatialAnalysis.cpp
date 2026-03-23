@@ -8,6 +8,8 @@
 
 using namespace std;
 
+static const int SA_FEATURE_COUNT = 5;
+
 // --- 内部ヘルパー関数 ---
 
 // 指定された軸の値を取得（0:x, 1:y, 2:z）
@@ -306,15 +308,11 @@ SpatialAnalyzer::SpatialAnalyzer() {
     show_voxels = false;
     feature_mode = 0;
     norm_mode = 0;
-    max_spd_val = 1.0f;
-    max_jrk_val = 1.0f;
-    max_ine_val = 1.0f;
-    max_pax_val = 1.0f;
-    max_psc_accumulated_val = 1.0f;
-    max_spd_accumulated_val = 1.0f;
-    max_jrk_accumulated_val = 1.0f;
-    max_ine_accumulated_val = 1.0f;
-    max_pax_accumulated_val = 1.0f;
+    for (int i = 0; i < SA_FEATURE_COUNT; ++i) {
+        max_val[i] = 1.0f;
+        max_accumulated_val[i] = 1.0f;
+        accumulated_pose_cache[i].valid = false;
+    }
     
     // 部位別表示モード
     selected_segment_index = -1;
@@ -331,23 +329,14 @@ SpatialAnalyzer::SpatialAnalyzer() {
     slice_plane_transform.setIdentity();
     
     // 表示用オイラー角
-    slice_rotation_x = 0.0f;
-    slice_rotation_y = 0.0f;
-    slice_rotation_z = 0.0f;
+    for(int i = 0; i < 3; i++)
+		slice_rotation[i] = 0.0f;
     
     use_rotated_slice = true;
     slice_positions.push_back(0.5f);
 
     has_frame_cache = false;
     sparse_threshold = 1e-4f;
-    occupancy_accumulated_pose_cache.valid = false;
-    speed_accumulated_pose_cache.valid = false;
-    jerk_accumulated_pose_cache.valid = false;
-    inertia_accumulated_pose_cache.valid = false;
-    principal_axis_accumulated_pose_cache.valid = false;
-    principal_axis_accumulated_pose_cache.valid = false;
-    principal_axis_accumulated_pose_cache.valid = false;
-
     temp_voxelize_num_segments = -1;
     temp_voxelize_resolution = -1;
     prev_presence_cache_entries[0] = PrevPresenceCacheEntry();
@@ -361,35 +350,11 @@ SpatialAnalyzer::~SpatialAnalyzer() {}
 void SpatialAnalyzer::ResizeGrids(int res) {
     grid_resolution = res;
 
-    // 瞬間グリッド
-    voxels1_psc.Resize(res); voxels2_psc.Resize(res); voxels_psc_diff.Resize(res);
-    voxels1_spd.Resize(res); voxels2_spd.Resize(res); voxels_spd_diff.Resize(res);
-    voxels1_jrk.Resize(res); voxels2_jrk.Resize(res); voxels_jrk_diff.Resize(res);
-    voxels1_ine.Resize(res); voxels2_ine.Resize(res); voxels_ine_diff.Resize(res);
-    voxels1_pax.Resize(res); voxels2_pax.Resize(res); voxels_pax_diff.Resize(res);
-
-    // 累積グリッド
-    voxels1_psc_accumulated.Resize(res);
-    voxels2_psc_accumulated.Resize(res);
-    voxels_psc_accumulated_diff.Resize(res);
-    voxels1_spd_accumulated.Resize(res);
-    voxels2_spd_accumulated.Resize(res);
-    voxels_spd_accumulated_diff.Resize(res);
-    voxels1_jrk_accumulated.Resize(res);
-    voxels2_jrk_accumulated.Resize(res);
-    voxels_jrk_accumulated_diff.Resize(res);
-    voxels1_ine_accumulated.Resize(res);
-    voxels2_ine_accumulated.Resize(res);
-    voxels_ine_accumulated_diff.Resize(res);
-    voxels1_pax_accumulated.Resize(res);
-    voxels2_pax_accumulated.Resize(res);
-    voxels_pax_accumulated_diff.Resize(res);
-
-    occupancy_accumulated_pose_cache.valid = false;
-    speed_accumulated_pose_cache.valid = false;
-    jerk_accumulated_pose_cache.valid = false;
-    inertia_accumulated_pose_cache.valid = false;
-    principal_axis_accumulated_pose_cache.valid = false;
+    for (int i = 0; i < SA_FEATURE_COUNT; ++i) {
+        voxels1[i].Resize(res); voxels2[i].Resize(res); voxels_diff[i].Resize(res);
+        voxels1_accumulated[i].Resize(res); voxels2_accumulated[i].Resize(res); voxels_accumulated_diff[i].Resize(res);
+        accumulated_pose_cache[i].valid = false;
+    }
 
     temp_voxelize_num_segments = -1;
     temp_voxelize_resolution = -1;
@@ -416,11 +381,8 @@ void SpatialAnalyzer::SetWorldBounds(float bounds[3][2]) {
     
     UpdateEulerAnglesFromTransform();
 
-    occupancy_accumulated_pose_cache.valid = false;
-    speed_accumulated_pose_cache.valid = false;
-    jerk_accumulated_pose_cache.valid = false;
-    inertia_accumulated_pose_cache.valid = false;
-    principal_axis_accumulated_pose_cache.valid = false;
+    for (int i = 0; i < SA_FEATURE_COUNT; ++i)
+        accumulated_pose_cache[i].valid = false;
 }
 
 // 指定時刻のモーションを占有率・速度・ジャーク・慣性モーメントのボクセルグリッドに変換
@@ -431,28 +393,20 @@ void SpatialAnalyzer::VoxelizeMotion(Motion* m, float time, VoxelGrid& occ, Voxe
     int num_segments = m->body->num_segments;
     bool need_resize = (temp_voxelize_num_segments != num_segments || temp_voxelize_resolution != grid_resolution);
     if (need_resize) {
-        temp_voxelize_seg_psc.Resize(num_segments, grid_resolution);
-        temp_voxelize_seg_spd.Resize(num_segments, grid_resolution);
-        temp_voxelize_seg_jrk.Resize(num_segments, grid_resolution);
-        temp_voxelize_seg_ine.Resize(num_segments, grid_resolution);
-        temp_voxelize_seg_pax.Resize(num_segments, grid_resolution);
+		for (int i = 0; i < SA_FEATURE_COUNT; ++i)
+			temp_voxelize_seg[i].Resize(num_segments, grid_resolution);
         temp_voxelize_num_segments = num_segments;
         temp_voxelize_resolution = grid_resolution;
     } else {
-        temp_voxelize_seg_psc.Clear();
-        temp_voxelize_seg_spd.Clear();
-        temp_voxelize_seg_jrk.Clear();
-        temp_voxelize_seg_ine.Clear();
-        temp_voxelize_seg_pax.Clear();
+        for (int i = 0; i < SA_FEATURE_COUNT; ++i)
+			temp_voxelize_seg[i].Clear();
     }
 
-    SegmentVoxelData& seg_psc = temp_voxelize_seg_psc;
-    SegmentVoxelData& seg_spd = temp_voxelize_seg_spd;
-    SegmentVoxelData& seg_jrk = temp_voxelize_seg_jrk;
-    SegmentVoxelData& seg_ine = temp_voxelize_seg_ine;
-    SegmentVoxelData& seg_pax = temp_voxelize_seg_pax;
-
-    VoxelizeMotionBySegment(m, time, seg_psc, seg_spd, seg_jrk, seg_ine, seg_pax);
+	SegmentVoxelData seg_voxels[SA_FEATURE_COUNT];
+	for (int i = 0; i < SA_FEATURE_COUNT; ++i)
+        seg_voxels[i] = temp_voxelize_seg[i];
+        
+    VoxelizeMotionBySegment(m, time, seg_voxels[0], seg_voxels[1], seg_voxels[2], seg_voxels[3], seg_voxels[4]);
 
     int size = grid_resolution * grid_resolution * grid_resolution;
     if ((int)occ.data.size() != size) occ.Resize(grid_resolution);
@@ -468,11 +422,11 @@ void SpatialAnalyzer::VoxelizeMotion(Motion* m, float time, VoxelGrid& occ, Voxe
     std::fill(pax.data.begin(), pax.data.end(), 0.0f);
 
     for (int s = 0; s < num_segments; ++s) {
-        const std::vector<float>& psc_data = seg_psc.segment_grids[s].data;
-        const std::vector<float>& spd_data = seg_spd.segment_grids[s].data;
-        const std::vector<float>& jrk_data = seg_jrk.segment_grids[s].data;
-        const std::vector<float>& ine_data = seg_ine.segment_grids[s].data;
-        const std::vector<float>& pax_data = seg_pax.segment_grids[s].data;
+        const std::vector<float>& psc_data = seg_voxels[0].segment_grids[s].data;
+        const std::vector<float>& spd_data = seg_voxels[1].segment_grids[s].data;
+        const std::vector<float>& jrk_data = seg_voxels[2].segment_grids[s].data;
+        const std::vector<float>& ine_data = seg_voxels[3].segment_grids[s].data;
+        const std::vector<float>& pax_data = seg_voxels[4].segment_grids[s].data;
 
         for (int i = 0; i < size; ++i) {
             occ.data[i] += psc_data[i];
@@ -488,69 +442,30 @@ void SpatialAnalyzer::VoxelizeMotion(Motion* m, float time, VoxelGrid& occ, Voxe
 void SpatialAnalyzer::UpdateVoxels(Motion* m1, Motion* m2, float current_time) {
     int selected_count = GetSelectedSegmentCount();
     bool use_segment_mode = show_segment_mode && (selected_count > 0 || selected_segment_index >= 0);
+    int feature = feature_mode;
+    if (feature < 0 || feature >= SA_FEATURE_COUNT)
+        feature = 0;
 
-    if (feature_mode == 0) {
-        voxels1_psc.Clear(); voxels2_psc.Clear(); voxels_psc_diff.Clear();
-        max_psc_val = 0.0f;
-    } else if (feature_mode == 1) {
-        voxels1_spd.Clear(); voxels2_spd.Clear(); voxels_spd_diff.Clear();
-        max_spd_val = 0.0f;
-    } else if (feature_mode == 2) {
-        voxels1_jrk.Clear(); voxels2_jrk.Clear(); voxels_jrk_diff.Clear();
-        max_jrk_val = 0.0f;
-    } else if (feature_mode == 3) {
-        voxels1_ine.Clear(); voxels2_ine.Clear(); voxels_ine_diff.Clear();
-        max_ine_val = 0.0f;
-    } else {
-        voxels1_pax.Clear(); voxels2_pax.Clear(); voxels_pax_diff.Clear();
-        max_pax_val = 0.0f;
-    }
+    voxels1[feature].Clear();
+    voxels2[feature].Clear();
+    voxels_diff[feature].Clear();
+    max_val[feature] = 0.0f;
 
     bool compose_segment_data = use_segment_mode && (norm_mode == 0);
-    if (!ComposeInstantFeatureFromFrameCache(m1, m2, feature_mode, current_time, compose_segment_data)) {
-        VoxelizeMotion(m1, current_time, voxels1_psc, voxels1_spd, voxels1_jrk, voxels1_ine, voxels1_pax);
-        VoxelizeMotion(m2, current_time, voxels2_psc, voxels2_spd, voxels2_jrk, voxels2_ine, voxels2_pax);
+    if (!ComposeInstantFeatureFromFrameCache(m1, m2, feature, current_time, compose_segment_data)) {
+        VoxelizeMotion(m1, current_time, voxels1[0], voxels1[1], voxels1[2], voxels1[3], voxels1[4]);
+        VoxelizeMotion(m2, current_time, voxels2[0], voxels2[1], voxels2[2], voxels2[3], voxels2[4]);
     }
 
     // 差分計算と最大値更新（現在のfeature_modeのみ）
     int size = grid_resolution * grid_resolution * grid_resolution;
 
-    if (feature_mode == 0) {
-        for (int i = 0; i < size; ++i) {
-            float d = fabsf(voxels1_psc.data[i] - voxels2_psc.data[i]);
-            voxels_psc_diff.data[i] = d;
-            if (d > max_psc_val) max_psc_val = d;
-        }
-        if (max_psc_val < 1e-5f) max_psc_val = 1.0f;
-    } else if (feature_mode == 1) {
-        for (int i = 0; i < size; ++i) {
-            float d = fabsf(voxels1_spd.data[i] - voxels2_spd.data[i]);
-            voxels_spd_diff.data[i] = d;
-            if (d > max_spd_val) max_spd_val = d;
-        }
-        if (max_spd_val < 1e-5f) max_spd_val = 1.0f;
-    } else if (feature_mode == 2) {
-        for (int i = 0; i < size; ++i) {
-            float d = fabsf(voxels1_jrk.data[i] - voxels2_jrk.data[i]);
-            voxels_jrk_diff.data[i] = d;
-            if (d > max_jrk_val) max_jrk_val = d;
-        }
-        if (max_jrk_val < 1e-5f) max_jrk_val = 1.0f;
-    } else if (feature_mode == 3) {
-        for (int i = 0; i < size; ++i) {
-            float d = fabsf(voxels1_ine.data[i] - voxels2_ine.data[i]);
-            voxels_ine_diff.data[i] = d;
-            if (d > max_ine_val) max_ine_val = d;
-        }
-        if (max_ine_val < 1e-5f) max_ine_val = 1.0f;
-    } else {
-        for (int i = 0; i < size; ++i) {
-            float d = fabsf(voxels1_pax.data[i] - voxels2_pax.data[i]);
-            voxels_pax_diff.data[i] = d;
-            if (d > max_pax_val) max_pax_val = d;
-        }
-        if (max_pax_val < 1e-5f) max_pax_val = 1.0f;
+    for (int i = 0; i < size; ++i) {
+        float d = fabsf(voxels1[feature].data[i] - voxels2[feature].data[i]);
+        voxels_diff[feature].data[i] = d;
+        if (d > max_val[feature]) max_val[feature] = d;
     }
+    if (max_val[feature] < 1e-5f) max_val[feature] = 1.0f;
 }
 
 bool SpatialAnalyzer::ComposeInstantFeatureFromFrameCache(Motion* m1, Motion* m2, int feature, float current_time, bool compose_segment_data) {
@@ -573,22 +488,13 @@ bool SpatialAnalyzer::ComposeInstantFeatureFromFrameCache(Motion* m1, Motion* m2
     VoxelGrid* out1 = nullptr;
     VoxelGrid* out2 = nullptr;
 
-    if (feature == 0) {
-        seg1 = &segment_presence_voxels1; seg2 = &segment_presence_voxels2;
-        out1 = &voxels1_psc; out2 = &voxels2_psc;
-    } else if (feature == 1) {
-        seg1 = &segment_speed_voxels1; seg2 = &segment_speed_voxels2;
-        out1 = &voxels1_spd; out2 = &voxels2_spd;
-    } else if (feature == 2) {
-        seg1 = &segment_jerk_voxels1; seg2 = &segment_jerk_voxels2;
-        out1 = &voxels1_jrk; out2 = &voxels2_jrk;
-    } else if (feature == 3) {
-        seg1 = &segment_inertia_voxels1; seg2 = &segment_inertia_voxels2;
-        out1 = &voxels1_ine; out2 = &voxels2_ine;
-    } else {
-        seg1 = &segment_principal_axis_voxels1; seg2 = &segment_principal_axis_voxels2;
-        out1 = &voxels1_pax; out2 = &voxels2_pax;
-    }
+    if (feature < 0 || feature >= SA_FEATURE_COUNT)
+        return false;
+
+    seg1 = &segment_voxels1[feature];
+    seg2 = &segment_voxels2[feature];
+    out1 = &voxels1[feature];
+    out2 = &voxels2[feature];
 
     int size = grid_resolution * grid_resolution * grid_resolution;
     if ((int)out1->data.size() != size) out1->Resize(grid_resolution);
@@ -709,6 +615,10 @@ void SpatialAnalyzer::DrawCTMaps(int win_width, int win_height) {
     int selected_count = GetSelectedSegmentCount();
     bool use_segment_mode = show_segment_mode && (selected_count > 0 || selected_segment_index >= 0);
     
+    int feature = feature_mode;
+    if (feature < 0 || feature >= SA_FEATURE_COUNT)
+        feature = 0;
+
     if (use_segment_mode) {
         UpdateSegmentCache();
         grid1 = &cached_segment_grid1;
@@ -716,33 +626,15 @@ void SpatialAnalyzer::DrawCTMaps(int win_width, int win_height) {
         grid_diff = &cached_segment_diff;
         max_value = cached_segment_max_val;
     } else if (norm_mode == 0) {
-        // 瞬間表示
-        VoxelGrid* grids[][3] = {
-            {&voxels1_psc, &voxels2_psc, &voxels_psc_diff},
-            {&voxels1_spd, &voxels2_spd, &voxels_spd_diff},
-            {&voxels1_jrk, &voxels2_jrk, &voxels_jrk_diff},
-            {&voxels1_ine, &voxels2_ine, &voxels_ine_diff},
-            {&voxels1_pax, &voxels2_pax, &voxels_pax_diff}
-        };
-        float max_vals[] = {max_psc_val, max_spd_val, max_jrk_val, max_ine_val, max_pax_val};
-        grid1 = grids[feature_mode][0];
-        grid2 = grids[feature_mode][1];
-        grid_diff = grids[feature_mode][2];
-        max_value = max_vals[feature_mode];
+        grid1 = &voxels1[feature];
+        grid2 = &voxels2[feature];
+        grid_diff = &voxels_diff[feature];
+        max_value = max_val[feature];
     } else {
-        // 累積表示
-        VoxelGrid* grids[][3] = {
-            {&voxels1_psc_accumulated, &voxels2_psc_accumulated, &voxels_psc_accumulated_diff},
-            {&voxels1_spd_accumulated, &voxels2_spd_accumulated, &voxels_spd_accumulated_diff},
-            {&voxels1_jrk_accumulated, &voxels2_jrk_accumulated, &voxels_jrk_accumulated_diff},
-            {&voxels1_ine_accumulated, &voxels2_ine_accumulated, &voxels_ine_accumulated_diff},
-            {&voxels1_pax_accumulated, &voxels2_pax_accumulated, &voxels_pax_accumulated_diff}
-        };
-        float max_vals[] = {max_psc_accumulated_val, max_spd_accumulated_val, max_jrk_accumulated_val, max_ine_accumulated_val, max_pax_accumulated_val};
-        grid1 = grids[feature_mode][0];
-        grid2 = grids[feature_mode][1];
-        grid_diff = grids[feature_mode][2];
-        max_value = max_vals[feature_mode];
+        grid1 = &voxels1_accumulated[feature];
+        grid2 = &voxels2_accumulated[feature];
+        grid_diff = &voxels_accumulated_diff[feature];
+        max_value = max_accumulated_val[feature];
     }
     
     DrawRotatedSliceMap(start_x, y_pos, map_w, map_h, *grid1, max_value, "Rotated M1");
@@ -776,25 +668,25 @@ void SpatialAnalyzer::DrawVoxels3D() {
     
     // 描画するグリッドと最大値を決定
     VoxelGrid* grid_to_draw = nullptr;
-    float max_val = 1.0f;
+    float draw_max_val = 1.0f;
     
     int selected_count = GetSelectedSegmentCount();
     bool use_segment_mode = show_segment_mode && (selected_count > 0 || selected_segment_index >= 0);
     
+    int feature = feature_mode;
+    if (feature < 0 || feature >= SA_FEATURE_COUNT)
+        feature = 0;
+
     if (use_segment_mode) {
         UpdateSegmentCache();
         grid_to_draw = &cached_segment_diff;
-        max_val = cached_segment_max_val;
+        draw_max_val = cached_segment_max_val;
     } else if (norm_mode == 0) {
-        VoxelGrid* grids[] = {&voxels_psc_diff, &voxels_spd_diff, &voxels_jrk_diff, &voxels_ine_diff, &voxels_pax_diff};
-        float max_vals[] = {max_psc_val, max_spd_val, max_jrk_val, max_ine_val, max_pax_val};
-        grid_to_draw = grids[feature_mode];
-        max_val = max_vals[feature_mode];
+        grid_to_draw = &voxels_diff[feature];
+        draw_max_val = max_val[feature];
     } else {
-        VoxelGrid* grids[] = {&voxels_psc_accumulated_diff, &voxels_spd_accumulated_diff, &voxels_jrk_accumulated_diff, &voxels_ine_accumulated_diff, &voxels_pax_accumulated_diff};
-        float max_vals[] = {max_psc_accumulated_val, max_spd_accumulated_val, max_jrk_accumulated_val, max_ine_accumulated_val, max_pax_accumulated_val};
-        grid_to_draw = grids[feature_mode];
-        max_val = max_vals[feature_mode];
+        grid_to_draw = &voxels_accumulated_diff[feature];
+        draw_max_val = max_accumulated_val[feature];
     }
     
     // ボクセルを描画
@@ -809,7 +701,7 @@ void SpatialAnalyzer::DrawVoxels3D() {
                 float wy = world_bounds[1][0] + (y + 0.5f) * cell_size_y;
                 float wz = world_bounds[2][0] + (z + 0.5f) * cell_size_z;
                 
-                float norm_val = min(val / max_val, 1.0f);
+                float norm_val = min(val / draw_max_val, 1.0f);
                 Color3f color = sa_get_heatmap_color(norm_val);
                 
                 glColor4f(color.x, color.y, color.z, 0.3f + 0.5f * norm_val);
@@ -836,199 +728,114 @@ void SpatialAnalyzer::AccumulateAllFrames(Motion* m1, Motion* m2)
     
     ClearAccumulatedData();
     
-    // グリッドをリサイズ
-    voxels1_psc_accumulated.Resize(grid_resolution);
-    voxels2_psc_accumulated.Resize(grid_resolution);
-    voxels_psc_accumulated_diff.Resize(grid_resolution);
-    voxels1_spd_accumulated.Resize(grid_resolution);
-    voxels2_spd_accumulated.Resize(grid_resolution);
-    voxels_spd_accumulated_diff.Resize(grid_resolution);
-    voxels1_jrk_accumulated.Resize(grid_resolution);
-    voxels2_jrk_accumulated.Resize(grid_resolution);
-    voxels_jrk_accumulated_diff.Resize(grid_resolution);
-    voxels1_ine_accumulated.Resize(grid_resolution);
-    voxels2_ine_accumulated.Resize(grid_resolution);
-    voxels_ine_accumulated_diff.Resize(grid_resolution);
-    voxels1_pax_accumulated.Resize(grid_resolution);
-    voxels2_pax_accumulated.Resize(grid_resolution);
-    voxels_pax_accumulated_diff.Resize(grid_resolution);
-
-    // 部位ごとのグリッドをリサイズ
-    segment_presence_voxels1.Resize(num_segments, grid_resolution);
-    segment_presence_voxels2.Resize(num_segments, grid_resolution);
-    segment_speed_voxels1.Resize(num_segments, grid_resolution);
-    segment_speed_voxels2.Resize(num_segments, grid_resolution);
-    segment_jerk_voxels1.Resize(num_segments, grid_resolution);
-    segment_jerk_voxels2.Resize(num_segments, grid_resolution);
-    segment_inertia_voxels1.Resize(num_segments, grid_resolution);
-    segment_inertia_voxels2.Resize(num_segments, grid_resolution);
-    segment_principal_axis_voxels1.Resize(num_segments, grid_resolution);
-    segment_principal_axis_voxels2.Resize(num_segments, grid_resolution);
+    for (int f = 0; f < SA_FEATURE_COUNT; ++f) {
+        voxels1_accumulated[f].Resize(grid_resolution);
+        voxels2_accumulated[f].Resize(grid_resolution);
+        voxels_accumulated_diff[f].Resize(grid_resolution);
+        segment_voxels1[f].Resize(num_segments, grid_resolution);
+        segment_voxels2[f].Resize(num_segments, grid_resolution);
+    }
     
     // 基準姿勢を保存
     if (m1->num_frames > 0)
-        voxels1_psc_accumulated.SetReference(m1->frames[0].root_pos, m1->frames[0].root_ori);
+        for (int f = 0; f < SA_FEATURE_COUNT; ++f)
+            voxels1_accumulated[f].SetReference(m1->frames[0].root_pos, m1->frames[0].root_ori);
     if (m2->num_frames > 0)
-        voxels2_psc_accumulated.SetReference(m2->frames[0].root_pos, m2->frames[0].root_ori);
+        for (int f = 0; f < SA_FEATURE_COUNT; ++f)
+            voxels2_accumulated[f].SetReference(m2->frames[0].root_pos, m2->frames[0].root_ori);
     
     std::cout << "Accumulating voxels (integrated) for " << num_segments << " segments..." << std::endl;
     
     // モーション処理用のラムダ関数
-    auto processMotion = [&](Motion* m, 
-                             SegmentVoxelData& seg_psc, SegmentVoxelData& seg_spd, SegmentVoxelData& seg_jrk, SegmentVoxelData& seg_ine, SegmentVoxelData& seg_pax,
-                             VoxelGrid& acc_psc, VoxelGrid& acc_spd, VoxelGrid& acc_jrk, VoxelGrid& acc_ine, VoxelGrid& acc_pax) {
+    auto processMotion = [&](Motion* m, SegmentVoxelData* seg_data, VoxelGrid* acc_data) {
         for (int f = 0; f < m->num_frames; ++f) {
             float time = f * m->interval;
-            SegmentVoxelData temp_seg_psc, temp_seg_spd, temp_seg_jrk, temp_seg_ine, temp_seg_pax;
-            temp_seg_psc.Resize(num_segments, grid_resolution);
-            temp_seg_spd.Resize(num_segments, grid_resolution);
-            temp_seg_jrk.Resize(num_segments, grid_resolution);
-            temp_seg_ine.Resize(num_segments, grid_resolution);
-            temp_seg_pax.Resize(num_segments, grid_resolution);
+            SegmentVoxelData temp_seg[SA_FEATURE_COUNT];
+            for (int i = 0; i < SA_FEATURE_COUNT; ++i)
+                temp_seg[i].Resize(num_segments, grid_resolution);
 
             // モーションに基づくボクセル化
-            VoxelizeMotionBySegment(m, time, temp_seg_psc, temp_seg_spd, temp_seg_jrk, temp_seg_ine, temp_seg_pax);
+            VoxelizeMotionBySegment(m, time, temp_seg[0], temp_seg[1], temp_seg[2], temp_seg[3], temp_seg[4]);
 
             // セグメントごとのボクセルデータを累積
             for (int s = 0; s < num_segments; ++s) {
                 for (int i = 0; i < size; ++i) {
-                    float psc_val = temp_seg_psc.segment_grids[s].data[i];
-                    float spd_val = temp_seg_spd.segment_grids[s].data[i];
-                    float jrk_val = temp_seg_jrk.segment_grids[s].data[i];
-                    float ine_val = temp_seg_ine.segment_grids[s].data[i];
-                    float pax_val = temp_seg_pax.segment_grids[s].data[i];
-
-                    seg_psc.segment_grids[s].data[i] += psc_val;
-                    if (spd_val > seg_spd.segment_grids[s].data[i])
-                        seg_spd.segment_grids[s].data[i] = spd_val;
-                    if (jrk_val > seg_jrk.segment_grids[s].data[i])
-                        seg_jrk.segment_grids[s].data[i] = jrk_val;
-                    if (ine_val > seg_ine.segment_grids[s].data[i])
-                        seg_ine.segment_grids[s].data[i] = ine_val;
-                    if (pax_val > seg_pax.segment_grids[s].data[i])
-                        seg_pax.segment_grids[s].data[i] = pax_val;
-
-                    acc_psc.data[i] += psc_val;
-                    if (spd_val > acc_spd.data[i]) acc_spd.data[i] = spd_val;
-                    if (jrk_val > acc_jrk.data[i]) acc_jrk.data[i] = jrk_val;
-                    if (ine_val > acc_ine.data[i]) acc_ine.data[i] = ine_val;
-                    if (pax_val > acc_pax.data[i]) acc_pax.data[i] = pax_val;
+                    for (int feat = 0; feat < SA_FEATURE_COUNT; ++feat) {
+                        float v = temp_seg[feat].segment_grids[s].data[i];
+                        if (feat == 0) {
+                            seg_data[feat].segment_grids[s].data[i] += v;
+                            acc_data[feat].data[i] += v;
+                        } else {
+                            if (v > seg_data[feat].segment_grids[s].data[i])
+                                seg_data[feat].segment_grids[s].data[i] = v;
+                            if (v > acc_data[feat].data[i])
+                                acc_data[feat].data[i] = v;
+                        }
+                    }
                 }
             }
         }
     };
 
-    processMotion(m1, segment_presence_voxels1, segment_speed_voxels1, segment_jerk_voxels1, segment_inertia_voxels1, segment_principal_axis_voxels1,
-                  voxels1_psc_accumulated, voxels1_spd_accumulated, voxels1_jrk_accumulated, voxels1_ine_accumulated, voxels1_pax_accumulated);
-    processMotion(m2, segment_presence_voxels2, segment_speed_voxels2, segment_jerk_voxels2, segment_inertia_voxels2, segment_principal_axis_voxels2,
-                  voxels2_psc_accumulated, voxels2_spd_accumulated, voxels2_jrk_accumulated, voxels2_ine_accumulated, voxels2_pax_accumulated);
+    processMotion(m1, segment_voxels1, voxels1_accumulated);
+    processMotion(m2, segment_voxels2, voxels2_accumulated);
     
     // 差分計算と最大値更新
+    for (int feat = 0; feat < SA_FEATURE_COUNT; ++feat)
+        max_accumulated_val[feat] = 0.0f;
+
     for (int i = 0; i < size; ++i) {
-        float diff_psc = abs(voxels1_psc_accumulated.data[i] - voxels2_psc_accumulated.data[i]);
-        voxels_psc_accumulated_diff.data[i] = diff_psc;
-        if (diff_psc > max_psc_accumulated_val) 
-            max_psc_accumulated_val = diff_psc;
-        
-        float diff_spd = abs(voxels1_spd_accumulated.data[i] - voxels2_spd_accumulated.data[i]);
-        voxels_spd_accumulated_diff.data[i] = diff_spd;
-        float max_spd = max(voxels1_spd_accumulated.data[i], voxels2_spd_accumulated.data[i]);
-        if (max_spd > max_spd_accumulated_val) 
-            max_spd_accumulated_val = max_spd;
-
-        float diff_jrk = abs(voxels1_jrk_accumulated.data[i] - voxels2_jrk_accumulated.data[i]);
-        voxels_jrk_accumulated_diff.data[i] = diff_jrk;
-        float max_jrk = max(voxels1_jrk_accumulated.data[i], voxels2_jrk_accumulated.data[i]);
-        if (max_jrk > max_jrk_accumulated_val) 
-            max_jrk_accumulated_val = max_jrk;
-
-        float diff_ine = abs(voxels1_ine_accumulated.data[i] - voxels2_ine_accumulated.data[i]);
-        voxels_ine_accumulated_diff.data[i] = diff_ine;
-        float max_ine = max(voxels1_ine_accumulated.data[i], voxels2_ine_accumulated.data[i]);
-        if (max_ine > max_ine_accumulated_val) 
-            max_ine_accumulated_val = max_ine;
-
-        float diff_pax = abs(voxels1_pax_accumulated.data[i] - voxels2_pax_accumulated.data[i]);
-        voxels_pax_accumulated_diff.data[i] = diff_pax;
-        float max_pax = max(voxels1_pax_accumulated.data[i], voxels2_pax_accumulated.data[i]);
-        if (max_pax > max_pax_accumulated_val)
-            max_pax_accumulated_val = max_pax;
+        for (int feat = 0; feat < SA_FEATURE_COUNT; ++feat) {
+            float d = abs(voxels1_accumulated[feat].data[i] - voxels2_accumulated[feat].data[i]);
+            voxels_accumulated_diff[feat].data[i] = d;
+            float candidate = (feat == 0) ? d : max(voxels1_accumulated[feat].data[i], voxels2_accumulated[feat].data[i]);
+            if (candidate > max_accumulated_val[feat])
+                max_accumulated_val[feat] = candidate;
+        }
     }
 
-    if (max_psc_accumulated_val < 1e-5f) max_psc_accumulated_val = 1.0f;
-    if (max_spd_accumulated_val < 1e-5f) max_spd_accumulated_val = 1.0f;
-    if (max_jrk_accumulated_val < 1e-5f) max_jrk_accumulated_val = 1.0f;
-    if (max_ine_accumulated_val < 1e-5f) max_ine_accumulated_val = 1.0f;
-    if (max_pax_accumulated_val < 1e-5f) max_pax_accumulated_val = 1.0f;
+    for (int feat = 0; feat < SA_FEATURE_COUNT; ++feat)
+        if (max_accumulated_val[feat] < 1e-5f)
+            max_accumulated_val[feat] = 1.0f;
     
-    if (voxels1_psc_accumulated.has_reference)
-        voxels_psc_accumulated_diff.SetReference(
-            voxels1_psc_accumulated.reference_root_pos, 
-            voxels1_psc_accumulated.reference_root_ori);
+    if (voxels1_accumulated[0].has_reference)
+        voxels_accumulated_diff[0].SetReference(
+            voxels1_accumulated[0].reference_root_pos,
+            voxels1_accumulated[0].reference_root_ori);
     
     // 部位ごとの最大値を計算
     InitializeSegmentSelection(num_segments);
     for (int s = 0; s < num_segments; ++s) {
-        float max_psc = 0.0f, max_spd = 0.0f, max_jrk = 0.0f, max_ine = 0.0f, max_pax = 0.0f;
+        float seg_max_vals[SA_FEATURE_COUNT] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
         for (int i = 0; i < size; ++i) {
-            float diff_psc = abs(segment_presence_voxels1.segment_grids[s].data[i] - 
-                                  segment_presence_voxels2.segment_grids[s].data[i]);
-            float diff_spd = abs(segment_speed_voxels1.segment_grids[s].data[i] - 
-                                 segment_speed_voxels2.segment_grids[s].data[i]);
-            float diff_jrk = abs(segment_jerk_voxels1.segment_grids[s].data[i] - 
-                                 segment_jerk_voxels2.segment_grids[s].data[i]);
-            float diff_ine = abs(segment_inertia_voxels1.segment_grids[s].data[i] - 
-                                 segment_inertia_voxels2.segment_grids[s].data[i]);
-            float diff_pax = abs(segment_principal_axis_voxels1.segment_grids[s].data[i] -
-                                 segment_principal_axis_voxels2.segment_grids[s].data[i]);
-            if (diff_psc > max_psc) max_psc = diff_psc;
-            if (diff_spd > max_spd) max_spd = diff_spd;
-            if (diff_jrk > max_jrk) max_jrk = diff_jrk;
-            if (diff_ine > max_ine) max_ine = diff_ine;
-            if (diff_pax > max_pax) max_pax = diff_pax;
+            for (int feat = 0; feat < SA_FEATURE_COUNT; ++feat) {
+                float d = abs(segment_voxels1[feat].segment_grids[s].data[i] -
+                              segment_voxels2[feat].segment_grids[s].data[i]);
+                if (d > seg_max_vals[feat])
+                    seg_max_vals[feat] = d;
+            }
         }
-        segment_max_presence[s] = (max_psc < 1e-5f) ? 1.0f : max_psc;
-        segment_max_speed[s] = (max_spd < 1e-5f) ? 1.0f : max_spd;
-        segment_max_jerk[s] = (max_jrk < 1e-5f) ? 1.0f : max_jrk;
-        segment_max_inertia[s] = (max_ine < 1e-5f) ? 1.0f : max_ine;
-        segment_max_principal_axis[s] = (max_pax < 1e-5f) ? 1.0f : max_pax;
+        for (int feat = 0; feat < SA_FEATURE_COUNT; ++feat)
+            segment_max[feat][s] = (seg_max_vals[feat] < 1e-5f) ? 1.0f : seg_max_vals[feat];
     }
 
     std::cout << "Integrated accumulation complete." << std::endl;
-    std::cout << "  Max presence diff: " << max_psc_accumulated_val << std::endl;
-    std::cout << "  Max speed: " << max_spd_accumulated_val << std::endl;
-    std::cout << "  Max jerk: " << max_jrk_accumulated_val << std::endl;
-    std::cout << "  Max inertia: " << max_ine_accumulated_val << std::endl;
-    std::cout << "  Max principal-axis speed: " << max_pax_accumulated_val << std::endl;
+    std::cout << "  Max presence diff: " << max_accumulated_val[0] << std::endl;
+    std::cout << "  Max speed: " << max_accumulated_val[1] << std::endl;
+    std::cout << "  Max jerk: " << max_accumulated_val[2] << std::endl;
+    std::cout << "  Max inertia: " << max_accumulated_val[3] << std::endl;
+    std::cout << "  Max principal-axis speed: " << max_accumulated_val[4] << std::endl;
 }
 
 // 累積ボクセルグリッドをクリアし、最大値をリセット
 void SpatialAnalyzer::ClearAccumulatedData()
 {
-    voxels1_psc_accumulated.Clear();
-    voxels2_psc_accumulated.Clear();
-    voxels_psc_accumulated_diff.Clear();
-    max_psc_accumulated_val = 0.0f;
-
-    voxels1_spd_accumulated.Clear();
-    voxels2_spd_accumulated.Clear();
-    voxels_spd_accumulated_diff.Clear();
-    max_spd_accumulated_val = 0.0f;
-
-    voxels1_jrk_accumulated.Clear();
-    voxels2_jrk_accumulated.Clear();
-    voxels_jrk_accumulated_diff.Clear();
-    max_jrk_accumulated_val = 0.0f;
-
-    voxels1_ine_accumulated.Clear();
-    voxels2_ine_accumulated.Clear();
-    voxels_ine_accumulated_diff.Clear();
-    max_ine_accumulated_val = 0.0f;
-
-    voxels1_pax_accumulated.Clear();
-    voxels2_pax_accumulated.Clear();
-    voxels_pax_accumulated_diff.Clear();
-    max_pax_accumulated_val = 0.0f;
+    for (int i = 0; i < SA_FEATURE_COUNT; ++i) {
+        voxels1_accumulated[i].Clear();
+        voxels2_accumulated[i].Clear();
+        voxels_accumulated_diff[i].Clear();
+        max_accumulated_val[i] = 0.0f;
+    }
 }
 
 void SpatialAnalyzer::BuildSingleMotionFeatureFrameCache(Motion* m, MotionFrameSegmentVoxelGridCache& cache) {
@@ -1157,10 +964,8 @@ void SpatialAnalyzer::BuildAllFeatureFrameCaches(Motion* m1, Motion* m2) {
     has_frame_cache = false;
     frame_cache1.Clear();
     frame_cache2.Clear();
-    occupancy_accumulated_pose_cache.valid = false;
-    speed_accumulated_pose_cache.valid = false;
-    jerk_accumulated_pose_cache.valid = false;
-    inertia_accumulated_pose_cache.valid = false;
+    for (int f = 0; f < SA_FEATURE_COUNT; ++f)
+        accumulated_pose_cache[f].valid = false;
 
     if (!m1 || !m2)
         return;
@@ -1187,32 +992,17 @@ void SpatialAnalyzer::ComposeAccumulatedFeatureFromFrameCache(Motion* m1, Motion
     c2 = &frame_cache2;
     has_cache = has_frame_cache;
 
-    if (feature == 0) {
-        pose_cache = &occupancy_accumulated_pose_cache;
-        seg1 = &segment_presence_voxels1; seg2 = &segment_presence_voxels2;
-        acc1 = &voxels1_psc_accumulated; acc2 = &voxels2_psc_accumulated; diff = &voxels_psc_accumulated_diff;
-        max_val = &max_psc_accumulated_val; seg_max = &segment_max_presence;
-    } else if (feature == 1) {
-        pose_cache = &speed_accumulated_pose_cache;
-        seg1 = &segment_speed_voxels1; seg2 = &segment_speed_voxels2;
-        acc1 = &voxels1_spd_accumulated; acc2 = &voxels2_spd_accumulated; diff = &voxels_spd_accumulated_diff;
-        max_val = &max_spd_accumulated_val; seg_max = &segment_max_speed;
-    } else if (feature == 2) {
-        pose_cache = &jerk_accumulated_pose_cache;
-        seg1 = &segment_jerk_voxels1; seg2 = &segment_jerk_voxels2;
-        acc1 = &voxels1_jrk_accumulated; acc2 = &voxels2_jrk_accumulated; diff = &voxels_jrk_accumulated_diff;
-        max_val = &max_jrk_accumulated_val; seg_max = &segment_max_jerk;
-    } else if (feature == 3) {
-        pose_cache = &inertia_accumulated_pose_cache;
-        seg1 = &segment_inertia_voxels1; seg2 = &segment_inertia_voxels2;
-        acc1 = &voxels1_ine_accumulated; acc2 = &voxels2_ine_accumulated; diff = &voxels_ine_accumulated_diff;
-        max_val = &max_ine_accumulated_val; seg_max = &segment_max_inertia;
-    } else {
-        pose_cache = &principal_axis_accumulated_pose_cache;
-        seg1 = &segment_principal_axis_voxels1; seg2 = &segment_principal_axis_voxels2;
-        acc1 = &voxels1_pax_accumulated; acc2 = &voxels2_pax_accumulated; diff = &voxels_pax_accumulated_diff;
-        max_val = &max_pax_accumulated_val; seg_max = &segment_max_principal_axis;
-    }
+    if (feature < 0 || feature >= SA_FEATURE_COUNT)
+        return;
+
+    pose_cache = &accumulated_pose_cache[feature];
+    seg1 = &segment_voxels1[feature];
+    seg2 = &segment_voxels2[feature];
+    acc1 = &voxels1_accumulated[feature];
+    acc2 = &voxels2_accumulated[feature];
+    diff = &voxels_accumulated_diff[feature];
+    max_val = &max_accumulated_val[feature];
+    seg_max = &segment_max[feature];
 
     if (!m1 || !m2 || !has_cache || m1->num_frames <= 0 || m2->num_frames <= 0)
         return;
@@ -1452,39 +1242,24 @@ bool SpatialAnalyzer::SaveVoxelCache(const char* motion1_name, const char* motio
     std::string base = GenerateCacheFilename(motion1_name, motion2_name);
     
     std::cout << "Saving voxel cache to " << base << "..." << std::endl;
+
+    const char* feature_file_prefixes[SA_FEATURE_COUNT] = {"acc", "spd_acc", "jrk_acc", "ine_acc", "pax_acc"};
+    const char* segment_file_suffixes[SA_FEATURE_COUNT] = {"seg", "seg_spd", "seg_jrk", "seg_ine", "seg_pax"};
     
     // 累積ボクセルデータを保存
-    if (!voxels1_psc_accumulated.SaveToFile((base + "_acc1.bin").c_str())) return false;
-    if (!voxels2_psc_accumulated.SaveToFile((base + "_acc2.bin").c_str())) return false;
-    if (!voxels_psc_accumulated_diff.SaveToFile((base + "_acc_diff.bin").c_str())) return false;
-    
-    if (!voxels1_spd_accumulated.SaveToFile((base + "_spd_acc1.bin").c_str())) return false;
-    if (!voxels2_spd_accumulated.SaveToFile((base + "_spd_acc2.bin").c_str())) return false;
-    if (!voxels_spd_accumulated_diff.SaveToFile((base + "_spd_acc_diff.bin").c_str())) return false;
-    
-    if (!voxels1_jrk_accumulated.SaveToFile((base + "_jrk_acc1.bin").c_str())) return false;
-    if (!voxels2_jrk_accumulated.SaveToFile((base + "_jrk_acc2.bin").c_str())) return false;
-    if (!voxels_jrk_accumulated_diff.SaveToFile((base + "_jrk_acc_diff.bin").c_str())) return false;
-
-    if (!voxels1_ine_accumulated.SaveToFile((base + "_ine_acc1.bin").c_str())) return false;
-    if (!voxels2_ine_accumulated.SaveToFile((base + "_ine_acc2.bin").c_str())) return false;
-    if (!voxels_ine_accumulated_diff.SaveToFile((base + "_ine_acc_diff.bin").c_str())) return false;
-
-    if (!voxels1_pax_accumulated.SaveToFile((base + "_pax_acc1.bin").c_str())) return false;
-    if (!voxels2_pax_accumulated.SaveToFile((base + "_pax_acc2.bin").c_str())) return false;
-    if (!voxels_pax_accumulated_diff.SaveToFile((base + "_pax_acc_diff.bin").c_str())) return false;
+    for (int f = 0; f < SA_FEATURE_COUNT; ++f) {
+        std::string prefix = feature_file_prefixes[f];
+        if (!voxels1_accumulated[f].SaveToFile((base + "_" + prefix + "1.bin").c_str())) return false;
+        if (!voxels2_accumulated[f].SaveToFile((base + "_" + prefix + "2.bin").c_str())) return false;
+        if (!voxels_accumulated_diff[f].SaveToFile((base + "_" + prefix + "_diff.bin").c_str())) return false;
+    }
 
     // 部位ごとのボクセルデータを保存
-    if (!segment_presence_voxels1.SaveToFile((base + "_seg1.bin").c_str())) return false;
-    if (!segment_presence_voxels2.SaveToFile((base + "_seg2.bin").c_str())) return false;
-    if (!segment_speed_voxels1.SaveToFile((base + "_seg_spd1.bin").c_str())) return false;
-    if (!segment_speed_voxels2.SaveToFile((base + "_seg_spd2.bin").c_str())) return false;
-    if (!segment_jerk_voxels1.SaveToFile((base + "_seg_jrk1.bin").c_str())) return false;
-    if (!segment_jerk_voxels2.SaveToFile((base + "_seg_jrk2.bin").c_str())) return false;
-    if (!segment_inertia_voxels1.SaveToFile((base + "_seg_ine1.bin").c_str())) return false;
-    if (!segment_inertia_voxels2.SaveToFile((base + "_seg_ine2.bin").c_str())) return false;
-    if (!segment_principal_axis_voxels1.SaveToFile((base + "_seg_pax1.bin").c_str())) return false;
-    if (!segment_principal_axis_voxels2.SaveToFile((base + "_seg_pax2.bin").c_str())) return false;
+    for (int f = 0; f < SA_FEATURE_COUNT; ++f) {
+        std::string suffix = segment_file_suffixes[f];
+        if (!segment_voxels1[f].SaveToFile((base + "_" + suffix + "1.bin").c_str())) return false;
+        if (!segment_voxels2[f].SaveToFile((base + "_" + suffix + "2.bin").c_str())) return false;
+    }
     
     // メタデータを保存
     ofstream meta_ofs(base + "_meta.txt");
@@ -1492,10 +1267,10 @@ bool SpatialAnalyzer::SaveVoxelCache(const char* motion1_name, const char* motio
         return false;
     
     meta_ofs << grid_resolution << std::endl;
-    meta_ofs << max_psc_accumulated_val << std::endl;
-    meta_ofs << max_spd_accumulated_val << std::endl;
-    meta_ofs << max_jrk_accumulated_val << std::endl;
-    meta_ofs << max_ine_accumulated_val << std::endl;
+    meta_ofs << max_accumulated_val[0] << std::endl;
+    meta_ofs << max_accumulated_val[1] << std::endl;
+    meta_ofs << max_accumulated_val[2] << std::endl;
+    meta_ofs << max_accumulated_val[3] << std::endl;
     for (int i = 0; i < 3; ++i)
         meta_ofs << world_bounds[i][0] << " " << world_bounds[i][1] << std::endl;
     meta_ofs.close();
@@ -1507,6 +1282,8 @@ bool SpatialAnalyzer::SaveVoxelCache(const char* motion1_name, const char* motio
 // ファイルからボクセルキャッシュを読み込み
 bool SpatialAnalyzer::LoadVoxelCache(const char* motion1_name, const char* motion2_name) {
     std::string base = GenerateCacheFilename(motion1_name, motion2_name);
+    const char* feature_file_prefixes[SA_FEATURE_COUNT] = {"acc", "spd_acc", "jrk_acc", "ine_acc", "pax_acc"};
+    const char* segment_file_suffixes[SA_FEATURE_COUNT] = {"seg", "seg_spd", "seg_jrk", "seg_ine", "seg_pax"};
     
     std::cout << "Loading voxel cache from " << base << "..." << std::endl;
     
@@ -1519,11 +1296,11 @@ bool SpatialAnalyzer::LoadVoxelCache(const char* motion1_name, const char* motio
     
     int res;
     meta_ifs >> res;
-    meta_ifs >> max_psc_accumulated_val;
-    meta_ifs >> max_spd_accumulated_val;
-    meta_ifs >> max_jrk_accumulated_val;
-    meta_ifs >> max_ine_accumulated_val;
-    max_pax_accumulated_val = 1.0f;
+    meta_ifs >> max_accumulated_val[0];
+    meta_ifs >> max_accumulated_val[1];
+    meta_ifs >> max_accumulated_val[2];
+    meta_ifs >> max_accumulated_val[3];
+    max_accumulated_val[4] = 1.0f;
     for (int i = 0; i < 3; ++i)
         meta_ifs >> world_bounds[i][0] >> world_bounds[i][1];
     meta_ifs.close();
@@ -1548,44 +1325,26 @@ bool SpatialAnalyzer::LoadVoxelCache(const char* motion1_name, const char* motio
     };
     
     // 累積ボクセルデータを読み込み
-    if (!loadFile(voxels1_psc_accumulated, base + "_acc1.bin")) return false;
-    if (!loadFile(voxels2_psc_accumulated, base + "_acc2.bin")) return false;
-    if (!loadFile(voxels_psc_accumulated_diff, base + "_acc_diff.bin")) return false;
-    
-    if (!loadFile(voxels1_spd_accumulated, base + "_spd_acc1.bin")) return false;
-    if (!loadFile(voxels2_spd_accumulated, base + "_spd_acc2.bin")) return false;
-    if (!loadFile(voxels_spd_accumulated_diff, base + "_spd_acc_diff.bin")) return false;
-    
-    if (!loadFile(voxels1_jrk_accumulated, base + "_jrk_acc1.bin")) return false;
-    if (!loadFile(voxels2_jrk_accumulated, base + "_jrk_acc2.bin")) return false;
-    if (!loadFile(voxels_jrk_accumulated_diff, base + "_jrk_acc_diff.bin")) return false;
-
-    if (!loadFile(voxels1_ine_accumulated, base + "_ine_acc1.bin")) return false;
-    if (!loadFile(voxels2_ine_accumulated, base + "_ine_acc2.bin")) return false;
-    if (!loadFile(voxels_ine_accumulated_diff, base + "_ine_acc_diff.bin")) return false;
-
-    if (!loadFile(voxels1_pax_accumulated, base + "_pax_acc1.bin")) return false;
-    if (!loadFile(voxels2_pax_accumulated, base + "_pax_acc2.bin")) return false;
-    if (!loadFile(voxels_pax_accumulated_diff, base + "_pax_acc_diff.bin")) return false;
+    for (int f = 0; f < SA_FEATURE_COUNT; ++f) {
+        std::string prefix = feature_file_prefixes[f];
+        if (!loadFile(voxels1_accumulated[f], base + "_" + prefix + "1.bin")) return false;
+        if (!loadFile(voxels2_accumulated[f], base + "_" + prefix + "2.bin")) return false;
+        if (!loadFile(voxels_accumulated_diff[f], base + "_" + prefix + "_diff.bin")) return false;
+    }
 
     // 部位ごとのボクセルデータを読み込み
-    if (!loadSegmentFile(segment_presence_voxels1, base + "_seg1.bin")) return false;
-    if (!loadSegmentFile(segment_presence_voxels2, base + "_seg2.bin")) return false;
-    if (!loadSegmentFile(segment_speed_voxels1, base + "_seg_spd1.bin")) return false;
-    if (!loadSegmentFile(segment_speed_voxels2, base + "_seg_spd2.bin")) return false;
-    if (!loadSegmentFile(segment_jerk_voxels1, base + "_seg_jrk1.bin")) return false;
-    if (!loadSegmentFile(segment_jerk_voxels2, base + "_seg_jrk2.bin")) return false;
-    if (!loadSegmentFile(segment_inertia_voxels1, base + "_seg_ine1.bin")) return false;
-    if (!loadSegmentFile(segment_inertia_voxels2, base + "_seg_ine2.bin")) return false;
-    if (!loadSegmentFile(segment_principal_axis_voxels1, base + "_seg_pax1.bin")) return false;
-    if (!loadSegmentFile(segment_principal_axis_voxels2, base + "_seg_pax2.bin")) return false;
+    for (int f = 0; f < SA_FEATURE_COUNT; ++f) {
+        std::string suffix = segment_file_suffixes[f];
+        if (!loadSegmentFile(segment_voxels1[f], base + "_" + suffix + "1.bin")) return false;
+        if (!loadSegmentFile(segment_voxels2[f], base + "_" + suffix + "2.bin")) return false;
+    }
 
-    max_pax_accumulated_val = 0.0f;
-    for (size_t i = 0; i < voxels_pax_accumulated_diff.data.size(); ++i)
-        if (voxels_pax_accumulated_diff.data[i] > max_pax_accumulated_val)
-            max_pax_accumulated_val = voxels_pax_accumulated_diff.data[i];
-    if (max_pax_accumulated_val < 1e-5f)
-        max_pax_accumulated_val = 1.0f;
+    max_accumulated_val[4] = 0.0f;
+    for (size_t i = 0; i < voxels_accumulated_diff[4].data.size(); ++i)
+        if (voxels_accumulated_diff[4].data[i] > max_accumulated_val[4])
+            max_accumulated_val[4] = voxels_accumulated_diff[4].data[i];
+    if (max_accumulated_val[4] < 1e-5f)
+        max_accumulated_val[4] = 1.0f;
     
     std::cout << "Voxel cache loaded successfully!" << std::endl;
     return true;
@@ -1634,9 +1393,8 @@ void SpatialAnalyzer::ResetSliceRotation() {
     slice_plane_transform.m13 = cy;
     slice_plane_transform.m23 = cz;
     
-    slice_rotation_x = 0.0f;
-    slice_rotation_y = 0.0f;
-    slice_rotation_z = 0.0f;
+    for(int i = 0; i < 3; i++)
+		slice_rotation[i] = 0.0f;
     pan_center.set(0.0f, 0.0f);
 }
 
@@ -1792,7 +1550,7 @@ void SpatialAnalyzer::DrawRotatedSliceMap(int x_pos, int y_pos, int w, int h, Vo
         glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, *c);
     
     char rot_info[128];
-    sprintf(rot_info, "Rot: X=%.0f Y=%.0f Z=%.0f", slice_rotation_x, slice_rotation_y, slice_rotation_z);
+    sprintf(rot_info, "Rot: X=%.0f Y=%.0f Z=%.0f", slice_rotation[0], slice_rotation[1], slice_rotation[2]);
     glRasterPos2i(x_pos, y_pos + h + 22);
     for (const char* c = rot_info; *c != '\0'; c++) 
         glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, *c);
@@ -1903,9 +1661,9 @@ void SpatialAnalyzer::UpdateEulerAnglesFromTransform() {
     if (ny < -1.0f) ny = -1.0f;
     float nxz = sqrtf(n.x * n.x + n.z * n.z);
     
-    slice_rotation_x = atan2f(-ny, nxz) * 180.0f / 3.14159265f;
-    slice_rotation_y = atan2f(n.x, n.z) * 180.0f / 3.14159265f;
-    slice_rotation_z = atan2f(u.y, v.y) * 180.0f / 3.14159265f;
+    slice_rotation[0] = atan2f(-ny, nxz) * 180.0f / 3.14159265f;
+    slice_rotation[1] = atan2f(n.x, n.z) * 180.0f / 3.14159265f;
+    slice_rotation[2] = atan2f(u.y, v.y) * 180.0f / 3.14159265f;
 }
 
 // === 共通ボクセル化ヘルパー関数 ===
@@ -2138,11 +1896,8 @@ void SpatialAnalyzer::WriteToVoxelGrid(const BoneData& bone, float bone_radius, 
 // 部位選択状態を初期化し、最大値配列を確保
 void SpatialAnalyzer::InitializeSegmentSelection(int num_segments) {
     selected_segments.assign(num_segments, false);
-    segment_max_presence.assign(num_segments, 1.0f);
-    segment_max_speed.assign(num_segments, 1.0f);
-    segment_max_jerk.assign(num_segments, 1.0f);
-    segment_max_inertia.assign(num_segments, 1.0f);
-    segment_max_principal_axis.assign(num_segments, 1.0f);
+    for (int f = 0; f < SA_FEATURE_COUNT; ++f)
+        segment_max[f].assign(num_segments, 1.0f);
 }
 
 // 指定部位の選択状態をトグル
@@ -2189,19 +1944,12 @@ int SpatialAnalyzer::GetSelectedSegmentCount() const {
 
 // 指定部位の最大値を現在の特徴量モードに応じて取得
 float SpatialAnalyzer::GetSegmentMaxValue(int segment_index) const {
-    if (segment_index < 0 || segment_index >= (int)segment_max_presence.size())
+    if (feature_mode < 0 || feature_mode >= SA_FEATURE_COUNT)
         return 1.0f;
-    
-    if (feature_mode == 0)
-        return segment_max_presence[segment_index];
-    else if (feature_mode == 1)
-        return segment_max_speed[segment_index];
-    else if (feature_mode == 2)
-        return segment_max_jerk[segment_index];
-    else if (feature_mode == 3)
-        return segment_max_inertia[segment_index];
-    else
-        return segment_max_principal_axis[segment_index];
+    if (segment_index < 0 || segment_index >= (int)segment_max[feature_mode].size())
+        return 1.0f;
+
+    return segment_max[feature_mode][segment_index];
 }
 
 // 部位選択キャッシュを無効化し、次回更新を強制
@@ -2238,26 +1986,13 @@ void SpatialAnalyzer::UpdateSegmentCache() {
     cached_segment_grid2.Clear();
     cached_segment_diff.Clear();
     
+    int feature = feature_mode;
+    if (feature < 0 || feature >= SA_FEATURE_COUNT)
+        feature = 0;
+
     // 特徴量に応じたデータソース選択
-    SegmentVoxelData* seg_data1 = nullptr;
-    SegmentVoxelData* seg_data2 = nullptr;
-    
-    if (feature_mode == 0) {
-        seg_data1 = &segment_presence_voxels1;
-        seg_data2 = &segment_presence_voxels2;
-    } else if (feature_mode == 1) {
-        seg_data1 = &segment_speed_voxels1;
-        seg_data2 = &segment_speed_voxels2;
-    } else if (feature_mode == 2) {
-        seg_data1 = &segment_jerk_voxels1;
-        seg_data2 = &segment_jerk_voxels2;
-    } else if (feature_mode == 3) {
-        seg_data1 = &segment_inertia_voxels1;
-        seg_data2 = &segment_inertia_voxels2;
-    } else {
-        seg_data1 = &segment_principal_axis_voxels1;
-        seg_data2 = &segment_principal_axis_voxels2;
-    }
+    SegmentVoxelData* seg_data1 = &segment_voxels1[feature];
+    SegmentVoxelData* seg_data2 = &segment_voxels2[feature];
     
     if (seg_data1->num_segments == 0) {
         segment_cache_dirty = false;

@@ -7,6 +7,8 @@
 #include "SimpleHumanGLUT.h"
 #include "VoxelData.h"
 
+static const int SA_FEATURE_COUNT = 5;
+
 // 2D point structure for spatial analysis
 struct SpatialPoint2f {
     float x, y;
@@ -54,47 +56,17 @@ public:
 
     float world_bounds[3][2];//ワールド座標系の表示・ボクセル化対象領域を表す3軸分の最小値/最大値
     
-	// 瞬間表示用占有率ボクセルデータ
-    VoxelGrid voxels1_psc, voxels2_psc, voxels_psc_diff;
+	// 瞬間表示用のボクセルデータ（必要に応じて追加）
+	VoxelGrid voxels1[SA_FEATURE_COUNT], voxels2[SA_FEATURE_COUNT], voxels_diff[SA_FEATURE_COUNT]; // 0:占有率, 1:速度, 2:ジャーク, 3:慣性モーメント, 4:慣性主軸角速度
 
-    // 瞬間表示用速度ボクセルデータ
-    VoxelGrid voxels1_spd, voxels2_spd, voxels_spd_diff;
+	// 累積ボクセルデータ（必要に応じて追加）
+	VoxelGrid voxels1_accumulated[SA_FEATURE_COUNT], voxels2_accumulated[SA_FEATURE_COUNT], voxels_accumulated_diff[SA_FEATURE_COUNT]; // 0:占有率, 1:速度, 2:ジャーク, 3:慣性モーメント, 4:慣性主軸角速度
     
-    // 瞬間表示用ジャークボクセルデータ
-    VoxelGrid voxels1_jrk, voxels2_jrk, voxels_jrk_diff;
+    // Motion1 部位ごとの占有率ボクセルデータ
+	SegmentVoxelData segment_voxels1[SA_FEATURE_COUNT]; // 0:占有率, 1:速度, 2:ジャーク, 3:慣性モーメント, 4:慣性主軸角速度
 
-    // 瞬間表示用慣性モーメントボクセルデータ
-    VoxelGrid voxels1_ine, voxels2_ine, voxels_ine_diff;
-
-    // 瞬間表示用慣性主軸角速度ボクセルデータ
-    VoxelGrid voxels1_pax, voxels2_pax, voxels_pax_diff;
-
-    // 占有率累積ボクセル（動作全体を通した占有率累積値）
-    VoxelGrid voxels1_psc_accumulated, voxels2_psc_accumulated, voxels_psc_accumulated_diff;
-
-    // 速度累計ボクセル（動作全体を通した最大速度）
-    VoxelGrid voxels1_spd_accumulated, voxels2_spd_accumulated, voxels_spd_accumulated_diff;
-
-    // ジャーク累計ボクセル（動作全体を通した最大ジャーク）
-    VoxelGrid voxels1_jrk_accumulated, voxels2_jrk_accumulated, voxels_jrk_accumulated_diff;
-
-    // 慣性モーメント累計ボクセル（動作全体を通した最大慣性モーメント）
-    VoxelGrid voxels1_ine_accumulated, voxels2_ine_accumulated, voxels_ine_accumulated_diff;
-
-    // 慣性主軸角速度累計ボクセル（動作全体を通した最大主軸角速度）
-    VoxelGrid voxels1_pax_accumulated, voxels2_pax_accumulated, voxels_pax_accumulated_diff;
-
-    // 部位ごとのボクセルデータ
-	SegmentVoxelData segment_presence_voxels1; // Motion1 部位ごとの占有率ボクセルデータ
-	SegmentVoxelData segment_presence_voxels2; // Motion2 部位ごとの占有率ボクセルデータ
-	SegmentVoxelData segment_speed_voxels1; // Motion1 部位ごとの速度ボクセルデータ
-	SegmentVoxelData segment_speed_voxels2; // Motion2 部位ごとの速度ボクセルデータ
-	SegmentVoxelData segment_jerk_voxels1; // Motion1 部位ごとのジャークボクセルデータ
-	SegmentVoxelData segment_jerk_voxels2; // Motion2 部位ごとのジャークボクセルデータ
-	SegmentVoxelData segment_inertia_voxels1; // Motion1 部位ごとの慣性モーメントボクセルデータ
-	SegmentVoxelData segment_inertia_voxels2; // Motion2 部位ごとの慣性モーメントボクセルデータ
-    SegmentVoxelData segment_principal_axis_voxels1; // Motion1 部位ごとの慣性主軸角速度ボクセルデータ
-    SegmentVoxelData segment_principal_axis_voxels2; // Motion2 部位ごとの慣性主軸角速度ボクセルデータ
+	// Motion2 部位ごとの占有率ボクセルデータ
+	SegmentVoxelData segment_voxels2[SA_FEATURE_COUNT]; // 0:占有率, 1:速度, 2:ジャーク, 3:慣性モーメント, 4:慣性主軸角速度
 
     // フレーム単位の疎ボクセルキャッシュ
     MotionFrameSegmentVoxelGridCache frame_cache1;
@@ -118,30 +90,16 @@ public:
         }
     };
     
-    AccumulatedPoseCache occupancy_accumulated_pose_cache;
-    AccumulatedPoseCache speed_accumulated_pose_cache;
-    AccumulatedPoseCache jerk_accumulated_pose_cache;
-    AccumulatedPoseCache inertia_accumulated_pose_cache;
-    AccumulatedPoseCache principal_axis_accumulated_pose_cache;
+	AccumulatedPoseCache accumulated_pose_cache[SA_FEATURE_COUNT]; // 0:占有率, 1:速度, 2:ジャーク, 3:慣性モーメント, 4:慣性主軸角速度
 
-	float max_psc_val; // 全体の最大占有率
-	float max_spd_val; // 全体の最大速度
-	float max_jrk_val; // 全体の最大ジャーク
-	float max_ine_val; // 全体の最大慣性モーメント
-    float max_pax_val; // 全体の最大慣性主軸角速度
+	// 瞬間表示用の最大値（必要に応じて追加）
+	float max_val[SA_FEATURE_COUNT]; // 0:占有率, 1:速度, 2:ジャーク, 3:慣性モーメント, 4:慣性主軸角速度
 
-	float max_psc_accumulated_val; // 占有率累積用の最大値
-	float max_spd_accumulated_val; // 速度累計用の最大値
-	float max_jrk_accumulated_val; // ジャーク累計用の最大値
-	float max_ine_accumulated_val; // 慣性モーメント累計用の最大値
-    float max_pax_accumulated_val; // 慣性主軸角速度累計用の最大値
+	// 累積用の最大値（必要に応じて追加）
+	float max_accumulated_val[SA_FEATURE_COUNT]; // 0:占有率, 1:速度, 2:ジャーク, 3:慣性モーメント, 4:慣性主軸角速度
 
-	// 部位ごとの最大値（正規化用）
-	std::vector<float> segment_max_presence;
-	std::vector<float> segment_max_speed;
-	std::vector<float> segment_max_jerk;
-	std::vector<float> segment_max_inertia;
-    std::vector<float> segment_max_principal_axis;
+	// 部位ごとの正規化用最大値（必要に応じて追加）
+	std::vector<float> segment_max[SA_FEATURE_COUNT]; // 0:占有率, 1:速度, 2:ジャーク, 3:慣性モーメント, 4:慣性主軸角速度
 
     // --- ビュー/スライス設定 ---
 	std::vector<float> slice_positions; // スライス位置 (0.0 - 1.0)
@@ -154,9 +112,7 @@ public:
     Matrix4f slice_plane_transform;
     
     // 表示用オイラー角（読み取り専用、逆算値）
-    float slice_rotation_x;
-    float slice_rotation_y;
-    float slice_rotation_z;
+	float slice_rotation[3]; // 0: X軸回転, 1: Y軸回転, 2: Z軸回転
     
     bool use_rotated_slice;      // 回転スライスモードを使用するか
 
@@ -261,11 +217,7 @@ private:
     };
 
     // VoxelizeMotion用の再利用バッファ（毎フレームの再確保を回避）
-    SegmentVoxelData temp_voxelize_seg_psc;
-    SegmentVoxelData temp_voxelize_seg_spd;
-    SegmentVoxelData temp_voxelize_seg_jrk;
-    SegmentVoxelData temp_voxelize_seg_ine;
-    SegmentVoxelData temp_voxelize_seg_pax;
+	SegmentVoxelData temp_voxelize_seg[SA_FEATURE_COUNT]; // 0:占有率, 1:速度, 2:ジャーク, 3:慣性モーメント, 4:慣性主軸角速度
     int temp_voxelize_num_segments;
     int temp_voxelize_resolution;
     PrevPresenceCacheEntry prev_presence_cache_entries[2];

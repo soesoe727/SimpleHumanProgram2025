@@ -349,7 +349,7 @@ void MotionApp::Display()
 
     char title[512];
     sprintf(title, "CT-Scan | Rot:X%.0f Y%.0f Z%.0f | Gizmo:%s(%s) | SpaceMouse:%s | Feature:%s | Data:%s | Seg:%s | Planes:%s | Voxels:%s",
-        analyzer.slice_rotation_x, analyzer.slice_rotation_y, analyzer.slice_rotation_z,
+        analyzer.slice_rotation[0], analyzer.slice_rotation[1], analyzer.slice_rotation[2],
         use_slice_gizmo ? "ON" : "OFF",
         slice_gizmo.GetMode() == GIZMO_TRANSLATE ? "Move" : "Rotate",
         use_spacemouse_slice ? "ON" : "OFF",
