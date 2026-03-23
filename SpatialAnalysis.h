@@ -42,6 +42,7 @@ struct FrameData {
     std::vector<Point3f> prev2_joint_pos;  // 2フレーム前の関節位置（加速度計算用）
 	std::vector<Point3f> prev3_joint_pos;  // 3フレーム前の関節位置（ジャーク計算用）
     float dt;                              // フレーム間隔
+    Point3f prev_root_pos;                 // 前フレームのルート位置
     
 	FrameData() : dt(0) {}
 };
@@ -65,6 +66,9 @@ public:
     // 瞬間表示用慣性モーメントボクセルデータ
     VoxelGrid voxels1_ine, voxels2_ine, voxels_ine_diff;
 
+    // 瞬間表示用慣性主軸角速度ボクセルデータ
+    VoxelGrid voxels1_pax, voxels2_pax, voxels_pax_diff;
+
     // 占有率累積ボクセル（動作全体を通した占有率累積値）
     VoxelGrid voxels1_psc_accumulated, voxels2_psc_accumulated, voxels_psc_accumulated_diff;
 
@@ -77,6 +81,9 @@ public:
     // 慣性モーメント累計ボクセル（動作全体を通した最大慣性モーメント）
     VoxelGrid voxels1_ine_accumulated, voxels2_ine_accumulated, voxels_ine_accumulated_diff;
 
+    // 慣性主軸角速度累計ボクセル（動作全体を通した最大主軸角速度）
+    VoxelGrid voxels1_pax_accumulated, voxels2_pax_accumulated, voxels_pax_accumulated_diff;
+
     // 部位ごとのボクセルデータ
 	SegmentVoxelData segment_presence_voxels1; // Motion1 部位ごとの占有率ボクセルデータ
 	SegmentVoxelData segment_presence_voxels2; // Motion2 部位ごとの占有率ボクセルデータ
@@ -86,12 +93,14 @@ public:
 	SegmentVoxelData segment_jerk_voxels2; // Motion2 部位ごとのジャークボクセルデータ
 	SegmentVoxelData segment_inertia_voxels1; // Motion1 部位ごとの慣性モーメントボクセルデータ
 	SegmentVoxelData segment_inertia_voxels2; // Motion2 部位ごとの慣性モーメントボクセルデータ
+    SegmentVoxelData segment_principal_axis_voxels1; // Motion1 部位ごとの慣性主軸角速度ボクセルデータ
+    SegmentVoxelData segment_principal_axis_voxels2; // Motion2 部位ごとの慣性主軸角速度ボクセルデータ
 
-    // occupancy専用：フレーム単位の疎ボクセルキャッシュ
+    // フレーム単位の疎ボクセルキャッシュ
     MotionFrameSegmentVoxelGridCache frame_cache1;
     MotionFrameSegmentVoxelGridCache frame_cache2;
     bool has_frame_cache;
-    float occupancy_sparse_threshold;
+    float sparse_threshold;
 
     // 再合成済みキャッシュの姿勢スナップショット
     struct AccumulatedPoseCache {
@@ -107,27 +116,32 @@ public:
             motion1_root_ori.setIdentity();
             motion2_root_ori.setIdentity();
         }
-    } occupancy_accumulated_pose_cache;
-
+    };
+    
+    AccumulatedPoseCache occupancy_accumulated_pose_cache;
     AccumulatedPoseCache speed_accumulated_pose_cache;
     AccumulatedPoseCache jerk_accumulated_pose_cache;
     AccumulatedPoseCache inertia_accumulated_pose_cache;
+    AccumulatedPoseCache principal_axis_accumulated_pose_cache;
 
 	float max_psc_val; // 全体の最大占有率
 	float max_spd_val; // 全体の最大速度
 	float max_jrk_val; // 全体の最大ジャーク
 	float max_ine_val; // 全体の最大慣性モーメント
+    float max_pax_val; // 全体の最大慣性主軸角速度
 
 	float max_psc_accumulated_val; // 占有率累積用の最大値
 	float max_spd_accumulated_val; // 速度累計用の最大値
 	float max_jrk_accumulated_val; // ジャーク累計用の最大値
 	float max_ine_accumulated_val; // 慣性モーメント累計用の最大値
+    float max_pax_accumulated_val; // 慣性主軸角速度累計用の最大値
 
 	// 部位ごとの最大値（正規化用）
 	std::vector<float> segment_max_presence;
 	std::vector<float> segment_max_speed;
 	std::vector<float> segment_max_jerk;
 	std::vector<float> segment_max_inertia;
+    std::vector<float> segment_max_principal_axis;
 
     // --- ビュー/スライス設定 ---
 	std::vector<float> slice_positions; // スライス位置 (0.0 - 1.0)
@@ -155,7 +169,7 @@ public:
 	bool show_planes; // スライス平面表示フラグ
 	bool show_maps; // 2Dマップ表示フラグ
     bool show_voxels;  // 3Dボクセル表示フラグ
-	int feature_mode; // 0: 占有率, 1: 速度, 2: ジャーク, 3: 慣性モーメント
+    int feature_mode; // 0: 占有率, 1: 速度, 2: ジャーク, 3: 慣性モーメント, 4: 慣性主軸角速度
 	int norm_mode; // 0: 瞬間表示, 1: 累積表示
     
     // 表示設定
@@ -170,6 +184,7 @@ public:
     float cached_segment_max_val;     // 選択部位の最大差分値
     bool segment_cache_dirty;         // キャッシュが無効かどうか
     int cached_feature_mode;          // キャッシュ作成時のfeature_mode
+    int cached_norm_mode;             // キャッシュ作成時のnorm_mode
     int cached_selected_segment_index;// キャッシュ作成時のselected_segment_index
     std::vector<bool> cached_selected_segments; // キャッシュ作成時の選択状態
 
@@ -182,7 +197,7 @@ public:
     
     // ボクセル計算
     void UpdateVoxels(Motion* m1, Motion* m2, float current_time);
-	void VoxelizeMotion(Motion* m, float time, VoxelGrid& occ, VoxelGrid& spd, VoxelGrid& jrk, VoxelGrid& ine);
+    void VoxelizeMotion(Motion* m, float time, VoxelGrid& occ, VoxelGrid& spd, VoxelGrid& jrk, VoxelGrid& ine, VoxelGrid& pax);
 
     // 総合累積ボクセル計算（全体＋部位ごとを同時に計算）
     void AccumulateAllFrames(Motion* m1, Motion* m2);
@@ -190,8 +205,8 @@ public:
     void BuildAllFeatureFrameCaches(Motion* m1, Motion* m2);
     void ComposeAccumulatedFeatureFromFrameCache(Motion* m1, Motion* m2, int feature);
 
-    // 部位ごとの占有率・速度・ジャーク・慣性モーメントボクセル計算（1フレーム分）
-    void VoxelizeMotionBySegment(Motion* m, float time, SegmentVoxelData& seg_presence_data, SegmentVoxelData& seg_speed_data, SegmentVoxelData& seg_jerk_data, SegmentVoxelData& seg_inertia_data);
+    // 部位ごとの占有率・速度・ジャーク・慣性モーメント・慣性主軸角速度ボクセル計算（1フレーム分）
+    void VoxelizeMotionBySegment(Motion* m, float time, SegmentVoxelData& seg_presence_data, SegmentVoxelData& seg_speed_data, SegmentVoxelData& seg_jerk_data, SegmentVoxelData& seg_inertia_data, SegmentVoxelData& seg_principal_axis_data);
     
     // ボクセルキャッシュ（ファイル保存・読み込み）
     bool SaveVoxelCache(const char* motion1_name, const char* motion2_name);
@@ -236,6 +251,25 @@ public:
     void UpdateSegmentCache();                          // キャッシュを更新
 
 private:
+    struct PrevPresenceCacheEntry {
+        const Motion* motion;
+        float time;
+        SegmentVoxelData seg_presence;
+        bool valid;
+
+        PrevPresenceCacheEntry() : motion(nullptr), time(0.0f), valid(false) {}
+    };
+
+    // VoxelizeMotion用の再利用バッファ（毎フレームの再確保を回避）
+    SegmentVoxelData temp_voxelize_seg_psc;
+    SegmentVoxelData temp_voxelize_seg_spd;
+    SegmentVoxelData temp_voxelize_seg_jrk;
+    SegmentVoxelData temp_voxelize_seg_ine;
+    SegmentVoxelData temp_voxelize_seg_pax;
+    int temp_voxelize_num_segments;
+    int temp_voxelize_resolution;
+    PrevPresenceCacheEntry prev_presence_cache_entries[2];
+
     // 回転スライス用のヘルパー
     void DrawRotatedSlicePlane();
     void DrawRotatedSliceMap(int x, int y, int w, int h, VoxelGrid& grid, float max_val, const char* title);
@@ -250,6 +284,9 @@ private:
     void ComputeAABB(const Point3f& p1, const Point3f& p2, float radius, 
                      int idx_min[3], int idx_max[3], const float world_range[3]);
     void WriteToVoxelGrid(const BoneData& bone, float bone_radius, const float world_range[3],
-                          VoxelGrid* occ_grid, VoxelGrid* spd_grid, VoxelGrid* jrk_grid = nullptr, VoxelGrid* ine_grid = nullptr);
+                          VoxelGrid* occ_grid, VoxelGrid* spd_grid, VoxelGrid* jrk_grid = nullptr, VoxelGrid* ine_grid = nullptr,
+                          std::vector<int>* touched_indices = nullptr, std::vector<unsigned char>* touched_marks = nullptr);
     void BuildSingleMotionFeatureFrameCache(Motion* m, MotionFrameSegmentVoxelGridCache& cache);
+    bool ComposeInstantFeatureFromFrameCache(Motion* m1, Motion* m2, int feature, float current_time, bool compose_segment_data);
+    void VoxelizeMotionSegmentPresenceOnly(Motion* m, float time, SegmentVoxelData& seg_presence_data);
 };
