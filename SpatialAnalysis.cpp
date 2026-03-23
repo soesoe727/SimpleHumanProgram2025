@@ -8,8 +8,6 @@
 
 using namespace std;
 
-static const int SA_FEATURE_COUNT = 5;
-
 // --- 内部ヘルパー関数 ---
 
 // 指定された軸の値を取得（0:x, 1:y, 2:z）
@@ -80,8 +78,29 @@ static bool sa_compute_principal_axis_from_presence_grid(const VoxelGrid& presen
         return false;
 
     double sum_w = 0.0;
-    double cx = root_pos.x, cy = root_pos.y, cz = root_pos.z;
+    double cx = 0.0, cy = 0.0, cz = 0.0;
     int size = (int)presence.data.size();
+
+    // 加重重心 Ct を計算
+    for (int i = 0; i < size; ++i) {
+        float w = presence.data[i];
+        if (w <= 1e-6f)
+            continue;
+        Point3f c = sa_voxel_center_from_linear_index(i, presence.resolution, world_bounds);
+        cx += (double)w * c.x;
+        cy += (double)w * c.y;
+        cz += (double)w * c.z;
+        sum_w += w;
+    }
+
+    if (sum_w <= 1e-8)
+        return false;
+
+    cx /= sum_w;
+    cy /= sum_w;
+    cz /= sum_w;
+
+    (void)root_pos;
 
     double c00 = 0.0, c01 = 0.0, c02 = 0.0;
     double c11 = 0.0, c12 = 0.0, c22 = 0.0;
@@ -99,11 +118,7 @@ static bool sa_compute_principal_axis_from_presence_grid(const VoxelGrid& presen
         c11 += (double)w * dy * dy;
         c12 += (double)w * dy * dz;
         c22 += (double)w * dz * dz;
-        sum_w += w;
     }
-
-    if (sum_w <= 1e-8)
-        return false;
 
     c00 /= sum_w; c01 /= sum_w; c02 /= sum_w;
     c11 /= sum_w; c12 /= sum_w; c22 /= sum_w;
@@ -117,9 +132,7 @@ static bool sa_compute_principal_axis_from_presence_grid(const VoxelGrid& presen
         float len = nv.length();
         if (len <= 1e-8f)
             return false;
-        nv.x /= len;
-		nv.y /= len;
-		nv.z /= len;
+        nv.x /= len; nv.y /= len; nv.z /= len;
         v = nv;
     }
 
@@ -140,7 +153,29 @@ static bool sa_compute_principal_axis_from_presence_grid_sparse(const VoxelGrid&
         return false;
 
     double sum_w = 0.0;
-    double cx = root_pos.x, cy = root_pos.y, cz = root_pos.z;
+    double cx = 0.0, cy = 0.0, cz = 0.0;
+
+    // 加重重心 Ct を計算
+    for (size_t k = 0; k < active_indices.size(); ++k) {
+        int i = active_indices[k];
+        float w = presence.data[i];
+        if (w <= 1e-6f)
+            continue;
+        Point3f c = sa_voxel_center_from_linear_index(i, presence.resolution, world_bounds);
+        cx += (double)w * c.x;
+        cy += (double)w * c.y;
+        cz += (double)w * c.z;
+        sum_w += w;
+    }
+
+    if (sum_w <= 1e-8)
+        return false;
+
+    cx /= sum_w;
+    cy /= sum_w;
+    cz /= sum_w;
+
+    (void)root_pos;
 
     double c00 = 0.0, c01 = 0.0, c02 = 0.0;
     double c11 = 0.0, c12 = 0.0, c22 = 0.0;
@@ -159,11 +194,7 @@ static bool sa_compute_principal_axis_from_presence_grid_sparse(const VoxelGrid&
         c11 += (double)w * dy * dy;
         c12 += (double)w * dy * dz;
         c22 += (double)w * dz * dz;
-        sum_w += w;
     }
-
-    if (sum_w <= 1e-8)
-        return false;
 
     c00 /= sum_w; c01 /= sum_w; c02 /= sum_w;
     c11 /= sum_w; c12 /= sum_w; c22 /= sum_w;
