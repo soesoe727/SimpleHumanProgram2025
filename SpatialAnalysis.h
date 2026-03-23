@@ -88,8 +88,8 @@ public:
 	SegmentVoxelData segment_inertia_voxels2; // Motion2 部位ごとの慣性モーメントボクセルデータ
 
     // occupancy専用：フレーム単位の疎ボクセルキャッシュ
-    MotionFrameSparseVoxelCache frame_cache1;
-    MotionFrameSparseVoxelCache frame_cache2;
+    MotionFrameSegmentVoxelGridCache frame_cache1;
+    MotionFrameSegmentVoxelGridCache frame_cache2;
     bool has_frame_cache;
     float occupancy_sparse_threshold;
 
@@ -251,5 +251,5 @@ private:
                      int idx_min[3], int idx_max[3], const float world_range[3]);
     void WriteToVoxelGrid(const BoneData& bone, float bone_radius, const float world_range[3],
                           VoxelGrid* occ_grid, VoxelGrid* spd_grid, VoxelGrid* jrk_grid = nullptr, VoxelGrid* ine_grid = nullptr);
-    void BuildSingleMotionFeatureFrameCache(Motion* m, MotionFrameSparseVoxelCache& cache);
+    void BuildSingleMotionFeatureFrameCache(Motion* m, MotionFrameSegmentVoxelGridCache& cache);
 };

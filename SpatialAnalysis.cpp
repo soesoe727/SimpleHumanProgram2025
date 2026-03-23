@@ -641,7 +641,7 @@ void SpatialAnalyzer::ClearAccumulatedData()
     max_ine_accumulated_val = 0.0f;
 }
 
-void SpatialAnalyzer::BuildSingleMotionFeatureFrameCache(Motion* m, MotionFrameSparseVoxelCache& cache) {
+void SpatialAnalyzer::BuildSingleMotionFeatureFrameCache(Motion* m, MotionFrameSegmentVoxelGridCache& cache) {
     cache.Clear();
     if (!m || !m->body || m->num_frames <= 0)
         return;
@@ -665,16 +665,17 @@ void SpatialAnalyzer::BuildSingleMotionFeatureFrameCache(Motion* m, MotionFrameS
 
         VoxelizeMotionBySegment(m, time, temp_seg_psc, temp_seg_spd, temp_seg_jrk, temp_seg_ine);
 
-        SegmentFrameSparseVoxelData& frame_sparse = cache.frames[f];
+        FrameSegmentVoxelGrid& frame_sparse = cache.frames[f];
         frame_sparse.Clear();
-        frame_sparse.SetReference(m->frames[f].root_pos, m->frames[f].root_ori);
 
         for (int s = 0; s < num_segments; ++s) {
             const VoxelGrid& g0 = temp_seg_psc.segment_grids[s];
             const VoxelGrid& g1 = temp_seg_spd.segment_grids[s];
             const VoxelGrid& g2 = temp_seg_jrk.segment_grids[s];
             const VoxelGrid& g3 = temp_seg_ine.segment_grids[s];
-            std::vector<SparseVoxel>& sparse_list = frame_sparse.segment_sparse_voxels[s];
+            SegmentVoxelGrid& segment_sparse = frame_sparse.segment_grids[s];
+            segment_sparse.SetReference(m->frames[f].root_pos, m->frames[f].root_ori);
+            std::vector<SparseVoxel>& sparse_list = segment_sparse.voxels;
             sparse_list.clear();
             for (int i = 0; i < size; ++i) {
                 float v0 = g0.data[i];
@@ -706,8 +707,8 @@ void SpatialAnalyzer::BuildAllFeatureFrameCaches(Motion* m1, Motion* m2) {
 }
 
 void SpatialAnalyzer::ComposeAccumulatedFeatureFromFrameCache(Motion* m1, Motion* m2, int feature) {
-    MotionFrameSparseVoxelCache* c1 = nullptr;
-    MotionFrameSparseVoxelCache* c2 = nullptr;
+    MotionFrameSegmentVoxelGridCache* c1 = nullptr;
+    MotionFrameSegmentVoxelGridCache* c2 = nullptr;
     bool has_cache = false;
     AccumulatedPoseCache* pose_cache = nullptr;
     SegmentVoxelData* seg1 = nullptr;
@@ -768,25 +769,26 @@ void SpatialAnalyzer::ComposeAccumulatedFeatureFromFrameCache(Motion* m1, Motion
     seg1->Resize(num_segments, grid_resolution); seg2->Resize(num_segments, grid_resolution);
     seg1->Clear(); seg2->Clear();
 
-    auto compose_single_motion = [&](Motion* m, const MotionFrameSparseVoxelCache& cache, SegmentVoxelData& out_segment, VoxelGrid& out_acc) {
+    auto compose_single_motion = [&](Motion* m, const MotionFrameSegmentVoxelGridCache& cache, SegmentVoxelData& out_segment, VoxelGrid& out_acc) {
         int frame_count = (std::min)((int)cache.frames.size(), m->num_frames);
         for (int f = 0; f < frame_count; ++f) {
-            const SegmentFrameSparseVoxelData& frame_sparse = cache.frames[f];
+            const FrameSegmentVoxelGrid& frame_sparse = cache.frames[f];
             const Point3f& curr_root_pos = m->frames[f].root_pos;
             const Matrix3f& curr_root_ori = m->frames[f].root_ori;
             for (int s = 0; s < cache.num_segments; ++s) {
                 if (s >= out_segment.num_segments) continue;
-                const std::vector<SparseVoxel>& sparse_list = frame_sparse.segment_sparse_voxels[s];
+                const SegmentVoxelGrid& segment_sparse = frame_sparse.segment_grids[s];
+                const std::vector<SparseVoxel>& sparse_list = segment_sparse.voxels;
                 VoxelGrid& seg_grid = out_segment.segment_grids[s];
                 for (size_t k = 0; k < sparse_list.size(); ++k) {
                     const SparseVoxel& sv = sparse_list[k];
                     Point3f cached_world = sa_voxel_center_from_linear_index(sv.index, grid_resolution, world_bounds);
                     Point3f transformed_world = cached_world;
-                    if (frame_sparse.has_reference) {
+                    if (segment_sparse.has_reference) {
                         transformed_world = sa_transform_world_by_root_delta(
                             cached_world,
-                            frame_sparse.reference_root_pos,
-                            frame_sparse.reference_root_ori,
+                            segment_sparse.reference_root_pos,
+                            segment_sparse.reference_root_ori,
                             curr_root_pos,
                             curr_root_ori);
                     }

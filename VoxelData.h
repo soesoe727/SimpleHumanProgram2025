@@ -88,29 +88,28 @@ struct SparseVoxel {
     }
 };
 
-struct SegmentFrameSparseVoxelData {
-    std::vector< std::vector<SparseVoxel> > segment_sparse_voxels;
-    int num_segments;
+// セグメント単位の疎ボクセルグリッド（非ゼロ値のみ保持）
+struct SegmentVoxelGrid {
+    int resolution;
+    std::vector<SparseVoxel> voxels; // 値があるボクセルのみ
 
-    // このフレームの基準姿勢（ルート）
+    // 基準姿勢情報（腰の位置・回転）
     Point3f reference_root_pos;
     Matrix3f reference_root_ori;
     bool has_reference;
 
-    SegmentFrameSparseVoxelData() : num_segments(0), has_reference(false) {
+    SegmentVoxelGrid() : resolution(0), has_reference(false) {
         reference_root_pos.set(0, 0, 0);
         reference_root_ori.setIdentity();
     }
 
-    void Resize(int num_seg) {
-        num_segments = num_seg;
-        segment_sparse_voxels.clear();
-        segment_sparse_voxels.resize(num_seg);
+    void Resize(int res) {
+        resolution = res;
+        voxels.clear();
     }
 
     void Clear() {
-        for (size_t i = 0; i < segment_sparse_voxels.size(); ++i)
-            segment_sparse_voxels[i].clear();
+        voxels.clear();
     }
 
     void SetReference(const Point3f& root_pos, const Matrix3f& root_ori) {
@@ -120,12 +119,41 @@ struct SegmentFrameSparseVoxelData {
     }
 };
 
-struct MotionFrameSparseVoxelCache {
+// 1フレーム分の部位別疎ボクセルグリッド
+struct FrameSegmentVoxelGrid {
+    std::vector<SegmentVoxelGrid> segment_grids;
+    int num_segments;
+
+    FrameSegmentVoxelGrid() : num_segments(0) {}
+
+    void Resize(int num_seg, int resolution) {
+        num_segments = num_seg;
+        segment_grids.clear();
+        segment_grids.resize(num_seg);
+        for (int i = 0; i < num_seg; ++i)
+            segment_grids[i].Resize(resolution);
+    }
+
+    void Clear() {
+        for (size_t i = 0; i < segment_grids.size(); ++i)
+            segment_grids[i].Clear();
+    }
+
+    SegmentVoxelGrid& GetSegmentGrid(int segment_index) {
+        if (segment_index >= 0 && segment_index < num_segments)
+            return segment_grids[segment_index];
+        static SegmentVoxelGrid dummy;
+        return dummy;
+    }
+};
+
+// フレーム数 × 部位数 の疎ボクセルグリッドキャッシュ
+struct MotionFrameSegmentVoxelGridCache {
     int resolution;
     int num_segments;
-    std::vector<SegmentFrameSparseVoxelData> frames;
+    std::vector<FrameSegmentVoxelGrid> frames;
 
-    MotionFrameSparseVoxelCache() : resolution(0), num_segments(0) {}
+    MotionFrameSegmentVoxelGridCache() : resolution(0), num_segments(0) {}
 
     void Resize(int num_frames, int num_seg, int res) {
         resolution = res;
@@ -133,7 +161,7 @@ struct MotionFrameSparseVoxelCache {
         frames.clear();
         frames.resize(num_frames);
         for (int i = 0; i < num_frames; ++i)
-            frames[i].Resize(num_seg);
+            frames[i].Resize(num_seg, res);
     }
 
     void Clear() {
