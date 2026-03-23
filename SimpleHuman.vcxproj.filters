@@ -150,6 +150,9 @@
     <ClCompile Include="MotionPlaybackApp4.cpp">
       <Filter>ソース ファイル\SimpleHuman</Filter>
     </ClCompile>
+    <ClCompile Include="SpecialAnalysis2.cpp">
+      <Filter>ソース ファイル\よく使うもの</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="MotionApp.h">

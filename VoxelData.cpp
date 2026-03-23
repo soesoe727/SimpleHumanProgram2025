@@ -149,3 +149,105 @@ bool SegmentVoxelData::LoadFromFile(const char* filename) {
     
     return ifs.good();
 }
+
+
+
+bool MotionFrameSparseVoxelCache::SaveToFile(const char* filename) const {
+    ofstream ofs(filename, ios::binary);
+    if (!ofs)
+        return false;
+
+    int version = 1;
+    ofs.write(reinterpret_cast<const char*>(&version), sizeof(int));
+    ofs.write(reinterpret_cast<const char*>(&resolution), sizeof(int));
+    ofs.write(reinterpret_cast<const char*>(&num_segments), sizeof(int));
+
+    int num_frames = static_cast<int>(frames.size());
+    ofs.write(reinterpret_cast<const char*>(&num_frames), sizeof(int));
+
+    for (int f = 0; f < num_frames; ++f) {
+        const SegmentFrameSparseVoxelData& frame = frames[f];
+        ofs.write(reinterpret_cast<const char*>(&frame.has_reference), sizeof(bool));
+        if (frame.has_reference) {
+            ofs.write(reinterpret_cast<const char*>(&frame.reference_root_pos.x), sizeof(float));
+            ofs.write(reinterpret_cast<const char*>(&frame.reference_root_pos.y), sizeof(float));
+            ofs.write(reinterpret_cast<const char*>(&frame.reference_root_pos.z), sizeof(float));
+
+            float m[9] = {
+                frame.reference_root_ori.m00, frame.reference_root_ori.m01, frame.reference_root_ori.m02,
+                frame.reference_root_ori.m10, frame.reference_root_ori.m11, frame.reference_root_ori.m12,
+                frame.reference_root_ori.m20, frame.reference_root_ori.m21, frame.reference_root_ori.m22
+            };
+            ofs.write(reinterpret_cast<const char*>(m), sizeof(m));
+        }
+
+        int frame_num_segments = static_cast<int>(frame.segment_sparse_voxels.size());
+        ofs.write(reinterpret_cast<const char*>(&frame_num_segments), sizeof(int));
+        for (int s = 0; s < frame_num_segments; ++s) {
+            const std::vector<SparseVoxel>& sv = frame.segment_sparse_voxels[s];
+            int sparse_count = static_cast<int>(sv.size());
+            ofs.write(reinterpret_cast<const char*>(&sparse_count), sizeof(int));
+            for (int i = 0; i < sparse_count; ++i) {
+                ofs.write(reinterpret_cast<const char*>(&sv[i].index), sizeof(int));
+                ofs.write(reinterpret_cast<const char*>(sv[i].values), sizeof(float) * 4);
+            }
+        }
+    }
+
+    return ofs.good();
+}
+
+bool MotionFrameSparseVoxelCache::LoadFromFile(const char* filename) {
+    ifstream ifs(filename, ios::binary);
+    if (!ifs)
+        return false;
+
+    int version = 0;
+    ifs.read(reinterpret_cast<char*>(&version), sizeof(int));
+    if (version != 1)
+        return false;
+
+    int res = 0;
+    int num_seg = 0;
+    int num_frames = 0;
+    ifs.read(reinterpret_cast<char*>(&res), sizeof(int));
+    ifs.read(reinterpret_cast<char*>(&num_seg), sizeof(int));
+    ifs.read(reinterpret_cast<char*>(&num_frames), sizeof(int));
+
+    Resize(num_frames, num_seg, res);
+
+    for (int f = 0; f < num_frames; ++f) {
+        SegmentFrameSparseVoxelData& frame = frames[f];
+
+        ifs.read(reinterpret_cast<char*>(&frame.has_reference), sizeof(bool));
+        if (frame.has_reference) {
+            ifs.read(reinterpret_cast<char*>(&frame.reference_root_pos.x), sizeof(float));
+            ifs.read(reinterpret_cast<char*>(&frame.reference_root_pos.y), sizeof(float));
+            ifs.read(reinterpret_cast<char*>(&frame.reference_root_pos.z), sizeof(float));
+
+            float m[9];
+            ifs.read(reinterpret_cast<char*>(m), sizeof(m));
+            frame.reference_root_ori.set(m[0], m[1], m[2], m[3], m[4], m[5], m[6], m[7], m[8]);
+        } else {
+            frame.reference_root_pos.set(0, 0, 0);
+            frame.reference_root_ori.setIdentity();
+        }
+
+        int frame_num_segments = 0;
+        ifs.read(reinterpret_cast<char*>(&frame_num_segments), sizeof(int));
+        frame.Resize(frame_num_segments);
+
+        for (int s = 0; s < frame_num_segments; ++s) {
+            int sparse_count = 0;
+            ifs.read(reinterpret_cast<char*>(&sparse_count), sizeof(int));
+            std::vector<SparseVoxel>& sv = frame.segment_sparse_voxels[s];
+            sv.resize(sparse_count);
+            for (int i = 0; i < sparse_count; ++i) {
+                ifs.read(reinterpret_cast<char*>(&sv[i].index), sizeof(int));
+                ifs.read(reinterpret_cast<char*>(sv[i].values), sizeof(float) * 4);
+            }
+        }
+    }
+
+    return ifs.good();
+}
