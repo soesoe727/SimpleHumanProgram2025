@@ -318,4 +318,7 @@
       <Filter>ヘッダー ファイル\imgui</Filter>
     </ClInclude>
   </ItemGroup>
+  <ItemGroup>
+    <None Include=".github\copilot-instructions.md" />
+  </ItemGroup>
 </Project>

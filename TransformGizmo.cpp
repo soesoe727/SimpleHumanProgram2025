@@ -47,8 +47,33 @@ void TransformGizmo::Draw(const Point3f& position, const Matrix3f& orientation, 
     
     if (m_mode == GIZMO_TRANSLATE) {
         DrawTranslateGizmo(Point3f(0, 0, 0), identity_mat, scale);
-    } else {
+    } else if (m_mode == GIZMO_ROTATE) {
         DrawRotateGizmo(Point3f(0, 0, 0), identity_mat, scale);
+    } else {
+        float arrow_length = 0.3f * scale;
+        float arrow_thickness = 0.02f * scale;
+        float radius = 0.25f * scale;
+        int segments = 64;
+
+        if (m_selected_axis == GIZMO_X) glColor3f(1.0f, 1.0f, 0.0f);
+        else glColor3f(1.0f, 0.0f, 0.0f);
+        glPushMatrix();
+        glRotatef(90, 0, 1, 0);
+        DrawArrow(Vector3f(1, 0, 0), arrow_length, arrow_thickness);
+        glPopMatrix();
+
+        if (m_selected_axis == GIZMO_Z) glColor3f(1.0f, 1.0f, 0.0f);
+        else glColor3f(0.0f, 0.0f, 1.0f);
+        DrawArrow(Vector3f(0, 0, 1), arrow_length, arrow_thickness);
+
+        glLineWidth(2.0f);
+        if (m_selected_axis == GIZMO_Y) glColor3f(1.0f, 1.0f, 0.0f);
+        else glColor3f(0.0f, 1.0f, 0.0f);
+        glPushMatrix();
+        glRotatef(90, 1, 0, 0);
+        DrawCircle(Vector3f(0, 1, 0), radius, segments);
+        glPopMatrix();
+        glLineWidth(1.0f);
     }
     
     glPopMatrix();
@@ -64,7 +89,7 @@ void TransformGizmo::DrawTranslateGizmo(const Point3f& position, const Matrix3f&
     // X軸（赤）- 右方向
     if (m_selected_axis == GIZMO_X) {
         glColor3f(1.0f, 1.0f, 0.0f);  // 選択時は黄色
-    } else {
+    } else if (m_mode == GIZMO_ROTATE) {
         glColor3f(1.0f, 0.0f, 0.0f);  // 赤
     }
     glPushMatrix();
@@ -190,6 +215,37 @@ GizmoAxis TransformGizmo::PickAxis(int mouse_x, int mouse_y, const Point3f& posi
                     closest_t = t;
                     closest_axis = (GizmoAxis)i;
                 }
+    } else {
+        Vector3f axes[2] = {
+            Vector3f(1, 0, 0),
+            Vector3f(0, 0, 1)
+        };
+        GizmoAxis axis_ids[2] = { GIZMO_X, GIZMO_Z };
+
+        for (int i = 0; i < 2; ++i) {
+            Vector3f axis_world = axes[i];
+            orientation.transform(&axis_world);
+
+            float t;
+            if (RayIntersectArrow(ray_origin, ray_dir, position, axis_world,
+                                 0.3f * scale, 0.05f * scale, t)) {
+                if (t < closest_t) {
+                    closest_t = t;
+                    closest_axis = axis_ids[i];
+                }
+            }
+        }
+
+        Vector3f normal_world(0, 1, 0);
+        orientation.transform(&normal_world);
+        float t;
+        if (RayIntersectCircle(ray_origin, ray_dir, position, normal_world,
+                              0.25f * scale, 0.05f * scale, t)) {
+            if (t < closest_t) {
+                closest_t = t;
+                closest_axis = GIZMO_Y;
+            }
+        }
             }
         }
     } else {
@@ -224,7 +280,8 @@ void TransformGizmo::StartDrag(const Point3f& position, int mouse_x, int mouse_y
     m_last_mouse_x = mouse_x;
     m_last_mouse_y = mouse_y;
     
-    if (m_mode == GIZMO_ROTATE) {
+    bool do_rotate_drag = (m_mode == GIZMO_ROTATE) || (m_mode == GIZMO_MODEL_XZ_YROT && m_selected_axis == GIZMO_Y);
+    if (do_rotate_drag) {
         Point3f ray_origin;
         Vector3f ray_dir;
         ScreenToWorldRay(mouse_x, mouse_y, win_width, win_height, ray_origin, ray_dir);
@@ -255,7 +312,10 @@ void TransformGizmo::UpdateDrag(int mouse_x, int mouse_y, int win_width, int win
     out_translation.set(0, 0, 0);
     out_rotation.setIdentity();
     
-    if (m_mode == GIZMO_TRANSLATE) {
+    bool do_translate_drag = (m_mode == GIZMO_TRANSLATE) ||
+                             (m_mode == GIZMO_MODEL_XZ_YROT && (m_selected_axis == GIZMO_X || m_selected_axis == GIZMO_Z));
+
+    if (do_translate_drag) {
         GLdouble modelview[16];
         glGetDoublev(GL_MODELVIEW_MATRIX, modelview);
         

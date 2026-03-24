@@ -11,6 +11,16 @@ using namespace std;
 
 static const float kPi = 3.14159265358979323846f;
 
+static int GetFrameIndexFromTime(const Motion* m, float time)
+{
+    if (!m || m->num_frames <= 0 || m->interval <= 1e-8f)
+        return 0;
+    int idx = (int)(time / m->interval);
+    if (idx < 0) idx = 0;
+    if (idx >= m->num_frames) idx = m->num_frames - 1;
+    return idx;
+}
+
 // インスタンスを保持する static ポインタ
 static MotionApp* g_app_instance = NULL;
 
@@ -39,6 +49,11 @@ MotionApp::MotionApp() {
     gizmo_dragging = false;
     slice_gizmo.SetMode(GIZMO_TRANSLATE);
 
+    use_model_gizmo = false;
+    model_gizmo_dragging = false;
+    model_gizmo_target = 0;
+    model_gizmo.SetMode(GIZMO_MODEL_XZ_YROT);
+
     // SpaceMouseによるスライス操作を有効化
     use_spacemouse_slice = true;
 
@@ -50,6 +65,11 @@ MotionApp::MotionApp() {
     prev_move1_z = 0.0f;
     prev_move2_x = 0.0f;
     prev_move2_z = 0.0f;
+    rot1_y_deg = 0.0f;
+    rot2_y_deg = 0.0f;
+    prev_rot1_y_deg = 0.0f;
+    prev_rot2_y_deg = 0.0f;
+    has_initial_root_cache = false;
 }
 
 // デストラクタ：モーションデータとポスチャを解放
@@ -145,6 +165,11 @@ void MotionApp::Keyboard(unsigned char key, int mx, int my) {
 
         case 'y': ToggleSliceGizmo(); break;
         case 'u': ToggleSliceGizmoMode(); break;
+        case 'h': ToggleModelGizmo(); break;
+        case 'g':
+            model_gizmo_target = (model_gizmo_target == 0) ? 1 : 0;
+            std::cout << "Model gizmo target: " << (model_gizmo_target == 0 ? "M1" : "M2") << std::endl;
+            break;
 
         case 'p':
             use_spacemouse_slice = !use_spacemouse_slice;
@@ -233,6 +258,28 @@ void MotionApp::MouseClick(int button, int state, int mx, int my)
 {
     GLUTBaseApp::MouseClick(button, state, mx, my);
 
+    if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN && use_model_gizmo && motion && motion2) {
+        Matrix3f gizmo_ori;
+        gizmo_ori.setIdentity();
+        Point3f gizmo_pos = GetModelGizmoPosition();
+        model_gizmo.SetActiveOrientation(gizmo_ori);
+        GizmoAxis axis = model_gizmo.PickAxis(mx, my, gizmo_pos, gizmo_ori, ComputeGizmoScale(), win_width, win_height);
+        if (model_gizmo.GetMode() == GIZMO_TRANSLATE && axis == GIZMO_Y)
+            axis = GIZMO_NONE;
+        if (model_gizmo.GetMode() == GIZMO_ROTATE && axis != GIZMO_Y)
+            axis = GIZMO_NONE;
+        model_gizmo.SetSelectedAxis(axis);
+        if (axis != GIZMO_NONE) {
+            model_gizmo.StartDrag(gizmo_pos, mx, my, win_width, win_height);
+            model_gizmo_dragging = true;
+            return;
+        }
+    } else if (button == GLUT_LEFT_BUTTON && state == GLUT_UP && model_gizmo_dragging) {
+        model_gizmo.SetSelectedAxis(GIZMO_NONE);
+        model_gizmo_dragging = false;
+        FinalizeModelTransform();
+    }
+
     if (!use_slice_gizmo || !analyzer.use_rotated_slice)
         return;
 
@@ -256,6 +303,13 @@ void MotionApp::MouseClick(int button, int state, int mx, int my)
 // マウスドラッグを処理（ギズモによるスライス平面の移動・回転）
 void MotionApp::MouseDrag(int mx, int my)
 {
+    if (use_model_gizmo && model_gizmo_dragging && model_gizmo.GetSelectedAxis() != GIZMO_NONE) {
+        Point3f translation;
+        Matrix4f local_rotation;
+        model_gizmo.UpdateDrag(mx, my, win_width, win_height, translation, local_rotation);
+        ApplyModelGizmoDelta(translation, local_rotation);
+    }
+
     if (use_slice_gizmo && gizmo_dragging && slice_gizmo.GetSelectedAxis() != GIZMO_NONE) {
         Point3f translation;
         Matrix4f local_rotation;
@@ -313,6 +367,18 @@ void MotionApp::Display()
     analyzer.DrawVoxels3D();
 
     // 4. ギズモの描画
+    if (use_model_gizmo && motion && motion2) {
+        Matrix3f model_gizmo_ori;
+        model_gizmo_ori.setIdentity();
+        Point3f model_gizmo_pos = GetModelGizmoPosition();
+        glPushAttrib(GL_ENABLE_BIT | GL_DEPTH_BUFFER_BIT);
+        glDepthMask(GL_FALSE);
+        glDepthFunc(GL_ALWAYS);
+        glDisable(GL_DEPTH_TEST);
+        model_gizmo.Draw(model_gizmo_pos, model_gizmo_ori, ComputeGizmoScale());
+        glPopAttrib();
+    }
+
     if (use_slice_gizmo && analyzer.use_rotated_slice) {
         SyncGizmoToSliceState();
         Matrix3f gizmo_ori = GetSliceGizmoOrientation();
@@ -348,10 +414,13 @@ void MotionApp::Display()
     }
 
     char title[512];
-    sprintf(title, "CT-Scan | Rot:X%.0f Y%.0f Z%.0f | Gizmo:%s(%s) | SpaceMouse:%s | Feature:%s | Data:%s | Seg:%s | Planes:%s | Voxels:%s",
+    sprintf(title, "CT-Scan | Rot:X%.0f Y%.0f Z%.0f | SliceGizmo:%s(%s) | ModelGizmo:%s(%s,%s) | SpaceMouse:%s | Feature:%s | Data:%s | Seg:%s | Planes:%s | Voxels:%s",
         analyzer.slice_rotation[0], analyzer.slice_rotation[1], analyzer.slice_rotation[2],
         use_slice_gizmo ? "ON" : "OFF",
         slice_gizmo.GetMode() == GIZMO_TRANSLATE ? "Move" : "Rotate",
+        use_model_gizmo ? "ON" : "OFF",
+        "MoveXZ+RotY",
+        model_gizmo_target == 0 ? "M1" : "M2",
         use_spacemouse_slice ? "ON" : "OFF",
         feature_mode_str, norm_mode_str, segment_info,
         analyzer.show_planes ? "ON" : "OFF",
@@ -392,8 +461,8 @@ void MotionApp::Display()
         ImGui::Combo("Norm (N)", &analyzer.norm_mode, norm_items, 2);
     }
 
-    // --- Model Move (XZ) ---
-    if (ImGui::CollapsingHeader("Model Move (XZ)")) {
+    // --- Model Transform ---
+    if (ImGui::CollapsingHeader("Model Transform", ImGuiTreeNodeFlags_DefaultOpen)) {
         bool apply_preview = false;
         bool apply_finalize = false;
         ImGui::SliderFloat("M1 X", &move1_x, -2.0f, 2.0f);
@@ -408,13 +477,17 @@ void MotionApp::Display()
         ImGui::SliderFloat("M2 Z", &move2_z, -2.0f, 2.0f);
         apply_preview = apply_preview || ImGui::IsItemEdited();
         apply_finalize = apply_finalize || ImGui::IsItemDeactivatedAfterEdit();
-        if (ImGui::Button("Reset Move")) {
-            move1_x = 0.0f;
-            move1_z = 0.0f;
-            move2_x = 0.0f;
-            move2_z = 0.0f;
-            apply_preview = true;
-            apply_finalize = true;
+        ImGui::SliderFloat("M1 RotY", &rot1_y_deg, -180.0f, 180.0f);
+        apply_preview = apply_preview || ImGui::IsItemEdited();
+        apply_finalize = apply_finalize || ImGui::IsItemDeactivatedAfterEdit();
+        ImGui::SliderFloat("M2 RotY", &rot2_y_deg, -180.0f, 180.0f);
+        apply_preview = apply_preview || ImGui::IsItemEdited();
+        apply_finalize = apply_finalize || ImGui::IsItemDeactivatedAfterEdit();
+
+        if (ImGui::Button("Reset Transform")) {
+            RestoreInitialRootCache();
+            apply_preview = false;
+            apply_finalize = false;
         }
 
         if (apply_preview || apply_finalize)
@@ -457,7 +530,7 @@ void MotionApp::Display()
         if (ImGui::Button("Reset View")) analyzer.ResetView();
     }
 
-    // --- Gizmo ---
+    // --- Slice Gizmo ---
     if (ImGui::CollapsingHeader("Gizmo")) {
         if (ImGui::Button("Toggle Gizmo (Y)")) ToggleSliceGizmo();
         ImGui::SameLine();
@@ -474,6 +547,19 @@ void MotionApp::Display()
         }
         ImGui::SameLine();
         ImGui::Text(use_spacemouse_slice ? "ON" : "OFF");
+
+        ImGui::Separator();
+        ImGui::Text("Model Gizmo:");
+        if (ImGui::Button("Toggle Model Gizmo (H)")) ToggleModelGizmo();
+        ImGui::SameLine();
+        ImGui::Text(use_model_gizmo ? "ON" : "OFF");
+
+        ImGui::Text("Handles: Red=X Move, Blue=Z Move, Green=Y Rotate");
+
+        if (ImGui::Button("Switch Target (G)"))
+            model_gizmo_target = (model_gizmo_target == 0) ? 1 : 0;
+        ImGui::SameLine();
+        ImGui::Text(model_gizmo_target == 0 ? "Target: M1" : "Target: M2");
     }
 
     // --- Segment ---
@@ -544,11 +630,14 @@ void MotionApp::LoadBVH(const char* file_name) {
         delete curr_posture;
     motion = new_motion;
     curr_posture = new Posture(motion->body);
+    has_initial_root_cache = false;
 
     move1_x = 0.0f;
     move1_z = 0.0f;
     prev_move1_x = 0.0f;
     prev_move1_z = 0.0f;
+    rot1_y_deg = 0.0f;
+    prev_rot1_y_deg = 0.0f;
 
     Start();
 }
@@ -567,11 +656,14 @@ void MotionApp::LoadBVH2(const char* file_name)
         delete curr_posture2;
     motion2 = m2;
     curr_posture2 = new Posture(motion2->body); 
+    has_initial_root_cache = false;
 
     move2_x = 0.0f;
     move2_z = 0.0f;
     prev_move2_x = 0.0f;
     prev_move2_z = 0.0f;
+    rot2_y_deg = 0.0f;
+    prev_rot2_y_deg = 0.0f;
 
     PrepareAllData();
     Start();
@@ -691,6 +783,59 @@ void MotionApp::CalculateWorldBounds() {
 }
 
 // 位置・向き調整、境界計算、ボクセルキャッシュの読み込み/計算を実行
+void MotionApp::CaptureInitialRootCache() {
+    if (!motion || !motion2) {
+        has_initial_root_cache = false;
+        return;
+    }
+
+    initial_root_pos1.resize(motion->num_frames);
+    initial_root_ori1.resize(motion->num_frames);
+    for (int i = 0; i < motion->num_frames; ++i) {
+        initial_root_pos1[i] = motion->frames[i].root_pos;
+        initial_root_ori1[i] = motion->frames[i].root_ori;
+    }
+
+    initial_root_pos2.resize(motion2->num_frames);
+    initial_root_ori2.resize(motion2->num_frames);
+    for (int i = 0; i < motion2->num_frames; ++i) {
+        initial_root_pos2[i] = motion2->frames[i].root_pos;
+        initial_root_ori2[i] = motion2->frames[i].root_ori;
+    }
+
+    has_initial_root_cache = true;
+}
+
+void MotionApp::RestoreInitialRootCache() {
+    if (!has_initial_root_cache || !motion || !motion2)
+        return;
+    if ((int)initial_root_pos1.size() != motion->num_frames || (int)initial_root_ori1.size() != motion->num_frames)
+        return;
+    if ((int)initial_root_pos2.size() != motion2->num_frames || (int)initial_root_ori2.size() != motion2->num_frames)
+        return;
+
+    for (int i = 0; i < motion->num_frames; ++i) {
+        motion->frames[i].root_pos = initial_root_pos1[i];
+        motion->frames[i].root_ori = initial_root_ori1[i];
+    }
+    for (int i = 0; i < motion2->num_frames; ++i) {
+        motion2->frames[i].root_pos = initial_root_pos2[i];
+        motion2->frames[i].root_ori = initial_root_ori2[i];
+    }
+
+    move1_x = move1_z = move2_x = move2_z = 0.0f;
+    prev_move1_x = prev_move1_z = prev_move2_x = prev_move2_z = 0.0f;
+    rot1_y_deg = rot2_y_deg = 0.0f;
+    prev_rot1_y_deg = prev_rot2_y_deg = 0.0f;
+
+    motion->GetPosture(animation_time, *curr_posture);
+    motion2->GetPosture(animation_time, *curr_posture2);
+
+    CalculateWorldBounds();
+    analyzer.BuildAllFeatureFrameCaches(motion, motion2);
+    UpdateVoxelDataWrapper();
+}
+
 void MotionApp::PrepareAllData() {
     if (!motion || !motion2)
         return;
@@ -712,6 +857,8 @@ void MotionApp::PrepareAllData() {
     std::cout << "Building feature frame caches..." << std::endl;
     analyzer.BuildAllFeatureFrameCaches(motion, motion2);
 
+    CaptureInitialRootCache();
+
     UpdateVoxelDataWrapper();
 }
 
@@ -723,15 +870,41 @@ void MotionApp::ApplyXZMoveFromUI(bool finalize_update) {
     float d1z = move1_z - prev_move1_z;
     float d2x = move2_x - prev_move2_x;
     float d2z = move2_z - prev_move2_z;
+    float d1r_deg = rot1_y_deg - prev_rot1_y_deg;
+    float d2r_deg = rot2_y_deg - prev_rot2_y_deg;
+    float d1r = d1r_deg * kPi / 180.0f;
+    float d2r = d2r_deg * kPi / 180.0f;
 
-    if (fabsf(d1x) < 1e-6f && fabsf(d1z) < 1e-6f && fabsf(d2x) < 1e-6f && fabsf(d2z) < 1e-6f)
+    Matrix3f rot1, rot2;
+    rot1.rotY(d1r);
+    rot2.rotY(d2r);
+
+    int f1 = GetFrameIndexFromTime(motion, animation_time);
+    int f2 = GetFrameIndexFromTime(motion2, animation_time);
+    Point3f pivot1 = motion->frames[f1].root_pos;
+    Point3f pivot2 = motion2->frames[f2].root_pos;
+
+    if (fabsf(d1x) < 1e-6f && fabsf(d1z) < 1e-6f && fabsf(d2x) < 1e-6f && fabsf(d2z) < 1e-6f &&
+        fabsf(d1r) < 1e-6f && fabsf(d2r) < 1e-6f)
         return;
 
     for (int i = 0; i < motion->num_frames; ++i) {
+        if (fabsf(d1r) > 1e-6f) {
+            Point3f rel = motion->frames[i].root_pos - pivot1;
+            rot1.transform(&rel);
+            motion->frames[i].root_pos = pivot1 + rel;
+            motion->frames[i].root_ori.mul(rot1, motion->frames[i].root_ori);
+        }
         motion->frames[i].root_pos.x += d1x;
         motion->frames[i].root_pos.z += d1z;
     }
     for (int i = 0; i < motion2->num_frames; ++i) {
+        if (fabsf(d2r) > 1e-6f) {
+            Point3f rel = motion2->frames[i].root_pos - pivot2;
+            rot2.transform(&rel);
+            motion2->frames[i].root_pos = pivot2 + rel;
+            motion2->frames[i].root_ori.mul(rot2, motion2->frames[i].root_ori);
+        }
         motion2->frames[i].root_pos.x += d2x;
         motion2->frames[i].root_pos.z += d2z;
     }
@@ -740,6 +913,8 @@ void MotionApp::ApplyXZMoveFromUI(bool finalize_update) {
     prev_move1_z = move1_z;
     prev_move2_x = move2_x;
     prev_move2_z = move2_z;
+    prev_rot1_y_deg = rot1_y_deg;
+    prev_rot2_y_deg = rot2_y_deg;
 
     motion->GetPosture(animation_time, *curr_posture);
     motion2->GetPosture(animation_time, *curr_posture2);
@@ -826,6 +1001,18 @@ void MotionApp::ToggleSliceGizmoMode()
     slice_gizmo.SetMode(mode == GIZMO_TRANSLATE ? GIZMO_ROTATE : GIZMO_TRANSLATE);
 }
 
+void MotionApp::ToggleModelGizmo()
+{
+    use_model_gizmo = !use_model_gizmo;
+    model_gizmo_dragging = false;
+    model_gizmo.SetSelectedAxis(GIZMO_NONE);
+}
+
+void MotionApp::ToggleModelGizmoMode()
+{
+    model_gizmo.SetMode(GIZMO_MODEL_XZ_YROT);
+}
+
 // スライス平面の向きをギズモ用の回転行列として取得
 Matrix3f MotionApp::GetSliceGizmoOrientation() const
 {
@@ -855,6 +1042,15 @@ Point3f MotionApp::GetSliceGizmoPosition() const
     return analyzer.GetSlicePlaneCenter();
 }
 
+Point3f MotionApp::GetModelGizmoPosition() const
+{
+    if (model_gizmo_target == 0 && curr_posture)
+        return curr_posture->root_pos;
+    if (model_gizmo_target == 1 && curr_posture2)
+        return curr_posture2->root_pos;
+    return Point3f(0.0f, 0.0f, 0.0f);
+}
+
 // ワールド境界に基づいてギズモの表示サイズを計算
 float MotionApp::ComputeGizmoScale() const
 {
@@ -878,6 +1074,75 @@ void MotionApp::ApplySliceGizmoDelta(const Point3f& translation, const Matrix4f&
         if (fabsf(trace - 3.0f) > 0.0001f)
             analyzer.ApplySlicePlaneRotation(local_rotation);
     }
+}
+
+void MotionApp::ApplyModelGizmoDelta(const Point3f& translation, const Matrix4f& local_rotation)
+{
+    if (!motion || !motion2)
+        return;
+
+    Motion* target_motion = (model_gizmo_target == 0) ? motion : motion2;
+    float* move_x = (model_gizmo_target == 0) ? &move1_x : &move2_x;
+    float* move_z = (model_gizmo_target == 0) ? &move1_z : &move2_z;
+    float* prev_move_x = (model_gizmo_target == 0) ? &prev_move1_x : &prev_move2_x;
+    float* prev_move_z = (model_gizmo_target == 0) ? &prev_move1_z : &prev_move2_z;
+    float* rot_y_deg = (model_gizmo_target == 0) ? &rot1_y_deg : &rot2_y_deg;
+    float* prev_rot_y_deg = (model_gizmo_target == 0) ? &prev_rot1_y_deg : &prev_rot2_y_deg;
+
+    float dx = translation.x;
+    float dz = translation.z;
+    float angle = 0.0f;
+
+    float trace = local_rotation.m00 + local_rotation.m11 + local_rotation.m22;
+    if (fabsf(trace - 3.0f) > 1e-5f)
+        angle = atan2f(local_rotation.m02, local_rotation.m00);
+
+    bool has_translation = fabsf(dx) > 1e-6f || fabsf(dz) > 1e-6f;
+    bool has_rotation = fabsf(angle) > 1e-6f;
+    if (!has_translation && !has_rotation)
+        return;
+
+    Matrix3f rot_y;
+    rot_y.rotY(angle);
+
+    int frame_idx = GetFrameIndexFromTime(target_motion, animation_time);
+    Point3f pivot = target_motion->frames[frame_idx].root_pos;
+
+    for (int i = 0; i < target_motion->num_frames; ++i) {
+        if (has_rotation) {
+            Point3f rel = target_motion->frames[i].root_pos - pivot;
+            rot_y.transform(&rel);
+            target_motion->frames[i].root_pos = pivot + rel;
+            target_motion->frames[i].root_ori.mul(rot_y, target_motion->frames[i].root_ori);
+        }
+        if (has_translation) {
+            target_motion->frames[i].root_pos.x += dx;
+            target_motion->frames[i].root_pos.z += dz;
+        }
+    }
+
+    *move_x += dx;
+    *move_z += dz;
+    *prev_move_x = *move_x;
+    *prev_move_z = *move_z;
+    *rot_y_deg += angle * 180.0f / kPi;
+    *prev_rot_y_deg = *rot_y_deg;
+
+    if (curr_posture && motion)
+        motion->GetPosture(animation_time, *curr_posture);
+    if (curr_posture2 && motion2)
+        motion2->GetPosture(animation_time, *curr_posture2);
+
+    UpdateVoxelDataWrapper();
+}
+
+void MotionApp::FinalizeModelTransform()
+{
+    if (!motion || !motion2)
+        return;
+    CalculateWorldBounds();
+    analyzer.BuildAllFeatureFrameCaches(motion, motion2);
+    UpdateVoxelDataWrapper();
 }
 
 // ギズモの状態をスライス平面の状態に同期

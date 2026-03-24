@@ -7,7 +7,8 @@
 // ギズモのモード
 enum GizmoMode {
     GIZMO_TRANSLATE,  // 移動モード
-    GIZMO_ROTATE      // 回転モード
+    GIZMO_ROTATE,     // 回転モード
+    GIZMO_MODEL_XZ_YROT // XZ移動 + Y回転（同時表示）
 };
 
 // 選択された軸/円
