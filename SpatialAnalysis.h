@@ -127,6 +127,8 @@ public:
     bool show_voxels;  // 3Dボクセル表示フラグ
     int feature_mode; // 0: 占有率, 1: 速度, 2: ジャーク, 3: 慣性モーメント, 4: 慣性主軸角速度
 	int norm_mode; // 0: 瞬間表示, 1: 累積表示
+    bool has_world_bounds_initialized;
+    float slice_display_base_range;
     
     // 表示設定
     int selected_segment_index;  // 表示する部位のインデックス (-1で全体) ※後方互換用

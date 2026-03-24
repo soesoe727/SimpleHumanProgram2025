@@ -89,7 +89,7 @@ void TransformGizmo::DrawTranslateGizmo(const Point3f& position, const Matrix3f&
     // X軸（赤）- 右方向
     if (m_selected_axis == GIZMO_X) {
         glColor3f(1.0f, 1.0f, 0.0f);  // 選択時は黄色
-    } else if (m_mode == GIZMO_ROTATE) {
+    } else {
         glColor3f(1.0f, 0.0f, 0.0f);  // 赤
     }
     glPushMatrix();

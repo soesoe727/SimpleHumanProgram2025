@@ -70,10 +70,8 @@ static int sa_get_frame_index_from_time(const Motion* m, float time) {
     return idx;
 }
 
-static bool sa_compute_principal_axis_from_presence_grid(const VoxelGrid& presence,
-                                                         const float world_bounds[3][2],
-                                                         const Point3f& root_pos,
-                                                         Vector3f& axis_out) {
+static bool sa_compute_principal_axis_from_presence_grid(const VoxelGrid& presence, const float world_bounds[3][2],
+    const Point3f& root_pos, Vector3f& axis_out) {
     if (presence.resolution <= 0 || presence.data.empty())
         return false;
 
@@ -144,11 +142,8 @@ static bool sa_compute_principal_axis_from_presence_grid(const VoxelGrid& presen
     return true;
 }
 
-static bool sa_compute_principal_axis_from_presence_grid_sparse(const VoxelGrid& presence,
-                                                                const float world_bounds[3][2],
-                                                                const std::vector<int>& active_indices,
-                                                                const Point3f& root_pos,
-                                                                Vector3f& axis_out) {
+static bool sa_compute_principal_axis_from_presence_grid_sparse(const VoxelGrid& presence, const float world_bounds[3][2],
+    const std::vector<int>& active_indices, const Point3f& root_pos, Vector3f& axis_out) {
     if (presence.resolution <= 0 || presence.data.empty() || active_indices.empty())
         return false;
 
@@ -222,12 +217,8 @@ static bool sa_compute_principal_axis_from_presence_grid_sparse(const VoxelGrid&
     return true;
 }
 
-static float sa_compute_principal_axis_angular_speed(const VoxelGrid& curr_presence,
-                                                     const VoxelGrid& prev_presence,
-                                                     float dt,
-                                                     const float world_bounds[3][2],
-                                                     const Point3f& curr_root_pos,
-                                                     const Point3f& prev_root_pos) {
+static float sa_compute_principal_axis_angular_speed(const VoxelGrid& curr_presence, const VoxelGrid& prev_presence,
+    float dt, const float world_bounds[3][2], const Point3f& curr_root_pos, const Point3f& prev_root_pos) {
     if (dt <= 1e-8f)
         return 0.0f;
 
@@ -246,14 +237,9 @@ static float sa_compute_principal_axis_angular_speed(const VoxelGrid& curr_prese
     return dtheta / dt;
 }
 
-static float sa_compute_principal_axis_angular_speed_sparse(const VoxelGrid& curr_presence,
-                                                            const VoxelGrid& prev_presence,
-                                                            float dt,
-                                                            const float world_bounds[3][2],
-                                                            const std::vector<int>& curr_active_indices,
-                                                            const std::vector<int>& prev_active_indices,
-                                                            const Point3f& curr_root_pos,
-                                                            const Point3f& prev_root_pos) {
+static float sa_compute_principal_axis_angular_speed_sparse(const VoxelGrid& curr_presence, const VoxelGrid& prev_presence,
+    float dt, const float world_bounds[3][2], const std::vector<int>& curr_active_indices, const std::vector<int>& prev_active_indices,
+    const Point3f& curr_root_pos, const Point3f& prev_root_pos) {
     if (dt <= 1e-8f)
         return 0.0f;
 
@@ -365,6 +351,8 @@ SpatialAnalyzer::SpatialAnalyzer() {
     
     use_rotated_slice = true;
     slice_positions.push_back(0.5f);
+    has_world_bounds_initialized = false;
+    slice_display_base_range = 1.0f;
 
     has_frame_cache = false;
     sparse_threshold = 1e-4f;
@@ -395,22 +383,37 @@ void SpatialAnalyzer::ResizeGrids(int res) {
 
 // ワールド座標の境界を設定し、スライス平面を中心に配置
 void SpatialAnalyzer::SetWorldBounds(float bounds[3][2]) {
+    bool first_initialize = !has_world_bounds_initialized;
+
     for (int i = 0; i < 3; ++i) {
         world_bounds[i][0] = bounds[i][0];
         world_bounds[i][1] = bounds[i][1];
     }
+
+    float world_range[3];
+    for (int i = 0; i < 3; ++i)
+        world_range[i] = world_bounds[i][1] - world_bounds[i][0];
+    float max_range = max(world_range[0], max(world_range[1], world_range[2]));
     
-    // スライス平面の中心をワールド中心に設定
-    float cx = (world_bounds[0][0] + world_bounds[0][1]) / 2.0f;
-    float cy = (world_bounds[1][0] + world_bounds[1][1]) / 2.0f;
-    float cz = (world_bounds[2][0] + world_bounds[2][1]) / 2.0f;
-    
-    slice_plane_transform.setIdentity();
-    slice_plane_transform.m03 = cx;
-    slice_plane_transform.m13 = cy;
-    slice_plane_transform.m23 = cz;
-    
-    UpdateEulerAnglesFromTransform();
+    // 初回のみスライス平面をワールド中心へ配置（再計算時は位置・向きを維持）
+    if (first_initialize) {
+        float cx = (world_bounds[0][0] + world_bounds[0][1]) / 2.0f;
+        float cy = (world_bounds[1][0] + world_bounds[1][1]) / 2.0f;
+        float cz = (world_bounds[2][0] + world_bounds[2][1]) / 2.0f;
+
+        slice_plane_transform.setIdentity();
+        slice_plane_transform.m03 = cx;
+        slice_plane_transform.m13 = cy;
+        slice_plane_transform.m23 = cz;
+        UpdateEulerAnglesFromTransform();
+
+        if (max_range > 1e-6f)
+            slice_display_base_range = max_range;
+    } else if (slice_display_base_range <= 1e-6f && max_range > 1e-6f) {
+        slice_display_base_range = max_range;
+    }
+
+    has_world_bounds_initialized = true;
 
     for (int i = 0; i < SA_FEATURE_COUNT; ++i)
         accumulated_pose_cache[i].valid = false;
@@ -1449,7 +1452,9 @@ void SpatialAnalyzer::DrawRotatedSlicePlane() {
     float world_range[3];
     for (int i = 0; i < 3; ++i)
         world_range[i] = world_bounds[i][1] - world_bounds[i][0];
-    float max_range = max(world_range[0], max(world_range[1], world_range[2]));
+    float max_range = slice_display_base_range;
+    if (max_range <= 1e-6f)
+        max_range = max(world_range[0], max(world_range[1], world_range[2]));
     float half_size = max_range * 0.6f * zoom;
 
     Point3f center = GetSlicePlaneCenter();
@@ -1523,7 +1528,9 @@ void SpatialAnalyzer::DrawRotatedSliceMap(int x_pos, int y_pos, int w, int h, Vo
     float world_range[3];
     for (int i = 0; i < 3; ++i)
         world_range[i] = world_bounds[i][1] - world_bounds[i][0];
-    float max_range = max(world_range[0], max(world_range[1], world_range[2]));
+    float max_range = slice_display_base_range;
+    if (max_range <= 1e-6f)
+        max_range = max(world_range[0], max(world_range[1], world_range[2]));
     float half_size = max_range * 0.6f * zoom;
 
     Point3f center = GetSlicePlaneCenter();

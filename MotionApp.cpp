@@ -363,7 +363,9 @@ void MotionApp::Display()
     // 3. Analyzerによる3D描画
     if (analyzer.show_planes)
         analyzer.DrawSlicePlanes();
-    UpdateVoxelDataWrapper();
+
+    if (!model_gizmo_dragging)
+        UpdateVoxelDataWrapper();
     analyzer.DrawVoxels3D();
 
     // 4. ギズモの描画
@@ -747,39 +749,35 @@ void MotionApp::CalculateWorldBounds() {
     if (!motion || !motion2)
         return;
 
-    float bounds[3][2];
-    for (int i = 0; i < 3; ++i) {
-        bounds[i][0] = 1e6;  
-        bounds[i][1] = -1e6;
-    }
+    float min_x = 1e6f, min_y = 1e6f, min_z = 1e6f;
+    float max_x = -1e6f, max_y = -1e6f, max_z = -1e6f;
 
-    auto update_bounds = [&](const Motion* m) {
-        vector<Matrix4f> seg_frames;
+    auto update_root_minmax = [&](const Motion* m) {
         for (int f = 0; f < m->num_frames; ++f) {
-            ForwardKinematics(m->frames[f], seg_frames);
-            for (int s = 0; s < m->body->num_segments; ++s) {
-                Point3f p(seg_frames[s].m03, seg_frames[s].m13, seg_frames[s].m23);
-                if (p.x < bounds[0][0]) bounds[0][0] = p.x;
-                if (p.x > bounds[0][1]) bounds[0][1] = p.x;
-                if (p.y < bounds[1][0]) bounds[1][0] = p.y;
-                if (p.y > bounds[1][1]) bounds[1][1] = p.y;
-                if (p.z < bounds[2][0]) bounds[2][0] = p.z;
-                if (p.z > bounds[2][1]) bounds[2][1] = p.z;
-            }
+            const Point3f& p = m->frames[f].root_pos;
+            if (p.x < min_x) min_x = p.x;
+            if (p.x > max_x) max_x = p.x;
+            if (p.y < min_y) min_y = p.y;
+            if (p.y > max_y) max_y = p.y;
+            if (p.z < min_z) min_z = p.z;
+            if (p.z > max_z) max_z = p.z;
         }
     };
-    
-    update_bounds(motion);
-    update_bounds(motion2);
 
-    for (int i = 0; i < 3; ++i) {
-        float range = bounds[i][1] - bounds[i][0];
-        bounds[i][0] -= range * 0.05f;
-        bounds[i][1] += range * 0.05f;
-    }
+    update_root_minmax(motion);
+    update_root_minmax(motion2);
+
+    const float margin_radius = 1.0f; // 各軸に対して1mマージン
+    float bounds[3][2];
+    bounds[0][0] = min_x - margin_radius;
+    bounds[0][1] = max_x + margin_radius;
+    bounds[1][0] = min_y - margin_radius;
+    bounds[1][1] = max_y + margin_radius;
+    bounds[2][0] = min_z - margin_radius;
+    bounds[2][1] = max_z + margin_radius;
 
     analyzer.SetWorldBounds(bounds);
-    printf("World bounds calculated and set to Analyzer.\n");
+    printf("World bounds set from all-frame root min/max + 1m margin.\n");
 }
 
 // 位置・向き調整、境界計算、ボクセルキャッシュの読み込み/計算を実行
@@ -833,7 +831,7 @@ void MotionApp::RestoreInitialRootCache() {
 
     CalculateWorldBounds();
     analyzer.BuildAllFeatureFrameCaches(motion, motion2);
-    UpdateVoxelDataWrapper();
+    // Display()側で毎フレーム更新するため、ここでは二重更新しない
 }
 
 void MotionApp::PrepareAllData() {
@@ -859,7 +857,7 @@ void MotionApp::PrepareAllData() {
 
     CaptureInitialRootCache();
 
-    UpdateVoxelDataWrapper();
+    // Display()側で毎フレーム更新するため、ここでは二重更新しない
 }
 
 void MotionApp::ApplyXZMoveFromUI(bool finalize_update) {
@@ -884,43 +882,51 @@ void MotionApp::ApplyXZMoveFromUI(bool finalize_update) {
     Point3f pivot1 = motion->frames[f1].root_pos;
     Point3f pivot2 = motion2->frames[f2].root_pos;
 
-    if (fabsf(d1x) < 1e-6f && fabsf(d1z) < 1e-6f && fabsf(d2x) < 1e-6f && fabsf(d2z) < 1e-6f &&
-        fabsf(d1r) < 1e-6f && fabsf(d2r) < 1e-6f)
+    bool has_delta = !(fabsf(d1x) < 1e-6f && fabsf(d1z) < 1e-6f &&
+                       fabsf(d2x) < 1e-6f && fabsf(d2z) < 1e-6f &&
+                       fabsf(d1r) < 1e-6f && fabsf(d2r) < 1e-6f);
+
+    // finalize時は差分が0でも重い再計算を必ず実行する
+    if (!has_delta && !finalize_update)
         return;
 
-    for (int i = 0; i < motion->num_frames; ++i) {
-        if (fabsf(d1r) > 1e-6f) {
-            Point3f rel = motion->frames[i].root_pos - pivot1;
-            rot1.transform(&rel);
-            motion->frames[i].root_pos = pivot1 + rel;
-            motion->frames[i].root_ori.mul(rot1, motion->frames[i].root_ori);
+    if (has_delta) {
+        for (int i = 0; i < motion->num_frames; ++i) {
+            if (fabsf(d1r) > 1e-6f) {
+                Point3f rel = motion->frames[i].root_pos - pivot1;
+                rot1.transform(&rel);
+                motion->frames[i].root_pos = pivot1 + rel;
+                motion->frames[i].root_ori.mul(rot1, motion->frames[i].root_ori);
+            }
+            motion->frames[i].root_pos.x += d1x;
+            motion->frames[i].root_pos.z += d1z;
         }
-        motion->frames[i].root_pos.x += d1x;
-        motion->frames[i].root_pos.z += d1z;
-    }
-    for (int i = 0; i < motion2->num_frames; ++i) {
-        if (fabsf(d2r) > 1e-6f) {
-            Point3f rel = motion2->frames[i].root_pos - pivot2;
-            rot2.transform(&rel);
-            motion2->frames[i].root_pos = pivot2 + rel;
-            motion2->frames[i].root_ori.mul(rot2, motion2->frames[i].root_ori);
+        for (int i = 0; i < motion2->num_frames; ++i) {
+            if (fabsf(d2r) > 1e-6f) {
+                Point3f rel = motion2->frames[i].root_pos - pivot2;
+                rot2.transform(&rel);
+                motion2->frames[i].root_pos = pivot2 + rel;
+                motion2->frames[i].root_ori.mul(rot2, motion2->frames[i].root_ori);
+            }
+            motion2->frames[i].root_pos.x += d2x;
+            motion2->frames[i].root_pos.z += d2z;
         }
-        motion2->frames[i].root_pos.x += d2x;
-        motion2->frames[i].root_pos.z += d2z;
     }
 
-    prev_move1_x = move1_x;
-    prev_move1_z = move1_z;
-    prev_move2_x = move2_x;
-    prev_move2_z = move2_z;
-    prev_rot1_y_deg = rot1_y_deg;
-    prev_rot2_y_deg = rot2_y_deg;
+    if (has_delta) {
+        prev_move1_x = move1_x;
+        prev_move1_z = move1_z;
+        prev_move2_x = move2_x;
+        prev_move2_z = move2_z;
+        prev_rot1_y_deg = rot1_y_deg;
+        prev_rot2_y_deg = rot2_y_deg;
+    }
 
     motion->GetPosture(animation_time, *curr_posture);
     motion2->GetPosture(animation_time, *curr_posture2);
 
     if (finalize_update) {
-        // モーション移動確定後にワールド範囲と各特徴量のフレームキャッシュを更新
+        // 移動・回転操作の完了時のみ重い再計算を行う
         CalculateWorldBounds();
         analyzer.BuildAllFeatureFrameCaches(motion, motion2);
     }
@@ -1133,7 +1139,7 @@ void MotionApp::ApplyModelGizmoDelta(const Point3f& translation, const Matrix4f&
     if (curr_posture2 && motion2)
         motion2->GetPosture(animation_time, *curr_posture2);
 
-    UpdateVoxelDataWrapper();
+    // ドラッグ中はモデル変形のみ行い、重い再計算はマウス離し時(FinalizeModelTransform)に実行
 }
 
 void MotionApp::FinalizeModelTransform()
