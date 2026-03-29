@@ -102,12 +102,12 @@ bool VoxelGrid::LoadFromFile(const char* filename) {
     return ifs.good();
 }
 
-// 部位ごとのボクセルデータをバイナリファイルへ保存
-bool SegmentVoxelData::SaveToFile(const char* filename) const {
+bool SaveSegmentVoxelGridsToFile(const std::vector<VoxelGrid>& segment_grids, const char* filename) {
     ofstream ofs(filename, ios::binary);
     if (!ofs) 
         return false;
-    
+
+    int num_segments = (int)segment_grids.size();
     ofs.write(reinterpret_cast<const char*>(&num_segments), sizeof(int));
     
     for (int i = 0; i < num_segments; ++i) {
@@ -122,8 +122,7 @@ bool SegmentVoxelData::SaveToFile(const char* filename) const {
     return ofs.good();
 }
 
-// バイナリファイルから部位ごとのボクセルデータを読み込み
-bool SegmentVoxelData::LoadFromFile(const char* filename) {
+bool LoadSegmentVoxelGridsFromFile(std::vector<VoxelGrid>& segment_grids, const char* filename) {
     ifstream ifs(filename, ios::binary);
     if (!ifs) 
         return false;
@@ -131,10 +130,9 @@ bool SegmentVoxelData::LoadFromFile(const char* filename) {
     int num_seg;
     ifs.read(reinterpret_cast<char*>(&num_seg), sizeof(int));
     
-    num_segments = num_seg;
     segment_grids.resize(num_seg);
     
-    for (int i = 0; i < num_segments; ++i) {
+    for (int i = 0; i < num_seg; ++i) {
         VoxelGrid& grid = segment_grids[i];
         
         int res;

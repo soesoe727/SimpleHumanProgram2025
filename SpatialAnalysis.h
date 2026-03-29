@@ -62,11 +62,11 @@ public:
 	// 累積ボクセルデータ（必要に応じて追加）
 	VoxelGrid voxels1_accumulated[SA_FEATURE_COUNT], voxels2_accumulated[SA_FEATURE_COUNT], voxels_accumulated_diff[SA_FEATURE_COUNT]; // 0:占有率, 1:速度, 2:ジャーク, 3:慣性モーメント, 4:慣性主軸角速度
     
-    // Motion1 部位ごとの占有率ボクセルデータ
-	SegmentVoxelData segment_voxels1[SA_FEATURE_COUNT]; // 0:占有率, 1:速度, 2:ジャーク, 3:慣性モーメント, 4:慣性主軸角速度
+    // Motion1 部位ごとの互換用密グリッド（内部はフレーム疎キャッシュから再合成）
+    std::vector<VoxelGrid> segment_voxels1[SA_FEATURE_COUNT]; // 0:占有率, 1:速度, 2:ジャーク, 3:慣性モーメント, 4:慣性主軸角速度
 
-	// Motion2 部位ごとの占有率ボクセルデータ
-	SegmentVoxelData segment_voxels2[SA_FEATURE_COUNT]; // 0:占有率, 1:速度, 2:ジャーク, 3:慣性モーメント, 4:慣性主軸角速度
+  // Motion2 部位ごとの互換用密グリッド（内部はフレーム疎キャッシュから再合成）
+    std::vector<VoxelGrid> segment_voxels2[SA_FEATURE_COUNT]; // 0:占有率, 1:速度, 2:ジャーク, 3:慣性モーメント, 4:慣性主軸角速度
 
     // フレーム単位の疎ボクセルキャッシュ
     MotionFrameSegmentVoxelGridCache frame_cache1;
@@ -163,8 +163,12 @@ public:
     void BuildAllFeatureFrameCaches(Motion* m1, Motion* m2);
     void ComposeAccumulatedFeatureFromFrameCache(Motion* m1, Motion* m2, int feature);
 
-    // 部位ごとの占有率・速度・ジャーク・慣性モーメント・慣性主軸角速度ボクセル計算（1フレーム分）
-    void VoxelizeMotionBySegment(Motion* m, float time, SegmentVoxelData& seg_presence_data, SegmentVoxelData& seg_speed_data, SegmentVoxelData& seg_jerk_data, SegmentVoxelData& seg_inertia_data, SegmentVoxelData& seg_principal_axis_data);
+    void VoxelizeMotionBySegmentGrids(Motion* m, float time,
+                                      std::vector<VoxelGrid>& seg_presence_grids,
+                                      std::vector<VoxelGrid>& seg_speed_grids,
+                                      std::vector<VoxelGrid>& seg_jerk_grids,
+                                      std::vector<VoxelGrid>& seg_inertia_grids,
+                                      std::vector<VoxelGrid>& seg_principal_axis_grids);
     
     // ボクセルキャッシュ（ファイル保存・読み込み）
     bool SaveVoxelCache(const char* motion1_name, const char* motion2_name);
@@ -212,14 +216,16 @@ private:
     struct PrevPresenceCacheEntry {
         const Motion* motion;
         float time;
-        SegmentVoxelData seg_presence;
+        std::vector<VoxelGrid> seg_presence_grids;
+        int num_segments;
+        int resolution;
         bool valid;
 
-        PrevPresenceCacheEntry() : motion(nullptr), time(0.0f), valid(false) {}
+        PrevPresenceCacheEntry() : motion(nullptr), time(0.0f), num_segments(0), resolution(0), valid(false) {}
     };
 
     // VoxelizeMotion用の再利用バッファ（毎フレームの再確保を回避）
-	SegmentVoxelData temp_voxelize_seg[SA_FEATURE_COUNT]; // 0:占有率, 1:速度, 2:ジャーク, 3:慣性モーメント, 4:慣性主軸角速度
+    std::vector<VoxelGrid> temp_voxelize_seg[SA_FEATURE_COUNT]; // 0:占有率, 1:速度, 2:ジャーク, 3:慣性モーメント, 4:慣性主軸角速度
     int temp_voxelize_num_segments;
     int temp_voxelize_resolution;
     PrevPresenceCacheEntry prev_presence_cache_entries[2];
@@ -242,5 +248,5 @@ private:
                           std::vector<int>* touched_indices = nullptr, std::vector<unsigned char>* touched_marks = nullptr);
     void BuildSingleMotionFeatureFrameCache(Motion* m, MotionFrameSegmentVoxelGridCache& cache);
     bool ComposeInstantFeatureFromFrameCache(Motion* m1, Motion* m2, int feature, float current_time, bool compose_segment_data);
-    void VoxelizeMotionSegmentPresenceOnly(Motion* m, float time, SegmentVoxelData& seg_presence_data);
+    void VoxelizeMotionSegmentPresenceOnly(Motion* m, float time, std::vector<VoxelGrid>& seg_presence_grids);
 };
