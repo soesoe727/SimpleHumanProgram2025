@@ -3,3 +3,5 @@
 ## プロジェクト ガイドライン
 - User wants model gizmo to show only required handles simultaneously (red X arrow + blue Z arrow + green Y rotation circle), and Y rotation should be in-place rather than world-origin dependent.
 - User ultimately wants to remove `VoxelGrid` and `SegmentVoxelData`, and migrate fully to per-frame × per-segment sparse voxel cache structures with on-demand accumulation.
+- User prefers workflow updates that explicitly state what will be fixed before edits, and after completing edits, include the next planned fix.
+- User prefers batching about three small fixes in one iteration instead of one-by-one changes.

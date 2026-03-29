@@ -2,6 +2,7 @@
 #include <vector>
 #include <cmath>
 #include <string>
+#include <functional>
 #include <Point3.h>
 #include "SimpleHuman.h"
 #include "SimpleHumanGLUT.h"
@@ -55,6 +56,8 @@ public:
 	int grid_resolution; // ボクセルグリッド解像度
 
     float world_bounds[3][2];//ワールド座標系の表示・ボクセル化対象領域を表す3軸分の最小値/最大値
+
+private:
     
 	// 瞬間表示用のボクセルデータ（必要に応じて追加）
 	VoxelGrid voxels1[SA_FEATURE_COUNT], voxels2[SA_FEATURE_COUNT], voxels_diff[SA_FEATURE_COUNT]; // 0:占有率, 1:速度, 2:ジャーク, 3:慣性モーメント, 4:慣性主軸角速度
@@ -94,6 +97,8 @@ public:
 
 	// 部位ごとの正規化用最大値（必要に応じて追加）
 	std::vector<float> segment_max[SA_FEATURE_COUNT]; // 0:占有率, 1:速度, 2:ジャーク, 3:慣性モーメント, 4:慣性主軸角速度
+
+public:
 
     // --- ビュー/スライス設定 ---
 	std::vector<float> slice_positions; // スライス位置 (0.0 - 1.0)
@@ -149,7 +154,6 @@ public:
     
     // ボクセル計算
     void UpdateVoxels(Motion* m1, Motion* m2, float current_time);
-    void VoxelizeMotion(Motion* m, float time, VoxelGrid& occ, VoxelGrid& spd, VoxelGrid& jrk, VoxelGrid& ine, VoxelGrid& pax);
 
     // 総合累積ボクセル計算（全体＋部位ごとを同時に計算）
     void AccumulateAllFrames(Motion* m1, Motion* m2);
@@ -157,13 +161,6 @@ public:
     void BuildAllFeatureFrameCaches(Motion* m1, Motion* m2);
     void ComposeAccumulatedFeatureFromFrameCache(Motion* m1, Motion* m2, int feature);
 
-    void VoxelizeMotionBySegmentGrids(Motion* m, float time,
-                                      std::vector<VoxelGrid>& seg_presence_grids,
-                                      std::vector<VoxelGrid>& seg_speed_grids,
-                                      std::vector<VoxelGrid>& seg_jerk_grids,
-                                      std::vector<VoxelGrid>& seg_inertia_grids,
-                                      std::vector<VoxelGrid>& seg_principal_axis_grids);
-    
     // ボクセルキャッシュ（ファイル保存・読み込み）
     bool SaveVoxelCache(const char* motion1_name, const char* motion2_name);
     bool LoadVoxelCache(const char* motion1_name, const char* motion2_name);
@@ -207,10 +204,6 @@ public:
     void UpdateSegmentCache();                          // キャッシュを更新
 
 private:
-    // 互換用密グリッド（読み込み互換や限定フォールバック用途）
-    std::vector<VoxelGrid> segment_voxels1[SA_FEATURE_COUNT];
-    std::vector<VoxelGrid> segment_voxels2[SA_FEATURE_COUNT];
-
     const Motion* last_instant_motion1;
     const Motion* last_instant_motion2;
     float last_instant_time;
@@ -218,7 +211,6 @@ private:
     const Motion* last_accum_motion1;
     const Motion* last_accum_motion2;
     bool has_latest_accum_context;
-    bool has_loaded_segment_dense_cache;
 
     struct PrevPresenceCacheEntry {
         const Motion* motion;
@@ -233,8 +225,20 @@ private:
 
     // 回転スライス用のヘルパー
     void DrawRotatedSlicePlane();
-    void DrawRotatedSliceMap(int x, int y, int w, int h, VoxelGrid& grid, float max_val, const char* title);
-    float SampleVoxelAtWorldPos(VoxelGrid& grid, const Point3f& world_pos);
+    void DrawRotatedSliceMapWithSampler(int x, int y, int w, int h, float max_val, const char* title,
+                                        const std::function<float(const Point3f&)>& sampler);
+    void ResolveDisplayGridPointersForCurrentMode(VoxelGrid*& grid1,
+                                                  VoxelGrid*& grid2,
+                                                  VoxelGrid*& grid_diff,
+                                                  float& max_value);
+    void ResolveDiffGridPointerForCurrentMode(VoxelGrid*& grid_diff,
+                                              float& max_value);
+    void ResolveDisplaySamplersForCurrentMode(std::function<float(const Point3f&)>& sampler1,
+                                              std::function<float(const Point3f&)>& sampler2,
+                                              std::function<float(const Point3f&)>& sampler_diff,
+                                              float& max_value);
+    void ResolveDiffVoxelSamplerForCurrentMode(std::function<float(int, int, int)>& sampler,
+                                               float& max_value);
     
     // オイラー角を変換行列から逆算（表示用）
     void UpdateEulerAnglesFromTransform();
@@ -246,6 +250,13 @@ private:
                      int idx_min[3], int idx_max[3], const float world_range[3]);
     void WriteToVoxelGrid(const BoneData& bone, float bone_radius, const float world_range[3],
                           std::vector<SparseVoxel>* occ_sparse_values, std::vector<int>* occ_index_to_pos);
+    void VoxelizeMotion(Motion* m, float time, VoxelGrid& occ, VoxelGrid& spd, VoxelGrid& jrk, VoxelGrid& ine, VoxelGrid& pax);
+    void VoxelizeMotionBySegmentGrids(Motion* m, float time,
+                                      std::vector<VoxelGrid>& seg_presence_grids,
+                                      std::vector<VoxelGrid>& seg_speed_grids,
+                                      std::vector<VoxelGrid>& seg_jerk_grids,
+                                      std::vector<VoxelGrid>& seg_inertia_grids,
+                                      std::vector<VoxelGrid>& seg_principal_axis_grids);
     void BuildSegmentSparseBaseValues(Motion* m, float time, std::vector<std::vector<SparseVoxel>>& seg_sparse_values);
     void BuildSegmentSparseVoxels(Motion* m, float time, std::vector<std::vector<SparseVoxel>>& seg_sparse_values);
     void BuildSingleMotionFeatureFrameCache(Motion* m, MotionFrameSegmentVoxelGridCache& cache);
