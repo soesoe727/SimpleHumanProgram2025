@@ -187,9 +187,6 @@
     <ClCompile Include="SpaceMouseDemoApp.cpp" />
     <ClCompile Include="SpaceMouseGLUTHelper.cpp" />
     <ClCompile Include="SpatialAnalysis.cpp" />
-    <ClCompile Include="SpecialAnalysis2.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-    </ClCompile>
     <ClCompile Include="VoxelData.cpp" />
     <ClCompile Include="stdafx.cpp" />
     <ClCompile Include="Timeline.cpp" />

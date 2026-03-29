@@ -59,44 +59,446 @@ static Point3f sa_voxel_center_from_linear_index(int linear_index, int resolutio
     return Point3f(wx, wy, wz);
 }
 
-static void sa_resize_segment_grids(std::vector<VoxelGrid>& grids, int num_segments, int resolution) {
-    if ((int)grids.size() != num_segments)
-        grids.resize(num_segments);
-    for (int s = 0; s < num_segments; ++s)
-        grids[s].Resize(resolution);
+static bool sa_world_to_voxel_index(const Point3f& p, int resolution, const float world_bounds[3][2], int& x, int& y, int& z);
+static void sa_accumulate_feature_value_to_grids(int feature, VoxelGrid* seg_grid_ptr, VoxelGrid& acc_grid, int x, int y, int z, float v);
+static Point3f sa_transform_world_by_root_delta(const Point3f& world_pos, const Point3f& from_root_pos,
+    const Matrix3f& from_root_ori, const Point3f& to_root_pos, const Matrix3f& to_root_ori);
+static int sa_min_segment_count(size_t a, size_t b);
+static int sa_get_frame_index_from_time(const Motion* m, float time);
+static void sa_resize_segment_grids(std::vector<VoxelGrid>& grids, int num_segments, int resolution);
+static void sa_clear_segment_grids(std::vector<VoxelGrid>& grids);
+static float sa_compute_principal_axis_angular_speed_sparse_values(
+    const std::vector<SparseVoxel>& curr_sparse_values,
+    const std::vector<SparseVoxel>& prev_sparse_values,
+    int resolution,
+    float dt,
+    const float world_bounds[3][2],
+    float weight_threshold = 1e-6f);
+static void sa_apply_principal_axis_speed_to_sparse_segment(
+    std::vector<SparseVoxel>& curr,
+    const std::vector<SparseVoxel>& prev,
+    int resolution,
+    float dt,
+    const float world_bounds[3][2],
+    float weight_threshold);
+
+static void sa_scatter_segment_sparse_feature_to_grids(
+    const SegmentVoxelGrid& segment_sparse,
+    int feature,
+    int resolution,
+    const float world_bounds[3][2],
+    const Point3f& curr_root_pos,
+    const Matrix3f& curr_root_ori,
+    float sparse_threshold,
+    VoxelGrid* seg_grid_ptr,
+    VoxelGrid& out_acc) {
+    const std::vector<SparseVoxel>& sparse_list = segment_sparse.voxels;
+    for (size_t k = 0; k < sparse_list.size(); ++k) {
+        const SparseVoxel& sv = sparse_list[k];
+        float v = sv.values[feature];
+        if (v <= sparse_threshold)
+            continue;
+
+        Point3f cached_world = sa_voxel_center_from_linear_index(sv.index, resolution, world_bounds);
+        Point3f transformed_world = cached_world;
+        if (segment_sparse.has_reference) {
+            transformed_world = sa_transform_world_by_root_delta(
+                cached_world,
+                segment_sparse.reference_root_pos,
+                segment_sparse.reference_root_ori,
+                curr_root_pos,
+                curr_root_ori);
+        }
+
+        int x, y, z;
+        if (!sa_world_to_voxel_index(transformed_world, resolution, world_bounds, x, y, z))
+            continue;
+
+        sa_accumulate_feature_value_to_grids(feature, seg_grid_ptr, out_acc, x, y, z, v);
+    }
 }
 
-static void sa_clear_segment_grids(std::vector<VoxelGrid>& grids) {
-    for (size_t s = 0; s < grids.size(); ++s)
-        grids[s].Clear();
+static void sa_compose_sparse_feature_frames_to_grids(
+    const Motion* m,
+    const MotionFrameSegmentVoxelGridCache& cache,
+    int feature,
+    int resolution,
+    const float world_bounds[3][2],
+    float sparse_threshold,
+    int frame_begin,
+    int frame_end,
+    std::vector<VoxelGrid>* out_seg_grids,
+    VoxelGrid& out_acc) {
+    if (!m)
+        return;
+
+    if (frame_begin < 0)
+        frame_begin = 0;
+    int max_frame = (std::min)((int)cache.frames.size(), m->num_frames) - 1;
+    if (max_frame < 0)
+        return;
+    if (frame_end > max_frame)
+        frame_end = max_frame;
+    if (frame_begin > frame_end)
+        return;
+
+    for (int f = frame_begin; f <= frame_end; ++f) {
+        const FrameSegmentVoxelGrid& frame_sparse = cache.frames[f];
+        const Point3f& curr_root_pos = m->frames[f].root_pos;
+        const Matrix3f& curr_root_ori = m->frames[f].root_ori;
+
+        int seg_count = cache.num_segments;
+        if (out_seg_grids)
+            seg_count = (std::min)(seg_count, (int)out_seg_grids->size());
+
+        for (int s = 0; s < seg_count; ++s) {
+            const SegmentVoxelGrid& segment_sparse = frame_sparse.segment_grids[s];
+            VoxelGrid* seg_grid_ptr = out_seg_grids ? &(*out_seg_grids)[s] : nullptr;
+            sa_scatter_segment_sparse_feature_to_grids(
+                segment_sparse,
+                feature,
+                resolution,
+                world_bounds,
+                curr_root_pos,
+                curr_root_ori,
+                sparse_threshold,
+                seg_grid_ptr,
+                out_acc);
+        }
+    }
 }
 
-static int sa_get_frame_index_from_time(const Motion* m, float time) {
-    if (!m || m->num_frames <= 0 || m->interval <= 1e-8f)
-        return 0;
-    int idx = (int)(time / m->interval);
-    if (idx < 0)
-        idx = 0;
-    if (idx >= m->num_frames)
-        idx = m->num_frames - 1;
-    return idx;
+static bool sa_compose_segment_feature_grids_from_frame_cache(
+    const Motion* m,
+    const MotionFrameSegmentVoxelGridCache& cache,
+    int feature,
+    int resolution,
+    const float world_bounds[3][2],
+    float sparse_threshold,
+    std::vector<VoxelGrid>& out_seg_grids) {
+    if (!m || feature < 0 || feature >= SA_FEATURE_COUNT)
+        return false;
+
+    int num_segments = cache.num_segments;
+    if (num_segments <= 0)
+        return false;
+
+    sa_resize_segment_grids(out_seg_grids, num_segments, resolution);
+    sa_clear_segment_grids(out_seg_grids);
+
+    VoxelGrid dummy_acc;
+    dummy_acc.Resize(resolution);
+    dummy_acc.Clear();
+
+    sa_compose_sparse_feature_frames_to_grids(
+        m,
+        cache,
+        feature,
+        resolution,
+        world_bounds,
+        sparse_threshold,
+        0,
+        m->num_frames - 1,
+        &out_seg_grids,
+        dummy_acc);
+
+    return true;
 }
 
-static bool sa_compute_principal_axis_from_presence_grid(const VoxelGrid& presence, const float world_bounds[3][2],
-    const Point3f& root_pos, Vector3f& axis_out) {
-    if (presence.resolution <= 0 || presence.data.empty())
+static void sa_collect_active_segments(const std::vector<bool>& selected_segments, int selected_segment_index, std::vector<int>& active_segments) {
+    active_segments.clear();
+    for (size_t s = 0; s < selected_segments.size(); ++s) {
+        if (selected_segments[s])
+            active_segments.push_back((int)s);
+    }
+
+    if (selected_segment_index >= 0 &&
+        selected_segment_index < (int)selected_segments.size() &&
+        !selected_segments[selected_segment_index]) {
+        active_segments.push_back(selected_segment_index);
+    }
+}
+
+static bool sa_compose_selected_segments_instant_from_frame_cache(
+    const Motion* m1,
+    const Motion* m2,
+    const MotionFrameSegmentVoxelGridCache& cache1,
+    const MotionFrameSegmentVoxelGridCache& cache2,
+    int feature,
+    int resolution,
+    const float world_bounds[3][2],
+    float sparse_threshold,
+    float current_time,
+    const std::vector<bool>& selected_segments,
+    int selected_segment_index,
+    VoxelGrid& out1,
+    VoxelGrid& out2,
+    VoxelGrid& out_diff,
+    float& out_max) {
+    if (!m1 || !m2)
+        return false;
+    if (feature < 0 || feature >= SA_FEATURE_COUNT)
+        return false;
+    if (cache1.frames.empty() || cache2.frames.empty())
+        return false;
+
+    std::vector<int> active_segments;
+    sa_collect_active_segments(selected_segments, selected_segment_index, active_segments);
+
+    int size = resolution * resolution * resolution;
+    if ((int)out1.data.size() != size) out1.Resize(resolution); else out1.Clear();
+    if ((int)out2.data.size() != size) out2.Resize(resolution); else out2.Clear();
+    if ((int)out_diff.data.size() != size) out_diff.Resize(resolution); else out_diff.Clear();
+
+    if (active_segments.empty()) {
+        out_max = 1.0f;
+        return true;
+    }
+
+    int f1 = sa_get_frame_index_from_time(m1, current_time);
+    int f2 = sa_get_frame_index_from_time(m2, current_time);
+    if (f1 < 0 || f1 >= (int)cache1.frames.size() || f2 < 0 || f2 >= (int)cache2.frames.size())
+        return false;
+
+    const FrameSegmentVoxelGrid& frame_sparse1 = cache1.frames[f1];
+    const FrameSegmentVoxelGrid& frame_sparse2 = cache2.frames[f2];
+    const Point3f& curr_root_pos1 = m1->frames[f1].root_pos;
+    const Matrix3f& curr_root_ori1 = m1->frames[f1].root_ori;
+    const Point3f& curr_root_pos2 = m2->frames[f2].root_pos;
+    const Matrix3f& curr_root_ori2 = m2->frames[f2].root_ori;
+
+    for (size_t k = 0; k < active_segments.size(); ++k) {
+        int s = active_segments[k];
+        if (s >= 0 && s < (int)frame_sparse1.segment_grids.size()) {
+            sa_scatter_segment_sparse_feature_to_grids(
+                frame_sparse1.segment_grids[s],
+                feature,
+                resolution,
+                world_bounds,
+                curr_root_pos1,
+                curr_root_ori1,
+                sparse_threshold,
+                nullptr,
+                out1);
+        }
+        if (s >= 0 && s < (int)frame_sparse2.segment_grids.size()) {
+            sa_scatter_segment_sparse_feature_to_grids(
+                frame_sparse2.segment_grids[s],
+                feature,
+                resolution,
+                world_bounds,
+                curr_root_pos2,
+                curr_root_ori2,
+                sparse_threshold,
+                nullptr,
+                out2);
+        }
+    }
+
+    out_max = 0.0f;
+    for (int i = 0; i < size; ++i) {
+        float d = fabsf(out1.data[i] - out2.data[i]);
+        out_diff.data[i] = d;
+        if (d > out_max)
+            out_max = d;
+    }
+    if (out_max < 1e-5f)
+        out_max = 1.0f;
+
+    return true;
+}
+
+static void sa_compose_selected_segments_feature_frames_to_grid(
+    const Motion* m,
+    const MotionFrameSegmentVoxelGridCache& cache,
+    int feature,
+    int resolution,
+    const float world_bounds[3][2],
+    float sparse_threshold,
+    int frame_begin,
+    int frame_end,
+    const std::vector<int>& active_segments,
+    VoxelGrid& out_grid) {
+    if (!m || feature < 0 || feature >= SA_FEATURE_COUNT)
+        return;
+
+    if (frame_begin < 0)
+        frame_begin = 0;
+    int max_frame = (std::min)((int)cache.frames.size(), m->num_frames) - 1;
+    if (max_frame < 0)
+        return;
+    if (frame_end > max_frame)
+        frame_end = max_frame;
+    if (frame_begin > frame_end)
+        return;
+
+    for (int f = frame_begin; f <= frame_end; ++f) {
+        const FrameSegmentVoxelGrid& frame_sparse = cache.frames[f];
+        const Point3f& curr_root_pos = m->frames[f].root_pos;
+        const Matrix3f& curr_root_ori = m->frames[f].root_ori;
+
+        for (size_t k = 0; k < active_segments.size(); ++k) {
+            int s = active_segments[k];
+            if (s < 0 || s >= (int)frame_sparse.segment_grids.size())
+                continue;
+
+            sa_scatter_segment_sparse_feature_to_grids(
+                frame_sparse.segment_grids[s],
+                feature,
+                resolution,
+                world_bounds,
+                curr_root_pos,
+                curr_root_ori,
+                sparse_threshold,
+                nullptr,
+                out_grid);
+        }
+    }
+}
+
+static bool sa_compose_selected_segments_accumulated_from_frame_cache(
+    const Motion* m1,
+    const Motion* m2,
+    const MotionFrameSegmentVoxelGridCache& cache1,
+    const MotionFrameSegmentVoxelGridCache& cache2,
+    int feature,
+    int resolution,
+    const float world_bounds[3][2],
+    float sparse_threshold,
+    const std::vector<bool>& selected_segments,
+    int selected_segment_index,
+    VoxelGrid& out1,
+    VoxelGrid& out2,
+    VoxelGrid& out_diff,
+    float& out_max) {
+    if (!m1 || !m2)
+        return false;
+    if (feature < 0 || feature >= SA_FEATURE_COUNT)
+        return false;
+    if (cache1.frames.empty() || cache2.frames.empty())
+        return false;
+
+    std::vector<int> active_segments;
+    sa_collect_active_segments(selected_segments, selected_segment_index, active_segments);
+
+    int size = resolution * resolution * resolution;
+    if ((int)out1.data.size() != size) out1.Resize(resolution); else out1.Clear();
+    if ((int)out2.data.size() != size) out2.Resize(resolution); else out2.Clear();
+    if ((int)out_diff.data.size() != size) out_diff.Resize(resolution); else out_diff.Clear();
+
+    if (active_segments.empty()) {
+        out_max = 1.0f;
+        return true;
+    }
+
+    sa_compose_selected_segments_feature_frames_to_grid(
+        m1,
+        cache1,
+        feature,
+        resolution,
+        world_bounds,
+        sparse_threshold,
+        0,
+        m1->num_frames - 1,
+        active_segments,
+        out1);
+
+    sa_compose_selected_segments_feature_frames_to_grid(
+        m2,
+        cache2,
+        feature,
+        resolution,
+        world_bounds,
+        sparse_threshold,
+        0,
+        m2->num_frames - 1,
+        active_segments,
+        out2);
+
+    out_max = 0.0f;
+    for (int i = 0; i < size; ++i) {
+        float d = fabsf(out1.data[i] - out2.data[i]);
+        out_diff.data[i] = d;
+        if (d > out_max)
+            out_max = d;
+    }
+    if (out_max < 1e-5f)
+        out_max = 1.0f;
+
+    return true;
+}
+
+static bool sa_compose_selected_segments_from_dense_grids(
+    const std::vector<VoxelGrid>& seg_data1,
+    const std::vector<VoxelGrid>& seg_data2,
+    int resolution,
+    const std::vector<bool>& selected_segments,
+    int selected_segment_index,
+    VoxelGrid& out1,
+    VoxelGrid& out2,
+    VoxelGrid& out_diff,
+    float& out_max) {
+    if (seg_data1.empty())
+        return false;
+
+    std::vector<int> active_segments;
+    sa_collect_active_segments(selected_segments, selected_segment_index, active_segments);
+    if (active_segments.empty()) {
+        out_max = 1.0f;
+        return true;
+    }
+
+    int size = resolution * resolution * resolution;
+    if ((int)out1.data.size() != size) out1.Resize(resolution); else out1.Clear();
+    if ((int)out2.data.size() != size) out2.Resize(resolution); else out2.Clear();
+    if ((int)out_diff.data.size() != size) out_diff.Resize(resolution); else out_diff.Clear();
+
+    out_max = 0.0f;
+    for (int i = 0; i < size; ++i) {
+        float val1 = 0.0f;
+        float val2 = 0.0f;
+
+        for (size_t k = 0; k < active_segments.size(); ++k) {
+            int s = active_segments[k];
+            if (s >= 0 && s < (int)seg_data1.size()) {
+                float v = seg_data1[s].data[i];
+                if (v > val1) val1 = v;
+            }
+            if (s >= 0 && s < (int)seg_data2.size()) {
+                float v = seg_data2[s].data[i];
+                if (v > val2) val2 = v;
+            }
+        }
+
+        out1.data[i] = val1;
+        out2.data[i] = val2;
+        float diff = fabsf(val1 - val2);
+        out_diff.data[i] = diff;
+        if (diff > out_max)
+            out_max = diff;
+    }
+
+    if (out_max < 1e-5f)
+        out_max = 1.0f;
+    return true;
+}
+
+static bool sa_compute_principal_axis_from_sparse_presence_values(
+    const std::vector<SparseVoxel>& sparse_values,
+    int resolution,
+    const float world_bounds[3][2],
+    Vector3f& axis_out,
+    float weight_threshold) {
+    if (resolution <= 0 || sparse_values.empty())
         return false;
 
     double sum_w = 0.0;
     double cx = 0.0, cy = 0.0, cz = 0.0;
-    int size = (int)presence.data.size();
-
-    // 加重重心 Ct を計算
-    for (int i = 0; i < size; ++i) {
-        float w = presence.data[i];
-        if (w <= 1e-6f)
+    for (size_t k = 0; k < sparse_values.size(); ++k) {
+        float w = sparse_values[k].values[0];
+        if (w <= weight_threshold)
             continue;
-        Point3f c = sa_voxel_center_from_linear_index(i, presence.resolution, world_bounds);
+        Point3f c = sa_voxel_center_from_linear_index(sparse_values[k].index, resolution, world_bounds);
         cx += (double)w * c.x;
         cy += (double)w * c.y;
         cz += (double)w * c.z;
@@ -110,15 +512,13 @@ static bool sa_compute_principal_axis_from_presence_grid(const VoxelGrid& presen
     cy /= sum_w;
     cz /= sum_w;
 
-    (void)root_pos;
-
     double c00 = 0.0, c01 = 0.0, c02 = 0.0;
     double c11 = 0.0, c12 = 0.0, c22 = 0.0;
-    for (int i = 0; i < size; ++i) {
-        float w = presence.data[i];
-        if (w <= 1e-6f)
+    for (size_t k = 0; k < sparse_values.size(); ++k) {
+        float w = sparse_values[k].values[0];
+        if (w <= weight_threshold)
             continue;
-        Point3f c = sa_voxel_center_from_linear_index(i, presence.resolution, world_bounds);
+        Point3f c = sa_voxel_center_from_linear_index(sparse_values[k].index, resolution, world_bounds);
         double dx = c.x - cx;
         double dy = c.y - cy;
         double dz = c.z - cz;
@@ -146,128 +546,113 @@ static bool sa_compute_principal_axis_from_presence_grid(const VoxelGrid& presen
         v = nv;
     }
 
-    if (v.length() <= 1e-8f)
-        return false;
-
-    v.normalize();
     axis_out = v;
     return true;
 }
 
-static bool sa_compute_principal_axis_from_presence_grid_sparse(const VoxelGrid& presence, const float world_bounds[3][2],
-    const std::vector<int>& active_indices, const Point3f& root_pos, Vector3f& axis_out) {
-    if (presence.resolution <= 0 || presence.data.empty() || active_indices.empty())
-        return false;
-
-    double sum_w = 0.0;
-    double cx = 0.0, cy = 0.0, cz = 0.0;
-
-    // 加重重心 Ct を計算
-    for (size_t k = 0; k < active_indices.size(); ++k) {
-        int i = active_indices[k];
-        float w = presence.data[i];
-        if (w <= 1e-6f)
-            continue;
-        Point3f c = sa_voxel_center_from_linear_index(i, presence.resolution, world_bounds);
-        cx += (double)w * c.x;
-        cy += (double)w * c.y;
-        cz += (double)w * c.z;
-        sum_w += w;
-    }
-
-    if (sum_w <= 1e-8)
-        return false;
-
-    cx /= sum_w;
-    cy /= sum_w;
-    cz /= sum_w;
-
-    (void)root_pos;
-
-    double c00 = 0.0, c01 = 0.0, c02 = 0.0;
-    double c11 = 0.0, c12 = 0.0, c22 = 0.0;
-    for (size_t k = 0; k < active_indices.size(); ++k) {
-        int i = active_indices[k];
-        float w = presence.data[i];
-        if (w <= 1e-6f)
-            continue;
-        Point3f c = sa_voxel_center_from_linear_index(i, presence.resolution, world_bounds);
-        double dx = c.x - cx;
-        double dy = c.y - cy;
-        double dz = c.z - cz;
-        c00 += (double)w * dx * dx;
-        c01 += (double)w * dx * dy;
-        c02 += (double)w * dx * dz;
-        c11 += (double)w * dy * dy;
-        c12 += (double)w * dy * dz;
-        c22 += (double)w * dz * dz;
-    }
-
-    c00 /= sum_w; c01 /= sum_w; c02 /= sum_w;
-    c11 /= sum_w; c12 /= sum_w; c22 /= sum_w;
-
-    Vector3f v(1.0f, 0.0f, 0.0f);
-    for (int it = 0; it < 16; ++it) {
-        Vector3f nv;
-        nv.x = (float)(c00 * v.x + c01 * v.y + c02 * v.z);
-        nv.y = (float)(c01 * v.x + c11 * v.y + c12 * v.z);
-        nv.z = (float)(c02 * v.x + c12 * v.y + c22 * v.z);
-        float len = nv.length();
-        if (len <= 1e-8f)
-            return false;
-        nv.x /= len;
-        nv.y /= len;
-        nv.z /= len;
-        v = nv;
-    }
-
-    if (v.length() <= 1e-8f)
-        return false;
-
-    v.normalize();
-    axis_out = v;
-    return true;
+static float sa_compute_unsigned_angle_between_unit_vectors(const Vector3f& a, const Vector3f& b) {
+    float dot = fabsf(a.x * b.x + a.y * b.y + a.z * b.z);
+    dot = (std::max)(0.0f, (std::min)(1.0f, dot));
+    return acosf(dot);
 }
 
-static float sa_compute_principal_axis_angular_speed(const VoxelGrid& curr_presence, const VoxelGrid& prev_presence,
-    float dt, const float world_bounds[3][2], const Point3f& curr_root_pos, const Point3f& prev_root_pos) {
-    if (dt <= 1e-8f)
+static int sa_min_segment_count(size_t a, size_t b) {
+    return (std::min)((int)a, (int)b);
+}
+
+static void sa_apply_uniform_principal_axis_speed(std::vector<SparseVoxel>& curr, float omega_axis) {
+    for (size_t k = 0; k < curr.size(); ++k) {
+        if (omega_axis > curr[k].values[4])
+            curr[k].values[4] = omega_axis;
+    }
+}
+
+static float sa_compute_principal_axis_angular_speed_sparse_values(
+    const std::vector<SparseVoxel>& curr_sparse_values,
+    const std::vector<SparseVoxel>& prev_sparse_values,
+    int resolution,
+    float dt,
+    const float world_bounds[3][2],
+    float weight_threshold) {
+    if (resolution <= 0 || dt <= 1e-8f || curr_sparse_values.empty() || prev_sparse_values.empty())
         return 0.0f;
+
+    float effective_weight_threshold = (std::max)(0.0f, weight_threshold);
 
     Vector3f e_curr, e_prev;
-    if (!sa_compute_principal_axis_from_presence_grid(curr_presence, world_bounds, curr_root_pos, e_curr))
+    if (!sa_compute_principal_axis_from_sparse_presence_values(curr_sparse_values, resolution, world_bounds, e_curr, effective_weight_threshold))
         return 0.0f;
-    if (!sa_compute_principal_axis_from_presence_grid(prev_presence, world_bounds, prev_root_pos, e_prev))
+    if (!sa_compute_principal_axis_from_sparse_presence_values(prev_sparse_values, resolution, world_bounds, e_prev, effective_weight_threshold))
         return 0.0f;
 
-    e_curr.normalize();
-    e_prev.normalize();
-
-    float dot = fabsf(e_curr.x * e_prev.x + e_curr.y * e_prev.y + e_curr.z * e_prev.z);
-    dot = max(-1.0f, min(1.0f, dot));
-    float dtheta = acosf(dot);
+    float dtheta = sa_compute_unsigned_angle_between_unit_vectors(e_curr, e_prev);
     return dtheta / dt;
 }
 
-static float sa_compute_principal_axis_angular_speed_sparse(const VoxelGrid& curr_presence, const VoxelGrid& prev_presence,
-    float dt, const float world_bounds[3][2], const std::vector<int>& curr_active_indices, const std::vector<int>& prev_active_indices,
-    const Point3f& curr_root_pos, const Point3f& prev_root_pos) {
-    if (dt <= 1e-8f)
-        return 0.0f;
+static void sa_apply_principal_axis_speed_to_sparse_segment(
+    std::vector<SparseVoxel>& curr,
+    const std::vector<SparseVoxel>& prev,
+    int resolution,
+    float dt,
+    const float world_bounds[3][2],
+    float weight_threshold) {
+    if (resolution <= 0 || curr.empty() || prev.empty())
+        return;
 
-    Vector3f e_curr, e_prev;
-    if (!sa_compute_principal_axis_from_presence_grid_sparse(curr_presence, world_bounds, curr_active_indices, curr_root_pos, e_curr))
-        return 0.0f;
-    if (!sa_compute_principal_axis_from_presence_grid_sparse(prev_presence, world_bounds, prev_active_indices, prev_root_pos, e_prev))
-        return 0.0f;
+    float omega_axis = sa_compute_principal_axis_angular_speed_sparse_values(
+        curr,
+        prev,
+        resolution,
+        dt,
+        world_bounds,
+        weight_threshold);
 
-    e_curr.normalize();
-    e_prev.normalize();
+    if (omega_axis <= 0.0f)
+        return;
 
-    float dot = fabsf(e_curr.x * e_prev.x + e_curr.y * e_prev.y + e_curr.z * e_prev.z);
-    dot = max(-1.0f, min(1.0f, dot));
-    float dtheta = acosf(dot);
-    return dtheta / dt;
+    sa_apply_uniform_principal_axis_speed(curr, omega_axis);
+}
+
+static void sa_apply_principal_axis_speed_to_sparse_segments(
+    std::vector<std::vector<SparseVoxel>>& curr_sparse_values,
+    const std::vector<std::vector<SparseVoxel>>& prev_sparse_values,
+    int resolution,
+    float dt,
+    const float world_bounds[3][2],
+    float weight_threshold) {
+    int seg_count = sa_min_segment_count(curr_sparse_values.size(), prev_sparse_values.size());
+    for (int s = 0; s < seg_count; ++s) {
+        sa_apply_principal_axis_speed_to_sparse_segment(
+            curr_sparse_values[s],
+            prev_sparse_values[s],
+            resolution,
+            dt,
+            world_bounds,
+            weight_threshold);
+    }
+}
+
+static void sa_resize_segment_grids(std::vector<VoxelGrid>& grids, int num_segments, int resolution) {
+    if ((int)grids.size() != num_segments)
+        grids.resize(num_segments);
+    for (int s = 0; s < num_segments; ++s)
+        grids[s].Resize(resolution);
+}
+
+static void sa_clear_segment_grids(std::vector<VoxelGrid>& grids) {
+    for (size_t s = 0; s < grids.size(); ++s)
+        grids[s].Clear();
+}
+
+static int sa_get_frame_index_from_time(const Motion* m, float time) {
+    if (!m || m->num_frames <= 0 || m->interval <= 1e-8f)
+        return 0;
+    int idx = (int)(time / m->interval);
+    if (idx < 0)
+        idx = 0;
+    if (idx >= m->num_frames)
+        idx = m->num_frames - 1;
+    return idx;
 }
 
 static bool sa_nearly_equal_float(float a, float b, float eps = 1e-5f) {
@@ -298,6 +683,21 @@ static bool sa_world_to_voxel_index(const Point3f& p, int resolution, const floa
     z = (int)(((p.z - world_bounds[2][0]) / range_z) * resolution);
 
     return x >= 0 && x < resolution && y >= 0 && y < resolution && z >= 0 && z < resolution;
+}
+
+static void sa_accumulate_feature_value_to_grids(int feature, VoxelGrid* seg_grid_ptr, VoxelGrid& acc_grid, int x, int y, int z, float v) {
+    if (feature == 0) {
+        if (seg_grid_ptr)
+            seg_grid_ptr->At(x, y, z) += v;
+        acc_grid.At(x, y, z) += v;
+    } else {
+        if (seg_grid_ptr) {
+            float& seg_v = seg_grid_ptr->At(x, y, z);
+            if (v > seg_v) seg_v = v;
+        }
+        float& acc_v = acc_grid.At(x, y, z);
+        if (v > acc_v) acc_v = v;
+    }
 }
 
 static Point3f sa_transform_world_by_root_delta(const Point3f& world_pos, const Point3f& from_root_pos,
@@ -365,8 +765,14 @@ SpatialAnalyzer::SpatialAnalyzer() {
 
     has_frame_cache = false;
     sparse_threshold = 1e-4f;
-    temp_voxelize_num_segments = -1;
-    temp_voxelize_resolution = -1;
+    last_instant_motion1 = nullptr;
+    last_instant_motion2 = nullptr;
+    last_instant_time = 0.0f;
+    has_latest_instant_context = false;
+    last_accum_motion1 = nullptr;
+    last_accum_motion2 = nullptr;
+    has_latest_accum_context = false;
+    has_loaded_segment_dense_cache = false;
     prev_presence_cache_entries[0] = PrevPresenceCacheEntry();
     prev_presence_cache_entries[1] = PrevPresenceCacheEntry();
 }
@@ -384,10 +790,19 @@ void SpatialAnalyzer::ResizeGrids(int res) {
         accumulated_pose_cache[i].valid = false;
     }
 
-    temp_voxelize_num_segments = -1;
-    temp_voxelize_resolution = -1;
     prev_presence_cache_entries[0].valid = false;
     prev_presence_cache_entries[1].valid = false;
+    frame_cache1.Clear();
+    frame_cache2.Clear();
+    has_frame_cache = false;
+    last_instant_motion1 = nullptr;
+    last_instant_motion2 = nullptr;
+    last_instant_time = 0.0f;
+    last_accum_motion1 = nullptr;
+    last_accum_motion2 = nullptr;
+    has_latest_instant_context = false;
+    has_latest_accum_context = false;
+    has_loaded_segment_dense_cache = false;
 }
 
 // ワールド座標の境界を設定し、スライス平面を中心に配置
@@ -433,29 +848,6 @@ void SpatialAnalyzer::VoxelizeMotion(Motion* m, float time, VoxelGrid& occ, Voxe
     if (!m)
         return;
 
-    int num_segments = m->body->num_segments;
-    bool need_resize = (temp_voxelize_num_segments != num_segments || temp_voxelize_resolution != grid_resolution);
-    if (need_resize) {
-        for (int i = 0; i < SA_FEATURE_COUNT; ++i) {
-            temp_voxelize_seg[i].resize(num_segments);
-            for (int s = 0; s < num_segments; ++s)
-                temp_voxelize_seg[i][s].Resize(grid_resolution);
-        }
-        temp_voxelize_num_segments = num_segments;
-        temp_voxelize_resolution = grid_resolution;
-    } else {
-        for (int i = 0; i < SA_FEATURE_COUNT; ++i)
-            for (int s = 0; s < num_segments; ++s)
-                temp_voxelize_seg[i][s].Clear();
-    }
-
-    VoxelizeMotionBySegmentGrids(m, time,
-                                 temp_voxelize_seg[0],
-                                 temp_voxelize_seg[1],
-                                 temp_voxelize_seg[2],
-                                 temp_voxelize_seg[3],
-                                 temp_voxelize_seg[4]);
-
     int size = grid_resolution * grid_resolution * grid_resolution;
     if ((int)occ.data.size() != size) occ.Resize(grid_resolution);
     if ((int)spd.data.size() != size) spd.Resize(grid_resolution);
@@ -469,25 +861,29 @@ void SpatialAnalyzer::VoxelizeMotion(Motion* m, float time, VoxelGrid& occ, Voxe
     std::fill(ine.data.begin(), ine.data.end(), 0.0f);
     std::fill(pax.data.begin(), pax.data.end(), 0.0f);
 
-    for (int s = 0; s < num_segments; ++s) {
-        const std::vector<float>& psc_data = temp_voxelize_seg[0][s].data;
-        const std::vector<float>& spd_data = temp_voxelize_seg[1][s].data;
-        const std::vector<float>& jrk_data = temp_voxelize_seg[2][s].data;
-        const std::vector<float>& ine_data = temp_voxelize_seg[3][s].data;
-        const std::vector<float>& pax_data = temp_voxelize_seg[4][s].data;
+    std::vector<std::vector<SparseVoxel>> curr_sparse_presence;
+    BuildSegmentSparseVoxels(m, time, curr_sparse_presence);
 
-        for (int i = 0; i < size; ++i) {
-            occ.data[i] += psc_data[i];
-            if (spd_data[i] > spd.data[i]) spd.data[i] = spd_data[i];
-            if (jrk_data[i] > jrk.data[i]) jrk.data[i] = jrk_data[i];
-            if (ine_data[i] > ine.data[i]) ine.data[i] = ine_data[i];
-            if (pax_data[i] > pax.data[i]) pax.data[i] = pax_data[i];
+    for (size_t s = 0; s < curr_sparse_presence.size(); ++s) {
+        const std::vector<SparseVoxel>& sparse = curr_sparse_presence[s];
+        for (size_t k = 0; k < sparse.size(); ++k) {
+            int i = sparse[k].index;
+            occ.data[i] += sparse[k].values[0];
+            if (sparse[k].values[1] > spd.data[i]) spd.data[i] = sparse[k].values[1];
+            if (sparse[k].values[2] > jrk.data[i]) jrk.data[i] = sparse[k].values[2];
+            if (sparse[k].values[3] > ine.data[i]) ine.data[i] = sparse[k].values[3];
+            if (sparse[k].values[4] > pax.data[i]) pax.data[i] = sparse[k].values[4];
         }
     }
 }
 
 // 現在時刻の両モーションのボクセルを更新し、差分を計算
 void SpatialAnalyzer::UpdateVoxels(Motion* m1, Motion* m2, float current_time) {
+    last_instant_motion1 = m1;
+    last_instant_motion2 = m2;
+    last_instant_time = current_time;
+    has_latest_instant_context = (m1 != nullptr && m2 != nullptr);
+
     int selected_count = GetSelectedSegmentCount();
     bool use_segment_mode = show_segment_mode && (selected_count > 0 || selected_segment_index >= 0);
     int feature = feature_mode;
@@ -499,10 +895,36 @@ void SpatialAnalyzer::UpdateVoxels(Motion* m1, Motion* m2, float current_time) {
     voxels_diff[feature].Clear();
     max_val[feature] = 0.0f;
 
-    bool compose_segment_data = use_segment_mode && (norm_mode == 0);
-    if (!ComposeInstantFeatureFromFrameCache(m1, m2, feature, current_time, compose_segment_data)) {
+    if (!ComposeInstantFeatureFromFrameCache(m1, m2, feature, current_time)) {
         VoxelizeMotion(m1, current_time, voxels1[0], voxels1[1], voxels1[2], voxels1[3], voxels1[4]);
         VoxelizeMotion(m2, current_time, voxels2[0], voxels2[1], voxels2[2], voxels2[3], voxels2[4]);
+    }
+
+    if (use_segment_mode && norm_mode == 0) {
+        if (sa_compose_selected_segments_instant_from_frame_cache(
+            m1,
+            m2,
+            frame_cache1,
+            frame_cache2,
+            feature,
+            grid_resolution,
+            world_bounds,
+            sparse_threshold,
+            current_time,
+            selected_segments,
+            selected_segment_index,
+            cached_segment_grid1,
+            cached_segment_grid2,
+            cached_segment_diff,
+            cached_segment_max_val)) {
+            segment_cache_dirty = false;
+            cached_feature_mode = feature_mode;
+            cached_norm_mode = norm_mode;
+            cached_selected_segment_index = selected_segment_index;
+            cached_selected_segments = selected_segments;
+        } else {
+            segment_cache_dirty = true;
+        }
     }
 
     // 差分計算と最大値更新（現在のfeature_modeのみ）
@@ -516,7 +938,7 @@ void SpatialAnalyzer::UpdateVoxels(Motion* m1, Motion* m2, float current_time) {
     if (max_val[feature] < 1e-5f) max_val[feature] = 1.0f;
 }
 
-bool SpatialAnalyzer::ComposeInstantFeatureFromFrameCache(Motion* m1, Motion* m2, int feature, float current_time, bool compose_segment_data) {
+bool SpatialAnalyzer::ComposeInstantFeatureFromFrameCache(Motion* m1, Motion* m2, int feature, float current_time) {
     if (!m1 || !m2 || !has_frame_cache)
         return false;
     if (frame_cache1.frames.empty() || frame_cache2.frames.empty())
@@ -531,8 +953,6 @@ bool SpatialAnalyzer::ComposeInstantFeatureFromFrameCache(Motion* m1, Motion* m2
     if (f1 >= (int)frame_cache1.frames.size() || f2 >= (int)frame_cache2.frames.size())
         return false;
 
-    std::vector<VoxelGrid>* seg1_grids = nullptr;
-    std::vector<VoxelGrid>* seg2_grids = nullptr;
     VoxelGrid* out1 = nullptr;
     VoxelGrid* out2 = nullptr;
 
@@ -545,67 +965,13 @@ bool SpatialAnalyzer::ComposeInstantFeatureFromFrameCache(Motion* m1, Motion* m2
     int size = grid_resolution * grid_resolution * grid_resolution;
     if ((int)out1->data.size() != size) out1->Resize(grid_resolution);
     if ((int)out2->data.size() != size) out2->Resize(grid_resolution);
-    if (compose_segment_data) {
-        sa_resize_segment_grids(segment_voxels1[feature], num_segments, grid_resolution);
-        sa_resize_segment_grids(segment_voxels2[feature], num_segments, grid_resolution);
-        sa_clear_segment_grids(segment_voxels1[feature]);
-        sa_clear_segment_grids(segment_voxels2[feature]);
-        seg1_grids = &segment_voxels1[feature];
-        seg2_grids = &segment_voxels2[feature];
-    }
 
-    auto compose_one = [&](Motion* m, const MotionFrameSegmentVoxelGridCache& cache, int frame_idx, std::vector<VoxelGrid>* out_seg_grids, VoxelGrid& out_acc) {
-        const FrameSegmentVoxelGrid& frame_sparse = cache.frames[frame_idx];
-        const Point3f& curr_root_pos = m->frames[frame_idx].root_pos;
-        const Matrix3f& curr_root_ori = m->frames[frame_idx].root_ori;
-
-        int seg_count = cache.num_segments;
-        if (out_seg_grids)
-            seg_count = (std::min)(seg_count, (int)out_seg_grids->size());
-        for (int s = 0; s < seg_count; ++s) {
-            const SegmentVoxelGrid& segment_sparse = frame_sparse.segment_grids[s];
-            VoxelGrid* seg_grid_ptr = out_seg_grids ? &(*out_seg_grids)[s] : nullptr;
-            const std::vector<SparseVoxel>& sparse_list = segment_sparse.voxels;
-
-            for (size_t k = 0; k < sparse_list.size(); ++k) {
-                const SparseVoxel& sv = sparse_list[k];
-                float v = sv.values[feature];
-                if (v <= sparse_threshold)
-                    continue;
-
-                Point3f cached_world = sa_voxel_center_from_linear_index(sv.index, grid_resolution, world_bounds);
-                Point3f transformed_world = cached_world;
-                if (segment_sparse.has_reference) {
-                    transformed_world = sa_transform_world_by_root_delta(
-                        cached_world,
-                        segment_sparse.reference_root_pos,
-                        segment_sparse.reference_root_ori,
-                        curr_root_pos,
-                        curr_root_ori);
-                }
-
-                int x, y, z;
-                if (!sa_world_to_voxel_index(transformed_world, grid_resolution, world_bounds, x, y, z))
-                    continue;
-
-                if (feature == 0) {
-                    if (seg_grid_ptr)
-                        seg_grid_ptr->At(x, y, z) += v;
-                    out_acc.At(x, y, z) += v;
-                } else {
-                    if (seg_grid_ptr) {
-                        float& seg_v = seg_grid_ptr->At(x, y, z);
-                        if (v > seg_v) seg_v = v;
-                    }
-                    float& acc_v = out_acc.At(x, y, z);
-                    if (v > acc_v) acc_v = v;
-                }
-            }
-        }
-    };
-
-    compose_one(m1, frame_cache1, f1, seg1_grids, *out1);
-    compose_one(m2, frame_cache2, f2, seg2_grids, *out2);
+    sa_compose_sparse_feature_frames_to_grids(
+        m1, frame_cache1, feature, grid_resolution, world_bounds, sparse_threshold,
+        f1, f1, nullptr, *out1);
+    sa_compose_sparse_feature_frames_to_grids(
+        m2, frame_cache2, feature, grid_resolution, world_bounds, sparse_threshold,
+        f2, f2, nullptr, *out2);
     return true;
 }
 
@@ -770,6 +1136,12 @@ void SpatialAnalyzer::DrawVoxels3D() {
 // モーション全体を通して累積ボクセルを計算（占有率・速度・ジャーク + 部位ごと）
 void SpatialAnalyzer::AccumulateAllFrames(Motion* m1, Motion* m2)
 {
+    has_loaded_segment_dense_cache = false;
+
+    last_accum_motion1 = m1;
+    last_accum_motion2 = m2;
+    has_latest_accum_context = (m1 != nullptr && m2 != nullptr);
+
     if (!m1 || !m2)
         return;
 
@@ -815,124 +1187,35 @@ void SpatialAnalyzer::BuildSingleMotionFeatureFrameCache(Motion* m, MotionFrameS
         return;
 
     int num_segments = m->body->num_segments;
-    int size = grid_resolution * grid_resolution * grid_resolution;
     cache.Resize(m->num_frames, num_segments, grid_resolution);
-
-    std::vector<VoxelGrid> curr_seg_psc(num_segments), prev_seg_psc(num_segments), curr_seg_spd(num_segments), curr_seg_jrk(num_segments), curr_seg_ine(num_segments), curr_seg_pax(num_segments);
-    for (int s = 0; s < num_segments; ++s) {
-        curr_seg_psc[s].Resize(grid_resolution);
-        prev_seg_psc[s].Resize(grid_resolution);
-        curr_seg_spd[s].Resize(grid_resolution);
-        curr_seg_jrk[s].Resize(grid_resolution);
-        curr_seg_ine[s].Resize(grid_resolution);
-        curr_seg_pax[s].Resize(grid_resolution);
-    }
-    for (int s = 0; s < num_segments; ++s)
-        prev_seg_psc[s].Clear();
-
-    FrameData frame_data;
-    vector<BoneData> bones;
-    float world_range[3];
-    for (int i = 0; i < 3; ++i)
-        world_range[i] = world_bounds[i][1] - world_bounds[i][0];
-    float bone_radius = 0.08f;
-    bool has_prev_presence = false;
-    std::vector<std::vector<int>> curr_active_indices(num_segments), prev_active_indices(num_segments);
-    std::vector<std::vector<unsigned char>> curr_active_marks(num_segments, std::vector<unsigned char>(size, 0));
 
     for (int f = 0; f < m->num_frames; ++f) {
         float time = f * m->interval;
-        for (int s = 0; s < num_segments; ++s) {
-            curr_seg_psc[s].Clear();
-            curr_seg_spd[s].Clear();
-            curr_seg_jrk[s].Clear();
-            curr_seg_ine[s].Clear();
-            curr_seg_pax[s].Clear();
-        }
-        for (int s = 0; s < num_segments; ++s)
-            curr_active_indices[s].clear();
 
-        ComputeFrameData(m, time, frame_data);
-        ExtractBoneData(m, frame_data, bones);
-        for (const BoneData& bone : bones) {
-            if (!bone.valid)
-                continue;
-            int s = bone.segment_index;
-            VoxelGrid& seg_pres_grid = curr_seg_psc[s];
-            VoxelGrid& seg_spd_grid = curr_seg_spd[s];
-            VoxelGrid& seg_jrk_grid = curr_seg_jrk[s];
-            VoxelGrid& seg_ine_grid = curr_seg_ine[s];
-            WriteToVoxelGrid(bone, bone_radius, world_range, &seg_pres_grid, &seg_spd_grid, &seg_jrk_grid, &seg_ine_grid,
-                             &curr_active_indices[s], &curr_active_marks[s]);
-        }
-
-        if (has_prev_presence) {
-            const Point3f& curr_root_pos = m->frames[f].root_pos;
-            const Point3f& prev_root_pos = m->frames[f - 1].root_pos;
-            for (int s = 0; s < num_segments; ++s) {
-                float omega_axis = sa_compute_principal_axis_angular_speed_sparse(
-                    curr_seg_psc[s],
-                    prev_seg_psc[s],
-                    m->interval,
-                    world_bounds,
-                    curr_active_indices[s],
-                    prev_active_indices[s],
-                    curr_root_pos,
-                    prev_root_pos);
-
-                if (omega_axis <= 0.0f)
-                    continue;
-
-                VoxelGrid& curr_presence = curr_seg_psc[s];
-                VoxelGrid& seg_pax_grid = curr_seg_pax[s];
-                const std::vector<int>& active = curr_active_indices[s];
-                for (size_t k = 0; k < active.size(); ++k) {
-                    int i = active[k];
-                    if (curr_presence.data[i] <= sparse_threshold)
-                        continue;
-                    if (omega_axis > seg_pax_grid.data[i])
-                        seg_pax_grid.data[i] = omega_axis;
-                }
-            }
-        }
+        std::vector<std::vector<SparseVoxel>> curr_sparse_values;
+        BuildSegmentSparseBaseValues(m, time, curr_sparse_values);
 
         FrameSegmentVoxelGrid& frame_sparse = cache.frames[f];
         frame_sparse.Clear();
-
         for (int s = 0; s < num_segments; ++s) {
-            const VoxelGrid& g0 = curr_seg_psc[s];
-            const VoxelGrid& g1 = curr_seg_spd[s];
-            const VoxelGrid& g2 = curr_seg_jrk[s];
-            const VoxelGrid& g3 = curr_seg_ine[s];
-            const VoxelGrid& g4 = curr_seg_pax[s];
-            SegmentVoxelGrid& segment_sparse = frame_sparse.segment_grids[s];
-            segment_sparse.SetReference(m->frames[f].root_pos, m->frames[f].root_ori);
-            std::vector<SparseVoxel>& sparse_list = segment_sparse.voxels;
-            sparse_list.clear();
-            const std::vector<int>& active = curr_active_indices[s];
-            sparse_list.reserve(active.size());
-            for (size_t k = 0; k < active.size(); ++k) {
-                int i = active[k];
-                float v0 = g0.data[i];
-                float v1 = g1.data[i];
-                float v2 = g2.data[i];
-                float v3 = g3.data[i];
-                float v4 = g4.data[i];
-                if (v0 > sparse_threshold || v1 > sparse_threshold || v2 > sparse_threshold || v3 > sparse_threshold || v4 > sparse_threshold)
-                    sparse_list.push_back(SparseVoxel(i, v0, v1, v2, v3, v4));
+            frame_sparse.segment_grids[s].SetReference(m->frames[f].root_pos, m->frames[f].root_ori);
+            frame_sparse.segment_grids[s].voxels.swap(curr_sparse_values[s]);
+        }
+
+        if (f > 0) {
+            const float weight_threshold = sparse_threshold;
+            int seg_count = sa_min_segment_count(frame_sparse.segment_grids.size(), cache.frames[f - 1].segment_grids.size());
+            for (int s = 0; s < seg_count; ++s) {
+                sa_apply_principal_axis_speed_to_sparse_segment(
+                    frame_sparse.segment_grids[s].voxels,
+                    cache.frames[f - 1].segment_grids[s].voxels,
+                    grid_resolution,
+                    m->interval,
+                    world_bounds,
+                    weight_threshold);
             }
         }
 
-        for (int s = 0; s < num_segments; ++s) {
-            std::vector<int>& active = curr_active_indices[s];
-            std::vector<unsigned char>& marks = curr_active_marks[s];
-            for (size_t k = 0; k < active.size(); ++k)
-                marks[active[k]] = 0;
-        }
-
-        std::swap(curr_seg_psc, prev_seg_psc);
-        std::swap(curr_active_indices, prev_active_indices);
-        has_prev_presence = true;
     }
 }
 
@@ -940,6 +1223,7 @@ void SpatialAnalyzer::BuildAllFeatureFrameCaches(Motion* m1, Motion* m2) {
     has_frame_cache = false;
     frame_cache1.Clear();
     frame_cache2.Clear();
+    has_loaded_segment_dense_cache = false;
     for (int f = 0; f < SA_FEATURE_COUNT; ++f)
         accumulated_pose_cache[f].valid = false;
 
@@ -956,8 +1240,6 @@ void SpatialAnalyzer::ComposeAccumulatedFeatureFromFrameCache(Motion* m1, Motion
     MotionFrameSegmentVoxelGridCache* c2 = nullptr;
     bool has_cache = false;
     AccumulatedPoseCache* pose_cache = nullptr;
-    std::vector<VoxelGrid>* seg1_grids = nullptr;
-    std::vector<VoxelGrid>* seg2_grids = nullptr;
     VoxelGrid* acc1 = nullptr;
     VoxelGrid* acc2 = nullptr;
     VoxelGrid* diff = nullptr;
@@ -996,60 +1278,22 @@ void SpatialAnalyzer::ComposeAccumulatedFeatureFromFrameCache(Motion* m1, Motion
 
     int num_segments = m1->body->num_segments;
     int size = grid_resolution * grid_resolution * grid_resolution;
+    std::vector<VoxelGrid> seg1_grids;
+    std::vector<VoxelGrid> seg2_grids;
 
     acc1->Resize(grid_resolution); acc2->Resize(grid_resolution); diff->Resize(grid_resolution);
     acc1->Clear(); acc2->Clear(); diff->Clear();
-    sa_resize_segment_grids(segment_voxels1[feature], num_segments, grid_resolution);
-    sa_resize_segment_grids(segment_voxels2[feature], num_segments, grid_resolution);
-    sa_clear_segment_grids(segment_voxels1[feature]);
-    sa_clear_segment_grids(segment_voxels2[feature]);
-    seg1_grids = &segment_voxels1[feature];
-    seg2_grids = &segment_voxels2[feature];
+    sa_resize_segment_grids(seg1_grids, num_segments, grid_resolution);
+    sa_resize_segment_grids(seg2_grids, num_segments, grid_resolution);
+    sa_clear_segment_grids(seg1_grids);
+    sa_clear_segment_grids(seg2_grids);
 
-    auto compose_single_motion = [&](Motion* m, const MotionFrameSegmentVoxelGridCache& cache, std::vector<VoxelGrid>& out_segment_grids, VoxelGrid& out_acc) {
-        int frame_count = (std::min)((int)cache.frames.size(), m->num_frames);
-        for (int f = 0; f < frame_count; ++f) {
-            const FrameSegmentVoxelGrid& frame_sparse = cache.frames[f];
-            const Point3f& curr_root_pos = m->frames[f].root_pos;
-            const Matrix3f& curr_root_ori = m->frames[f].root_ori;
-            for (int s = 0; s < cache.num_segments; ++s) {
-                if (s >= (int)out_segment_grids.size()) continue;
-                const SegmentVoxelGrid& segment_sparse = frame_sparse.segment_grids[s];
-                const std::vector<SparseVoxel>& sparse_list = segment_sparse.voxels;
-                VoxelGrid& seg_grid = out_segment_grids[s];
-                for (size_t k = 0; k < sparse_list.size(); ++k) {
-                    const SparseVoxel& sv = sparse_list[k];
-                    Point3f cached_world = sa_voxel_center_from_linear_index(sv.index, grid_resolution, world_bounds);
-                    Point3f transformed_world = cached_world;
-                    if (segment_sparse.has_reference) {
-                        transformed_world = sa_transform_world_by_root_delta(
-                            cached_world,
-                            segment_sparse.reference_root_pos,
-                            segment_sparse.reference_root_ori,
-                            curr_root_pos,
-                            curr_root_ori);
-                    }
-                    int x, y, z;
-                    if (!sa_world_to_voxel_index(transformed_world, grid_resolution, world_bounds, x, y, z))
-                        continue;
-
-                    float v = sv.values[feature];
-                    if (feature == 0) {
-                        seg_grid.At(x, y, z) += v;
-                        out_acc.At(x, y, z) += v;
-                    } else {
-                        float& sv_seg = seg_grid.At(x, y, z);
-                        if (v > sv_seg) sv_seg = v;
-                        float& sv_acc = out_acc.At(x, y, z);
-                        if (v > sv_acc) sv_acc = v;
-                    }
-                }
-            }
-        }
-    };
-
-    compose_single_motion(m1, *c1, *seg1_grids, *acc1);
-    compose_single_motion(m2, *c2, *seg2_grids, *acc2);
+    sa_compose_sparse_feature_frames_to_grids(
+        m1, *c1, feature, grid_resolution, world_bounds, sparse_threshold,
+        0, m1->num_frames - 1, &seg1_grids, *acc1);
+    sa_compose_sparse_feature_frames_to_grids(
+        m2, *c2, feature, grid_resolution, world_bounds, sparse_threshold,
+        0, m2->num_frames - 1, &seg2_grids, *acc2);
 
     *max_val = 0.0f;
     for (int i = 0; i < size; ++i) {
@@ -1063,8 +1307,8 @@ void SpatialAnalyzer::ComposeAccumulatedFeatureFromFrameCache(Motion* m1, Motion
         InitializeSegmentSelection(num_segments);
     for (int s = 0; s < num_segments; ++s) {
         float smax = 0.0f;
-        const std::vector<float>& g1 = (*seg1_grids)[s].data;
-        const std::vector<float>& g2 = (*seg2_grids)[s].data;
+        const std::vector<float>& g1 = seg1_grids[s].data;
+        const std::vector<float>& g2 = seg2_grids[s].data;
         for (int i = 0; i < size; ++i) {
             float d = abs(g1[i] - g2[i]);
             if (d > smax) smax = d;
@@ -1080,9 +1324,14 @@ void SpatialAnalyzer::ComposeAccumulatedFeatureFromFrameCache(Motion* m1, Motion
     pose_cache->valid = true;
 }
 
-void SpatialAnalyzer::VoxelizeMotionSegmentPresenceOnly(Motion* m, float time, std::vector<VoxelGrid>& seg_presence_grids) {
-    if (!m)
+void SpatialAnalyzer::BuildSegmentSparseBaseValues(Motion* m, float time, std::vector<std::vector<SparseVoxel>>& seg_sparse_values) {
+    if (!m || !m->body)
         return;
+
+    int num_segments = m->body->num_segments;
+    int size = grid_resolution * grid_resolution * grid_resolution;
+    seg_sparse_values.assign(num_segments, std::vector<SparseVoxel>());
+    std::vector<std::vector<int>> index_to_pos(num_segments, std::vector<int>(size, -1));
 
     FrameData frame_data;
     ComputeFrameData(m, time, frame_data);
@@ -1098,10 +1347,28 @@ void SpatialAnalyzer::VoxelizeMotionSegmentPresenceOnly(Motion* m, float time, s
     for (const BoneData& bone : bones) {
         if (!bone.valid)
             continue;
-        if (bone.segment_index < 0 || bone.segment_index >= (int)seg_presence_grids.size())
+        if (bone.segment_index < 0 || bone.segment_index >= num_segments)
             continue;
-        VoxelGrid& seg_pres_grid = seg_presence_grids[bone.segment_index];
-        WriteToVoxelGrid(bone, bone_radius, world_range, &seg_pres_grid, nullptr, nullptr, nullptr);
+        WriteToVoxelGrid(bone,
+            bone_radius,
+            world_range,
+            &seg_sparse_values[bone.segment_index],
+            &index_to_pos[bone.segment_index]);
+    }
+
+    for (int s = 0; s < num_segments; ++s) {
+        std::vector<SparseVoxel>& sparse = seg_sparse_values[s];
+        size_t write_pos = 0;
+        for (size_t k = 0; k < sparse.size(); ++k) {
+            sparse[k].values[4] = 0.0f;
+            float v0 = sparse[k].values[0];
+            float v1 = sparse[k].values[1];
+            float v2 = sparse[k].values[2];
+            float v3 = sparse[k].values[3];
+            if (v0 > sparse_threshold || v1 > sparse_threshold || v2 > sparse_threshold || v3 > sparse_threshold)
+                sparse[write_pos++] = sparse[k];
+        }
+        sparse.resize(write_pos);
     }
 }
 
@@ -1132,106 +1399,84 @@ void SpatialAnalyzer::VoxelizeMotionBySegmentGrids(Motion* m, float time,
     prepare(seg_inertia_grids);
     prepare(seg_principal_axis_grids);
 
-    FrameData frame_data;
-    ComputeFrameData(m, time, frame_data);
+    std::vector<std::vector<SparseVoxel>> curr_sparse_presence;
+    BuildSegmentSparseVoxels(m, time, curr_sparse_presence);
 
-    vector<BoneData> bones;
-    ExtractBoneData(m, frame_data, bones);
-
-    float bone_radius = 0.08f;
-    float world_range[3];
-
-    for (int i = 0; i < 3; ++i) 
-        world_range[i] = world_bounds[i][1] - world_bounds[i][0];
-
-    for (const BoneData& bone : bones) {
-        if (!bone.valid) 
-            continue;
-
-        if (bone.segment_index < 0 || bone.segment_index >= num_segments)
-            continue;
-
-        VoxelGrid& seg_pres_grid = seg_presence_grids[bone.segment_index];
-        VoxelGrid& seg_spd_grid = seg_speed_grids[bone.segment_index];
-        VoxelGrid& seg_jrk_grid = seg_jerk_grids[bone.segment_index];
-        VoxelGrid& seg_ine_grid = seg_inertia_grids[bone.segment_index];
-        WriteToVoxelGrid(bone, bone_radius, world_range, &seg_pres_grid, &seg_spd_grid, &seg_jrk_grid, &seg_ine_grid);
+    for (int s = 0; s < num_segments; ++s) {
+        VoxelGrid& seg_pres_grid = seg_presence_grids[s];
+        VoxelGrid& seg_spd_grid = seg_speed_grids[s];
+        VoxelGrid& seg_jrk_grid = seg_jerk_grids[s];
+        VoxelGrid& seg_pax_grid = seg_principal_axis_grids[s];
+        VoxelGrid& seg_ine_grid = seg_inertia_grids[s];
+        const std::vector<SparseVoxel>& sparse = curr_sparse_presence[s];
+        for (size_t k = 0; k < sparse.size(); ++k) {
+            int i = sparse[k].index;
+            seg_pres_grid.data[i] = sparse[k].values[0];
+            seg_spd_grid.data[i] = sparse[k].values[1];
+            seg_jrk_grid.data[i] = sparse[k].values[2];
+            seg_ine_grid.data[i] = sparse[k].values[3];
+            if (sparse[k].values[4] > seg_pax_grid.data[i])
+                seg_pax_grid.data[i] = sparse[k].values[4];
+        }
     }
+}
+
+void SpatialAnalyzer::BuildSegmentSparseVoxels(Motion* m, float time, std::vector<std::vector<SparseVoxel>>& seg_sparse_values) {
+    seg_sparse_values.clear();
+    if (!m || !m->body)
+        return;
+
+    int num_segments = m->body->num_segments;
+    BuildSegmentSparseBaseValues(m, time, seg_sparse_values);
 
     float prev_time = time - m->interval;
     if (prev_time < 0.0f)
         prev_time = 0.0f;
 
-    const std::vector<VoxelGrid>* prev_seg_presence_ptr = nullptr;
-    std::vector<VoxelGrid> prev_seg_presence;
+    const std::vector<std::vector<SparseVoxel>>* prev_sparse_ptr = nullptr;
+    std::vector<std::vector<SparseVoxel>> prev_sparse_presence;
 
     PrevPresenceCacheEntry* entry_for_motion = nullptr;
+    PrevPresenceCacheEntry* first_free_entry = nullptr;
     for (int ci = 0; ci < 2; ++ci) {
         PrevPresenceCacheEntry& e = prev_presence_cache_entries[ci];
         if (e.valid && e.motion == m) {
             entry_for_motion = &e;
             break;
         }
+        if (!e.valid && !first_free_entry)
+            first_free_entry = &e;
     }
 
     bool can_reuse_prev = false;
     if (entry_for_motion && entry_for_motion->valid) {
         float dt_err = fabsf((time - entry_for_motion->time) - m->interval);
         can_reuse_prev = dt_err <= 1e-4f &&
-                         entry_for_motion->num_segments == num_segments &&
-                         entry_for_motion->resolution == grid_resolution &&
-                         (int)entry_for_motion->seg_presence_grids.size() == num_segments;
+                         (int)entry_for_motion->seg_presence_sparse.size() == num_segments;
     }
 
     if (can_reuse_prev) {
-        prev_seg_presence_ptr = &entry_for_motion->seg_presence_grids;
+        prev_sparse_ptr = &entry_for_motion->seg_presence_sparse;
     } else {
-        prev_seg_presence.resize(num_segments);
-        for (int s = 0; s < num_segments; ++s) {
-            prev_seg_presence[s].Resize(grid_resolution);
-            prev_seg_presence[s].Clear();
-        }
-        VoxelizeMotionSegmentPresenceOnly(m, prev_time, prev_seg_presence);
-        prev_seg_presence_ptr = &prev_seg_presence;
+        BuildSegmentSparseBaseValues(m, prev_time, prev_sparse_presence);
+        prev_sparse_ptr = &prev_sparse_presence;
     }
 
-    for (int s = 0; s < num_segments; ++s) {
-        float omega_axis = sa_compute_principal_axis_angular_speed(
-            seg_presence_grids[s],
-            (*prev_seg_presence_ptr)[s],
-            m->interval,
-            world_bounds,
-            frame_data.curr_root_pos,
-            frame_data.prev_root_pos);
+    const float weight_threshold = sparse_threshold;
+    sa_apply_principal_axis_speed_to_sparse_segments(
+        seg_sparse_values,
+        *prev_sparse_ptr,
+        grid_resolution,
+        m->interval,
+        world_bounds,
+        weight_threshold);
 
-        if (omega_axis <= 0.0f)
-            continue;
-
-        VoxelGrid& curr_presence = seg_presence_grids[s];
-        VoxelGrid& seg_pax_grid = seg_principal_axis_grids[s];
-        int voxel_count = (int)curr_presence.data.size();
-        for (int i = 0; i < voxel_count; ++i) {
-            if (curr_presence.data[i] <= sparse_threshold)
-                continue;
-            if (omega_axis > seg_pax_grid.data[i])
-                seg_pax_grid.data[i] = omega_axis;
-        }
-    }
-
-    if (!entry_for_motion) {
-        for (int ci = 0; ci < 2; ++ci) {
-            if (!prev_presence_cache_entries[ci].valid) {
-                entry_for_motion = &prev_presence_cache_entries[ci];
-                break;
-            }
-        }
-    }
+    if (!entry_for_motion)
+        entry_for_motion = first_free_entry;
     if (!entry_for_motion)
         entry_for_motion = &prev_presence_cache_entries[0];
 
-    entry_for_motion->seg_presence_grids = seg_presence_grids;
-    entry_for_motion->num_segments = num_segments;
-    entry_for_motion->resolution = grid_resolution;
+    entry_for_motion->seg_presence_sparse = seg_sparse_values;
     entry_for_motion->motion = m;
     entry_for_motion->time = time;
     entry_for_motion->valid = true;
@@ -1255,6 +1500,10 @@ bool SpatialAnalyzer::SaveVoxelCache(const char* motion1_name, const char* motio
 
     const char* feature_file_prefixes[SA_FEATURE_COUNT] = {"acc", "spd_acc", "jrk_acc", "ine_acc", "pax_acc"};
     const char* segment_file_suffixes[SA_FEATURE_COUNT] = {"seg", "seg_spd", "seg_jrk", "seg_ine", "seg_pax"};
+    bool can_compose_segment_from_sparse = has_frame_cache && has_latest_accum_context &&
+        last_accum_motion1 && last_accum_motion2;
+    bool can_use_loaded_segment_dense_cache = has_loaded_segment_dense_cache;
+    bool can_save_segment_dense = can_compose_segment_from_sparse || can_use_loaded_segment_dense_cache;
     
     // 累積ボクセルデータを保存
     for (int f = 0; f < SA_FEATURE_COUNT; ++f) {
@@ -1264,11 +1513,43 @@ bool SpatialAnalyzer::SaveVoxelCache(const char* motion1_name, const char* motio
         if (!voxels_accumulated_diff[f].SaveToFile((base + "_" + prefix + "_diff.bin").c_str())) return false;
     }
 
-    // 部位ごとのボクセルデータを保存
-    for (int f = 0; f < SA_FEATURE_COUNT; ++f) {
-        std::string suffix = segment_file_suffixes[f];
-        if (!SaveSegmentVoxelGridsToFile(segment_voxels1[f], (base + "_" + suffix + "1.bin").c_str())) return false;
-        if (!SaveSegmentVoxelGridsToFile(segment_voxels2[f], (base + "_" + suffix + "2.bin").c_str())) return false;
+    // 部位ごとのボクセルデータを保存（利用可能な場合のみ）
+    if (can_save_segment_dense) {
+        for (int f = 0; f < SA_FEATURE_COUNT; ++f) {
+            std::string suffix = segment_file_suffixes[f];
+            std::vector<VoxelGrid> seg1_to_save;
+            std::vector<VoxelGrid> seg2_to_save;
+
+            if (can_compose_segment_from_sparse) {
+                if (!sa_compose_segment_feature_grids_from_frame_cache(
+                        last_accum_motion1,
+                        frame_cache1,
+                        f,
+                        grid_resolution,
+                        world_bounds,
+                        sparse_threshold,
+                        seg1_to_save)) {
+                    return false;
+                }
+                if (!sa_compose_segment_feature_grids_from_frame_cache(
+                        last_accum_motion2,
+                        frame_cache2,
+                        f,
+                        grid_resolution,
+                        world_bounds,
+                        sparse_threshold,
+                        seg2_to_save)) {
+                    return false;
+                }
+            }
+
+            const std::vector<VoxelGrid>& src1 = can_compose_segment_from_sparse ? seg1_to_save : segment_voxels1[f];
+            const std::vector<VoxelGrid>& src2 = can_compose_segment_from_sparse ? seg2_to_save : segment_voxels2[f];
+            if (!SaveSegmentVoxelGridsToFile(src1, (base + "_" + suffix + "1.bin").c_str())) return false;
+            if (!SaveSegmentVoxelGridsToFile(src2, (base + "_" + suffix + "2.bin").c_str())) return false;
+        }
+    } else {
+        std::cout << "Segment dense cache files were not written (sparse frame cache and loaded dense cache are both unavailable)." << std::endl;
     }
     
     // メタデータを保存
@@ -1281,6 +1562,7 @@ bool SpatialAnalyzer::SaveVoxelCache(const char* motion1_name, const char* motio
     meta_ofs << max_accumulated_val[1] << std::endl;
     meta_ofs << max_accumulated_val[2] << std::endl;
     meta_ofs << max_accumulated_val[3] << std::endl;
+    meta_ofs << (can_save_segment_dense ? 1 : 0) << std::endl;
     for (int i = 0; i < 3; ++i)
         meta_ofs << world_bounds[i][0] << " " << world_bounds[i][1] << std::endl;
     meta_ofs.close();
@@ -1310,12 +1592,46 @@ bool SpatialAnalyzer::LoadVoxelCache(const char* motion1_name, const char* motio
     meta_ifs >> max_accumulated_val[1];
     meta_ifs >> max_accumulated_val[2];
     meta_ifs >> max_accumulated_val[3];
+    std::vector<double> meta_tail_values;
+    double tail_value = 0.0;
+    while (meta_ifs >> tail_value)
+        meta_tail_values.push_back(tail_value);
+
+    int has_segment_dense_in_meta = 1;
+    size_t bounds_offset = 0;
+    if (meta_tail_values.size() >= 7) {
+        double flag = meta_tail_values[0];
+        if ((flag == 0.0 || flag == 1.0)) {
+            has_segment_dense_in_meta = (int)flag;
+            bounds_offset = 1;
+        }
+    }
+
+    if (meta_tail_values.size() < bounds_offset + 6) {
+        std::cout << "Invalid cache metadata format: " << base + "_meta.txt" << std::endl;
+        return false;
+    }
+
     max_accumulated_val[4] = 1.0f;
-    for (int i = 0; i < 3; ++i)
-        meta_ifs >> world_bounds[i][0] >> world_bounds[i][1];
+    for (int i = 0; i < 3; ++i) {
+        world_bounds[i][0] = (float)meta_tail_values[bounds_offset + i * 2 + 0];
+        world_bounds[i][1] = (float)meta_tail_values[bounds_offset + i * 2 + 1];
+    }
     meta_ifs.close();
     
     ResizeGrids(res);
+    frame_cache1.Clear();
+    frame_cache2.Clear();
+    has_frame_cache = false;
+    last_instant_motion1 = nullptr;
+    last_instant_motion2 = nullptr;
+    last_instant_time = 0.0f;
+    last_accum_motion1 = nullptr;
+    last_accum_motion2 = nullptr;
+    has_latest_instant_context = false;
+    has_latest_accum_context = false;
+    has_loaded_segment_dense_cache = false;
+    segment_cache_dirty = true;
     
     // ファイル読み込み用ラムダ
     auto loadFile = [](VoxelGrid& grid, const std::string& file) -> bool {
@@ -1342,11 +1658,28 @@ bool SpatialAnalyzer::LoadVoxelCache(const char* motion1_name, const char* motio
         if (!loadFile(voxels_accumulated_diff[f], base + "_" + prefix + "_diff.bin")) return false;
     }
 
-    // 部位ごとのボクセルデータを読み込み
-    for (int f = 0; f < SA_FEATURE_COUNT; ++f) {
-        std::string suffix = segment_file_suffixes[f];
-        if (!loadSegmentFile(segment_voxels1[f], base + "_" + suffix + "1.bin")) return false;
-        if (!loadSegmentFile(segment_voxels2[f], base + "_" + suffix + "2.bin")) return false;
+    // 部位ごとのボクセルデータを読み込み（無ければ累積のみで継続）
+    bool segment_dense_loaded = (has_segment_dense_in_meta != 0);
+    if (segment_dense_loaded) {
+        for (int f = 0; f < SA_FEATURE_COUNT; ++f) {
+            std::string suffix = segment_file_suffixes[f];
+            if (!loadSegmentFile(segment_voxels1[f], base + "_" + suffix + "1.bin") ||
+                !loadSegmentFile(segment_voxels2[f], base + "_" + suffix + "2.bin")) {
+                segment_dense_loaded = false;
+                break;
+            }
+        }
+    }
+
+    if (!segment_dense_loaded) {
+        for (int f = 0; f < SA_FEATURE_COUNT; ++f) {
+            segment_voxels1[f].clear();
+            segment_voxels2[f].clear();
+        }
+        has_loaded_segment_dense_cache = false;
+        std::cout << "Segment dense cache files are unavailable. Continuing with accumulated-only cache." << std::endl;
+    } else {
+        has_loaded_segment_dense_cache = true;
     }
 
     max_accumulated_val[4] = 0.0f;
@@ -1833,8 +2166,7 @@ void SpatialAnalyzer::ComputeAABB(const Point3f& p1, const Point3f& p2, float ra
 
 // ボーンの影響をガウス分布で重み付けしてボクセルグリッドに書き込み
 void SpatialAnalyzer::WriteToVoxelGrid(const BoneData& bone, float bone_radius, const float world_range[3],
-                                        VoxelGrid* occ_grid, VoxelGrid* spd_grid, VoxelGrid* jrk_grid, VoxelGrid* ine_grid,
-                                        std::vector<int>* touched_indices, std::vector<unsigned char>* touched_marks) {
+                                        std::vector<SparseVoxel>* occ_sparse_values, std::vector<int>* occ_index_to_pos) {
     if (!bone.valid) 
         return;
     
@@ -1866,39 +2198,30 @@ void SpatialAnalyzer::WriteToVoxelGrid(const BoneData& bone, float bone_radius, 
                 float dist_sq = pow(voxel_center.x - closest.x, 2.0) + pow(voxel_center.y - closest.y, 2.0) + pow(voxel_center.z - closest.z, 2.0);
 
                 if (dist_sq < radius_sq) {                
-                    if (occ_grid) {
-                        float presence = exp(-dist_sq / sigma_sq);
-                        occ_grid->At(x, y, z) += presence;
-                    }
-                    
-                    if (spd_grid) {
-                        float s_interp = (1.0f - k_clamped) * bone.speed1 + k_clamped * bone.speed2;
-                        float& current_spd = spd_grid->At(x, y, z);
-                        if (s_interp > current_spd) 
-                            current_spd = s_interp;
-                    }
-                    
-                    if (jrk_grid) {
-                        float j_interp = (1.0f - k_clamped) * bone.jerk1 + k_clamped * bone.jerk2;
-                        float& current_jrk = jrk_grid->At(x, y, z);
-                        if (j_interp > current_jrk) 
-                            current_jrk = j_interp;
-                    }
+                    int idx = x + y * grid_resolution + z * grid_resolution * grid_resolution;
+                    float s_interp = (1.0f - k_clamped) * bone.speed1 + k_clamped * bone.speed2;
+                    float j_interp = (1.0f - k_clamped) * bone.jerk1 + k_clamped * bone.jerk2;
+                    float i_interp = (1.0f - k_clamped) * bone.inertia1 + k_clamped * bone.inertia2;
 
-                    if (ine_grid) {
-                        float i_interp = (1.0f - k_clamped) * bone.inertia1 + k_clamped * bone.inertia2;
-                        float& current_ine = ine_grid->At(x, y, z);
-                        if (i_interp > current_ine) 
-                            current_ine = i_interp;
-                    }
-
-                    if (touched_indices && touched_marks) {
-                        int idx = x + y * grid_resolution + z * grid_resolution * grid_resolution;
-                        if (idx >= 0 && idx < (int)touched_marks->size() && !(*touched_marks)[idx]) {
-                            (*touched_marks)[idx] = 1;
-                            touched_indices->push_back(idx);
+                    if (occ_sparse_values && occ_index_to_pos) {
+                        if (idx >= 0 && idx < (int)occ_index_to_pos->size()) {
+                            float presence = exp(-dist_sq / sigma_sq);
+                            int pos = (*occ_index_to_pos)[idx];
+                            if (pos < 0) {
+                                (*occ_index_to_pos)[idx] = (int)occ_sparse_values->size();
+                                occ_sparse_values->push_back(SparseVoxel(idx, presence, s_interp, j_interp, i_interp, 0.0f));
+                            } else {
+                                (*occ_sparse_values)[pos].values[0] += presence;
+                                if (s_interp > (*occ_sparse_values)[pos].values[1])
+                                    (*occ_sparse_values)[pos].values[1] = s_interp;
+                                if (j_interp > (*occ_sparse_values)[pos].values[2])
+                                    (*occ_sparse_values)[pos].values[2] = j_interp;
+                                if (i_interp > (*occ_sparse_values)[pos].values[3])
+                                    (*occ_sparse_values)[pos].values[3] = i_interp;
+                            }
                         }
                     }
+
                 }
             }
         }
@@ -2004,11 +2327,93 @@ void SpatialAnalyzer::UpdateSegmentCache() {
     if (feature < 0 || feature >= SA_FEATURE_COUNT)
         feature = 0;
 
+    if (norm_mode == 0 &&
+        has_frame_cache &&
+        has_latest_instant_context &&
+        sa_compose_selected_segments_instant_from_frame_cache(
+            last_instant_motion1,
+            last_instant_motion2,
+            frame_cache1,
+            frame_cache2,
+            feature,
+            grid_resolution,
+            world_bounds,
+            sparse_threshold,
+            last_instant_time,
+            selected_segments,
+            selected_segment_index,
+            cached_segment_grid1,
+            cached_segment_grid2,
+            cached_segment_diff,
+            cached_segment_max_val)) {
+        segment_cache_dirty = false;
+        cached_feature_mode = feature_mode;
+        cached_norm_mode = norm_mode;
+        cached_selected_segment_index = selected_segment_index;
+        cached_selected_segments = selected_segments;
+        return;
+    }
+
+    if (norm_mode == 1 &&
+        has_frame_cache &&
+        has_latest_accum_context &&
+        sa_compose_selected_segments_accumulated_from_frame_cache(
+            last_accum_motion1,
+            last_accum_motion2,
+            frame_cache1,
+            frame_cache2,
+            feature,
+            grid_resolution,
+            world_bounds,
+            sparse_threshold,
+            selected_segments,
+            selected_segment_index,
+            cached_segment_grid1,
+            cached_segment_grid2,
+            cached_segment_diff,
+            cached_segment_max_val)) {
+        segment_cache_dirty = false;
+        cached_feature_mode = feature_mode;
+        cached_norm_mode = norm_mode;
+        cached_selected_segment_index = selected_segment_index;
+        cached_selected_segments = selected_segments;
+        return;
+    }
+
+    if (norm_mode != 1) {
+        cached_segment_max_val = 1.0f;
+        segment_cache_dirty = false;
+        cached_feature_mode = feature_mode;
+        cached_norm_mode = norm_mode;
+        cached_selected_segment_index = selected_segment_index;
+        cached_selected_segments = selected_segments;
+        return;
+    }
+
+    if (!has_loaded_segment_dense_cache) {
+        cached_segment_max_val = 1.0f;
+        segment_cache_dirty = false;
+        cached_feature_mode = feature_mode;
+        cached_norm_mode = norm_mode;
+        cached_selected_segment_index = selected_segment_index;
+        cached_selected_segments = selected_segments;
+        return;
+    }
+
     // 特徴量に応じたデータソース選択（互換用密グリッド）
     const std::vector<VoxelGrid>& seg_data1 = segment_voxels1[feature];
     const std::vector<VoxelGrid>& seg_data2 = segment_voxels2[feature];
 
-    if (seg_data1.empty()) {
+    if (!sa_compose_selected_segments_from_dense_grids(
+        seg_data1,
+        seg_data2,
+        grid_resolution,
+        selected_segments,
+        selected_segment_index,
+        cached_segment_grid1,
+        cached_segment_grid2,
+        cached_segment_diff,
+        cached_segment_max_val)) {
         segment_cache_dirty = false;
         cached_feature_mode = feature_mode;
         cached_norm_mode = norm_mode;
@@ -2016,57 +2421,7 @@ void SpatialAnalyzer::UpdateSegmentCache() {
         cached_selected_segments = selected_segments;
         return;
     }
-    
-    int size = grid_resolution * grid_resolution * grid_resolution;
-    cached_segment_max_val = 0.0f;
-    
-    // 表示対象部位のリストを作成
-    std::vector<int> active_segments;
-    for (size_t s = 0; s < selected_segments.size(); ++s)
-        if (selected_segments[s])
-            active_segments.push_back((int)s);
-    
-    // ナビゲート中の部位も追加
-    if (selected_segment_index >= 0 && 
-        selected_segment_index < (int)selected_segments.size() &&
-        !selected_segments[selected_segment_index])
-        active_segments.push_back(selected_segment_index);
-    
-    if (active_segments.empty()) {
-        segment_cache_dirty = false;
-        cached_feature_mode = feature_mode;
-        cached_norm_mode = norm_mode;
-        cached_selected_segment_index = selected_segment_index;
-        cached_selected_segments = selected_segments;
-        return;
-    }
-    
-    // 選択部位のボクセルを集約
-    for (int i = 0; i < size; ++i) {
-        float val1 = 0.0f, val2 = 0.0f;
-        
-        for (int s : active_segments) {
-            if (s >= 0 && s < (int)seg_data1.size()) {
-                float v = seg_data1[s].data[i];
-                if (v > val1) val1 = v;
-            }
-            if (s >= 0 && s < (int)seg_data2.size()) {
-                float v = seg_data2[s].data[i];
-                if (v > val2) val2 = v;
-            }
-        }
-        
-        cached_segment_grid1.data[i] = val1;
-        cached_segment_grid2.data[i] = val2;
-        float diff = abs(val1 - val2);
-        cached_segment_diff.data[i] = diff;
-        if (diff > cached_segment_max_val) 
-            cached_segment_max_val = diff;
-    }
-    
-    if (cached_segment_max_val < 1e-5f) 
-        cached_segment_max_val = 1.0f;
-    
+
     segment_cache_dirty = false;
     cached_feature_mode = feature_mode;
     cached_norm_mode = norm_mode;

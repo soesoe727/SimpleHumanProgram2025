@@ -62,12 +62,6 @@ public:
 	// 累積ボクセルデータ（必要に応じて追加）
 	VoxelGrid voxels1_accumulated[SA_FEATURE_COUNT], voxels2_accumulated[SA_FEATURE_COUNT], voxels_accumulated_diff[SA_FEATURE_COUNT]; // 0:占有率, 1:速度, 2:ジャーク, 3:慣性モーメント, 4:慣性主軸角速度
     
-    // Motion1 部位ごとの互換用密グリッド（内部はフレーム疎キャッシュから再合成）
-    std::vector<VoxelGrid> segment_voxels1[SA_FEATURE_COUNT]; // 0:占有率, 1:速度, 2:ジャーク, 3:慣性モーメント, 4:慣性主軸角速度
-
-  // Motion2 部位ごとの互換用密グリッド（内部はフレーム疎キャッシュから再合成）
-    std::vector<VoxelGrid> segment_voxels2[SA_FEATURE_COUNT]; // 0:占有率, 1:速度, 2:ジャーク, 3:慣性モーメント, 4:慣性主軸角速度
-
     // フレーム単位の疎ボクセルキャッシュ
     MotionFrameSegmentVoxelGridCache frame_cache1;
     MotionFrameSegmentVoxelGridCache frame_cache2;
@@ -213,21 +207,28 @@ public:
     void UpdateSegmentCache();                          // キャッシュを更新
 
 private:
+    // 互換用密グリッド（読み込み互換や限定フォールバック用途）
+    std::vector<VoxelGrid> segment_voxels1[SA_FEATURE_COUNT];
+    std::vector<VoxelGrid> segment_voxels2[SA_FEATURE_COUNT];
+
+    const Motion* last_instant_motion1;
+    const Motion* last_instant_motion2;
+    float last_instant_time;
+    bool has_latest_instant_context;
+    const Motion* last_accum_motion1;
+    const Motion* last_accum_motion2;
+    bool has_latest_accum_context;
+    bool has_loaded_segment_dense_cache;
+
     struct PrevPresenceCacheEntry {
         const Motion* motion;
         float time;
-        std::vector<VoxelGrid> seg_presence_grids;
-        int num_segments;
-        int resolution;
+        std::vector<std::vector<SparseVoxel>> seg_presence_sparse;
         bool valid;
 
-        PrevPresenceCacheEntry() : motion(nullptr), time(0.0f), num_segments(0), resolution(0), valid(false) {}
+        PrevPresenceCacheEntry() : motion(nullptr), time(0.0f), valid(false) {}
     };
 
-    // VoxelizeMotion用の再利用バッファ（毎フレームの再確保を回避）
-    std::vector<VoxelGrid> temp_voxelize_seg[SA_FEATURE_COUNT]; // 0:占有率, 1:速度, 2:ジャーク, 3:慣性モーメント, 4:慣性主軸角速度
-    int temp_voxelize_num_segments;
-    int temp_voxelize_resolution;
     PrevPresenceCacheEntry prev_presence_cache_entries[2];
 
     // 回転スライス用のヘルパー
@@ -244,9 +245,9 @@ private:
     void ComputeAABB(const Point3f& p1, const Point3f& p2, float radius, 
                      int idx_min[3], int idx_max[3], const float world_range[3]);
     void WriteToVoxelGrid(const BoneData& bone, float bone_radius, const float world_range[3],
-                          VoxelGrid* occ_grid, VoxelGrid* spd_grid, VoxelGrid* jrk_grid = nullptr, VoxelGrid* ine_grid = nullptr,
-                          std::vector<int>* touched_indices = nullptr, std::vector<unsigned char>* touched_marks = nullptr);
+                          std::vector<SparseVoxel>* occ_sparse_values, std::vector<int>* occ_index_to_pos);
+    void BuildSegmentSparseBaseValues(Motion* m, float time, std::vector<std::vector<SparseVoxel>>& seg_sparse_values);
+    void BuildSegmentSparseVoxels(Motion* m, float time, std::vector<std::vector<SparseVoxel>>& seg_sparse_values);
     void BuildSingleMotionFeatureFrameCache(Motion* m, MotionFrameSegmentVoxelGridCache& cache);
-    bool ComposeInstantFeatureFromFrameCache(Motion* m1, Motion* m2, int feature, float current_time, bool compose_segment_data);
-    void VoxelizeMotionSegmentPresenceOnly(Motion* m, float time, std::vector<VoxelGrid>& seg_presence_grids);
+    bool ComposeInstantFeatureFromFrameCache(Motion* m1, Motion* m2, int feature, float current_time);
 };
