@@ -288,11 +288,8 @@ static bool sa_world_to_voxel_index(const Point3f& p, int resolution, const floa
     return x >= 0 && x < resolution && y >= 0 && y < resolution && z >= 0 && z < resolution;
 }
 
-static Point3f sa_transform_world_by_root_delta(const Point3f& world_pos,
-                                                const Point3f& from_root_pos,
-                                                const Matrix3f& from_root_ori,
-                                                const Point3f& to_root_pos,
-                                                const Matrix3f& to_root_ori) {
+static Point3f sa_transform_world_by_root_delta(const Point3f& world_pos, const Point3f& from_root_pos,
+    const Matrix3f& from_root_ori, const Point3f& to_root_pos, const Matrix3f& to_root_ori) {
     float dx = world_pos.x - from_root_pos.x;
     float dy = world_pos.y - from_root_pos.y;
     float dz = world_pos.z - from_root_pos.z;
